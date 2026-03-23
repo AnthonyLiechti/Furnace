@@ -1852,9 +1852,103 @@ function renderCompleted() {
 }
 
 /* ── RENDER: SETTINGS ── */
+/* ── SPARK AUTH STATE ── */
+var sparkAuth = { connected: false, email: null };
+
+async function sparkCheckStatus() {
+  if (!window.furnaceAPI || !window.furnaceAPI.sparkGetStatus) return;
+  var status = await window.furnaceAPI.sparkGetStatus();
+  sparkAuth.connected = status.connected;
+  sparkAuth.email = status.email || null;
+}
+
+async function sparkLogin() {
+  var email = document.getElementById('spark-email').value.trim();
+  var pw = document.getElementById('spark-password').value;
+  if (!email || !pw) return;
+  var btn = document.getElementById('spark-connect-btn');
+  var msg = document.getElementById('spark-msg');
+  btn.disabled = true;
+  btn.textContent = 'Connecting…';
+  msg.textContent = '';
+  var result = await window.furnaceAPI.sparkLogin(email, pw);
+  if (result.ok) {
+    sparkAuth.connected = true;
+    sparkAuth.email = result.email;
+    renderSettings();
+  } else {
+    msg.textContent = result.error || 'Login failed';
+    msg.style.color = 'var(--ember)';
+    btn.disabled = false;
+    btn.textContent = 'Connect';
+  }
+}
+
+async function sparkLogout() {
+  await window.furnaceAPI.sparkLogout();
+  sparkAuth.connected = false;
+  sparkAuth.email = null;
+  renderSettings();
+}
+
+/* ── SPARK FETCH HELPER ── */
+var sparkConfig = null;
+
+async function sparkFetch(table, query, method, body) {
+  if (!sparkConfig) sparkConfig = await window.furnaceAPI.sparkReadConfig();
+  if (!sparkConfig) return null;
+  var token = await window.furnaceAPI.sparkGetToken();
+  if (!token) return null;
+  var url = sparkConfig.supabaseUrl + '/rest/v1/' + table + (query ? '?' + query : '');
+  var opts = {
+    method: method || 'GET',
+    headers: {
+      'apikey': sparkConfig.supabaseAnonKey,
+      'Authorization': 'Bearer ' + token,
+      'Content-Type': 'application/json',
+      'Prefer': method === 'PATCH' || method === 'POST' ? 'return=representation' : 'return=minimal',
+    },
+  };
+  if (body) opts.body = JSON.stringify(body);
+  try {
+    var resp = await fetch(url, opts);
+    if (!resp.ok) { console.error('Spark fetch error', resp.status, await resp.text()); return null; }
+    var text = await resp.text();
+    return text ? JSON.parse(text) : true;
+  } catch (err) { console.error('Spark fetch exception', err); return null; }
+}
+
 function renderSettings() {
   var h = '<h1 class="page-title">Settings</h1>';
-  h += '<p class="page-subtitle">Configure hourly rates per client for revenue calculations</p>';
+  h += '<p class="page-subtitle">Configure rates and integrations</p>';
+
+  /* ── Spark Connection Card ── */
+  h += '<div class="section-title" style="margin-top:4px">⚡ Spark Connection</div>';
+  h += '<div class="snapshot-banner" style="margin-bottom:24px">';
+  if (sparkAuth.connected) {
+    h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">';
+    h += '<div style="width:10px;height:10px;border-radius:50%;background:#81C784"></div>';
+    h += '<div style="font-size:14px;font-weight:600">Connected to Spark</div>';
+    h += '</div>';
+    h += '<div style="font-size:12px;opacity:.6;margin-bottom:14px">Signed in as ' + sparkAuth.email + '</div>';
+    h += '<button onclick="sparkLogout()" style="padding:6px 16px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:transparent;color:var(--ember);cursor:pointer;font-size:12px">Disconnect</button>';
+  } else {
+    h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">';
+    h += '<div style="width:10px;height:10px;border-radius:50%;background:var(--ember)"></div>';
+    h += '<div style="font-size:14px;font-weight:600">Not Connected</div>';
+    h += '</div>';
+    h += '<div style="font-size:12px;opacity:.6;margin-bottom:14px">Sign in with your Spark email and password to pull live budget data.</div>';
+    h += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
+    h += '<input type="email" id="spark-email" placeholder="Email" style="padding:7px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:var(--white);font-size:13px;width:200px">';
+    h += '<input type="password" id="spark-password" placeholder="Password" style="padding:7px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:var(--white);font-size:13px;width:180px" onkeydown="if(event.key===\'Enter\')sparkLogin()">';
+    h += '<button id="spark-connect-btn" onclick="sparkLogin()" style="padding:7px 18px;border-radius:6px;border:none;background:var(--ocean);color:var(--white);cursor:pointer;font-size:13px;font-weight:600">Connect</button>';
+    h += '</div>';
+    h += '<div id="spark-msg" style="font-size:12px;margin-top:8px;min-height:16px"></div>';
+  }
+  h += '</div>';
+
+  /* ── Client Rates ── */
+  h += '<div class="section-title">Client Hourly Rates</div>';
   h += '<div class="settings-grid">';
   for (var i = 0; i < CLIENTS.length; i++) {
     var c = CLIENTS[i];
@@ -3081,6 +3175,9 @@ async function loadData() {
         console.warn('Could not load native allocations:', ae);
       }
     }
+
+    /* Check Spark connection status */
+    await sparkCheckStatus();
 
     navigate('master');
   } catch(e) {
