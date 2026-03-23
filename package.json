@@ -1,0 +1,16 @@
+{
+  "name": "furnace",
+  "version": "1.0.0",
+  "description": "Forge Portfolio Tracker — internal dashboard for project budgets, hours, and resource allocation",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pull-data": "node scripts/pull-data.js"
+  },
+  "author": "Forge Media Group",
+  "license": "UNLICENSED",
+  "private": true,
+  "devDependencies": {
+    "electron": "^33.0.0"
+  }
+}

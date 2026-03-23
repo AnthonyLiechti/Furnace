@@ -1,0 +1,162 @@
+{
+  "version": 1,
+  "weeks": [
+    {
+      "weekOf": "2026-03-16",
+      "label": "Week 12 - March 16-20, 2026",
+      "importedFrom": "Times Explorer 2026-03-22.xlsx",
+      "importedAt": "2026-03-22T13:51:53",
+      "people": {
+        "Anthony Liechti": {
+          "projects": {
+            "CE S5 \u2014 Development": 2.5,
+            "Internal Meetings and Skill Development": 16.75,
+            "NEGU Gala Video": 1.0,
+            "Olson Superior Marketing": 2.5,
+            "Provider Testimonials (Erin Rose)": 1.0,
+            "SBW Brand Blitz": 5.5,
+            "Synchrony Organic Social Q2 2026": 15.25,
+            "Yardtopia Summer Campaign": 0.25
+          }
+        },
+        "Brett Yamaoka": {
+          "projects": {
+            "Internal Meetings and Skill Development": 3.92,
+            "OSP Rebrand": 0.5,
+            "Olson Superior Marketing": 12.42,
+            "Provider Testimonial - Audacity": 1.08,
+            "Synchrony Organic Social Q2 2026": 4.92,
+            "Yardtopia Website Refresh": 16.67
+          }
+        },
+        "Christian Lau": {
+          "projects": {
+            "Internal Meetings and Skill Development": 3.5,
+            "Synchrony Organic Social Q1 2026": 2.0,
+            "Synchrony Organic Social Q2 2026": 25.5,
+            "Synchrony Small Projects": 7.5,
+            "Time Off": 8.5
+          }
+        },
+        "Dave MacLeod": {
+          "projects": {
+            "NEGU Brand Guide": 2.5,
+            "Non-Billable (Private)": 19.5,
+            "Olson Superior Marketing": 6.0,
+            "Yardtopia Summer Campaign": 2.5
+          }
+        },
+        "Emily Spradley": {
+          "projects": {
+            "Internal Meetings and Skill Development": 4.5,
+            "Provider Testimonial - Audacity": 1.0,
+            "Provider Testimonial - CES4 Extras": 2.5,
+            "Provider Testimonials (Erin Rose)": 0.5,
+            "Rattlesnake Reservoir Videos": 1.25,
+            "Yardtopia Spring Campaign": 2.0,
+            "Yardtopia Summer Campaign": 1.5,
+            "Yardtopia Website Refresh": 26.75
+          }
+        },
+        "Emma": {
+          "projects": {
+            "Antonio Well U Shorts": 1.75,
+            "CE S5 \u2014 Development": 1.25,
+            "CES4 Social Media Post": 9.0,
+            "CareCredit Organic Social Strategy": 4.25,
+            "Internal Meetings and Skill Development": 1.0,
+            "New Opportunities": 0.5,
+            "Small Projects": 3.0,
+            "Synchrony Organic Social Q2 2026": 25.5
+          }
+        },
+        "Evan Figueroa": {
+          "projects": {
+            "Olson Superior Marketing": 3.5
+          }
+        },
+        "Grace Donovan": {
+          "projects": {
+            "CES4 Social Media Post": 4.17,
+            "Internal Meetings and Skill Development": 6.0,
+            "NEGU Gala Video": 1.0,
+            "Olson Superior Marketing": 6.83,
+            "Rattlesnake Reservoir Videos": 11.75,
+            "Small Projects": 10.42
+          }
+        },
+        "Jeff Butcher": {
+          "projects": {
+            "CE S5 \u2014 Development": 0.75,
+            "Internal Meetings and Skill Development": 1.0,
+            "NEGU Gala Video": 0.25,
+            "Non-Billable (Private)": 28.25,
+            "Olson Superior Marketing": 0.5,
+            "SBW Brand Blitz": 9.75,
+            "Synchrony Organic Social Q1 2026": 14.58
+          }
+        },
+        "Jeff Cole": {
+          "projects": {
+            "NEGU Gala Video": 0.5,
+            "Non-Billable (Private)": 0.5,
+            "Synchrony Organic Social Q1 2026": 11.5,
+            "Synchrony Small Projects": 1.5
+          }
+        },
+        "Jordan Pereira": {
+          "projects": {
+            "Internal Meetings and Skill Development": 5.67,
+            "Synchrony Organic Social Q2 2026": 28.33,
+            "Synchrony Small Projects": 4.0,
+            "Yardtopia Summer Campaign": 2.75
+          }
+        },
+        "Kirk Crockett": {
+          "projects": {
+            "CES4 Post": 1.0,
+            "Internal Meetings and Skill Development": 3.25,
+            "Olson Superior Marketing": 22.25,
+            "Provider Testimonial - Audacity": 0.5,
+            "Provider Testimonial - CES4 Extras": 0.5,
+            "SBW Brand Blitz": 8.5,
+            "Synchrony Small Projects": 2.0
+          }
+        },
+        "Lexi Golden": {
+          "projects": {
+            "Antonio Well U Shorts": 9.5,
+            "CE S5 \u2014 Development": 1.75,
+            "CES4 Post": 2.25,
+            "Internal Meetings and Skill Development": 4.0,
+            "New Opportunities": 2.5,
+            "SBW Brand Blitz": 17.5,
+            "Small Projects": 1.5,
+            "Well U Embedded Vertical Shorts 2026": 0.25
+          }
+        },
+        "Rae": {
+          "projects": {
+            "Internal Meetings and Skill Development": 0.5,
+            "New Opportunities": 0.25,
+            "Synchrony Organic Social Q1 2026": 1.0,
+            "Synchrony Organic Social Q2 2026": 31.0,
+            "Synchrony Small Projects": 1.25
+          }
+        },
+        "Richelle Butcher": {
+          "projects": {
+            "Synchrony Organic Social Q2 2026": 10.0
+          }
+        },
+        "Trevor": {
+          "projects": {
+            "Internal Meetings and Skill Development": 2.0,
+            "Yardtopia Website Refresh": 5.0
+          }
+        }
+      }
+    }
+  ],
+  "lastImport": "2026-03-22T13:51:53"
+}

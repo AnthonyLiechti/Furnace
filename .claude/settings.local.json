@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(SRC=\"/Users/anthonyliechti/Library/Application Support/Claude/local-agent-mode-sessions/e624101e-a73c-4924-8ebf-e499786fa338/279a2f0e-bb86-427b-b91b-81eb31e8cb89/local_1063d159-afec-42ab-9889-99c358908a3a/outputs/forge-portfolio-tracker\")",
+      "Bash(DEST=\"/Users/anthonyliechti/Documents/Furnace\")",
+      "Bash(cp \"$SRC/index.html\" \"$DEST/\")",
+      "Bash(cp \"$SRC/.gitignore\" \"$DEST/\")",
+      "Bash(cp \"$SRC/.env.example\" \"$DEST/\")",
+      "Bash(npm install:*)",
+      "Read(//opt/homebrew/bin/**)",
+      "Read(//Users/anthonyliechti/Documents/Furnace/$HOME/.nvm/versions/**)",
+      "Read(//Users/anthonyliechti/Documents/Furnace/$HOME/.volta/**)",
+      "Bash(brew --prefix)",
+      "Read(//opt/homebrew/opt/**)",
+      "Bash(brew list:*)",
+      "Bash(/opt/homebrew/bin/brew install:*)",
+      "Bash(/opt/homebrew/bin/npm install:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

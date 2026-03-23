@@ -1,0 +1,42 @@
+name: Daily Data Pull
+
+on:
+  schedule:
+    # Run at 6:00 PM Pacific (1:00 AM UTC next day) every weekday
+    - cron: '0 1 * * 2-6'
+  workflow_dispatch:
+    # Allow manual trigger from GitHub Actions UI
+
+permissions:
+  contents: write
+
+jobs:
+  pull-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Pull latest data from Monday.com
+        env:
+          MONDAY_API_KEY: ${{ secrets.MONDAY_API_KEY }}
+        run: node scripts/pull-data.js
+
+      - name: Check for changes
+        id: changes
+        run: |
+          git diff --quiet data/portfolio.json && echo "changed=false" >> $GITHUB_OUTPUT || echo "changed=true" >> $GITHUB_OUTPUT
+
+      - name: Commit and push updated data
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config user.name "Forge Data Bot"
+          git config user.email "bot@createdbyforge.com"
+          git add data/portfolio.json
+          git commit -m "chore: update portfolio data $(date +'%Y-%m-%d %H:%M')"
+          git push

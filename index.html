@@ -1,0 +1,3095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Furnace — Forge Portfolio Tracker</title>
+<style>
+:root {
+  --black: #000000; --canvas: #D6D1CA; --abyss: #184047;
+  --ocean: #306D7C; --sand: #DAC38E; --honey: #E3A65E;
+  --ember: #CE7338; --white: #FFFFFF; --light-gray: #F5F3F0;
+  --mid-gray: #8A8580; --dark-canvas: #B8B3AC;
+  --sidebar-w: 260px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: Arial, 'TT Hoves Pro', sans-serif; background: var(--light-gray); color: var(--black); display:flex; min-height:100vh; }
+
+/* Sidebar */
+.sidebar { width: var(--sidebar-w); background: var(--abyss); color: var(--white); position:fixed; top:0; left:0; bottom:0; overflow-y:auto; z-index:10; display:flex; flex-direction:column; }
+.sidebar-header { padding:20px 16px 12px; border-bottom:1px solid rgba(255,255,255,.15); }
+.sidebar-header h2 { font-size:16px; letter-spacing:1px; text-transform:uppercase; color:var(--sand); }
+.sidebar-header p { font-size:11px; color:rgba(255,255,255,.5); margin-top:4px; }
+.sidebar-nav { flex:1; padding:8px 0; }
+.nav-item { padding:10px 16px; cursor:pointer; font-size:13px; transition:background .15s; display:flex; align-items:center; gap:8px; }
+.nav-item:hover { background:rgba(255,255,255,.08); }
+.nav-item.active { background:rgba(255,255,255,.12); border-left:3px solid var(--sand); }
+.nav-item .icon { width:18px; text-align:center; flex-shrink:0; }
+.client-group { margin:4px 0; }
+.client-header { padding:8px 16px; cursor:pointer; font-size:13px; font-weight:700; color:var(--sand); display:flex; align-items:center; gap:8px; user-select:none; }
+.client-header:hover { background:rgba(255,255,255,.05); }
+.client-header .arrow { transition:transform .2s; font-size:10px; }
+.client-header .arrow.open { transform:rotate(90deg); }
+.client-projects { display:none; }
+.client-projects.open { display:block; }
+.client-projects .nav-item { padding-left:36px; font-size:12px; color:rgba(255,255,255,.75); line-height:1.3; }
+.client-projects .nav-item.active { color:var(--white); }
+.client-projects .nav-item .proj-code { font-size:9px; color:rgba(255,255,255,.35); display:block; margin-bottom:1px; font-family:monospace; letter-spacing:.3px; }
+.client-projects .nav-item.active .proj-code { color:rgba(255,255,255,.55); }
+.nav-divider { height:1px; background:rgba(255,255,255,.1); margin:8px 16px; }
+
+/* Toggle */
+.toggle-bar { padding:10px 16px; border-top:1px solid rgba(255,255,255,.15); }
+.toggle-wrap { display:flex; background:rgba(0,0,0,.3); border-radius:6px; overflow:hidden; }
+.toggle-btn { flex:1; padding:6px 0; text-align:center; font-size:11px; cursor:pointer; transition:background .15s, color .15s; color:rgba(255,255,255,.5); }
+.toggle-btn.active { background:var(--ocean); color:var(--white); }
+
+/* Main */
+.main { margin-left: var(--sidebar-w); flex:1; padding:28px 32px; }
+.page-title { font-size:22px; font-weight:700; color:var(--abyss); margin-bottom:4px; }
+.page-subtitle { font-size:13px; color:var(--mid-gray); margin-bottom:24px; }
+
+/* Stats Row */
+.stats-row { display:grid; grid-template-columns:repeat(auto-fit, minmax(170px,1fr)); gap:14px; margin-bottom:28px; }
+.stat-card { background:var(--white); border-radius:10px; padding:16px 18px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+.stat-card .label { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--mid-gray); margin-bottom:6px; }
+.stat-card .value { font-size:22px; font-weight:700; color:var(--abyss); }
+.stat-card .sub { font-size:11px; color:var(--mid-gray); margin-top:2px; }
+
+/* Project Cards */
+.card-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(320px,1fr)); gap:16px; margin-bottom:28px; }
+.project-card { background:var(--white); border-radius:10px; padding:18px; box-shadow:0 1px 4px rgba(0,0,0,.06); cursor:pointer; transition:box-shadow .15s, transform .1s; border-left:4px solid var(--ocean); }
+.project-card:hover { box-shadow:0 4px 12px rgba(0,0,0,.1); transform:translateY(-1px); }
+.project-card .card-client { font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--mid-gray); margin-bottom:4px; }
+.project-card .card-title { font-size:15px; font-weight:700; color:var(--abyss); margin-bottom:10px; }
+.project-card .card-code { font-size:11px; color:var(--mid-gray); }
+.progress-bar-wrap { background:var(--canvas); border-radius:6px; height:10px; overflow:hidden; margin:8px 0 6px; }
+.progress-bar-fill { height:100%; border-radius:6px; transition:width .4s; }
+.progress-meta { display:flex; justify-content:space-between; font-size:11px; color:var(--mid-gray); }
+
+/* Phase Table */
+.phase-table { width:100%; border-collapse:collapse; margin:16px 0; }
+.phase-table th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--mid-gray); padding:8px 12px; border-bottom:2px solid var(--canvas); }
+.phase-table td { padding:10px 12px; font-size:13px; border-bottom:1px solid var(--light-gray); }
+.phase-table tr:last-child td { border-bottom:none; }
+
+/* Badges */
+.badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; }
+.badge-completed { background:#E8F5E9; color:#2E7D32; }
+.badge-active { background:#E3F2FD; color:#1565C0; }
+.badge-future { background:#FFF3E0; color:#E65100; }
+.badge-na { background:#F5F5F5; color:#9E9E9E; }
+.badge-attention { background:#FFF0F0; color:#C62828; }
+.badge-over { background:#FFEBEE; color:#B71C1C; }
+
+/* Flagged */
+.flagged-card { background:var(--white); border-radius:10px; padding:18px; box-shadow:0 1px 4px rgba(0,0,0,.06); border-left:4px solid var(--ember); margin-bottom:12px; }
+.flagged-card .flag-title { font-size:15px; font-weight:700; color:var(--abyss); }
+.flagged-card .flag-reason { font-size:12px; color:var(--ember); margin-top:4px; }
+.flagged-card .flag-client { font-size:11px; color:var(--mid-gray); margin-top:2px; }
+
+/* Settings */
+.settings-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px,1fr)); gap:16px; }
+.settings-card { background:var(--white); border-radius:10px; padding:20px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+.settings-card h3 { font-size:14px; color:var(--abyss); margin-bottom:12px; }
+.rate-input-wrap { display:flex; align-items:center; gap:8px; margin-top:8px; }
+.rate-input-wrap label { font-size:12px; color:var(--mid-gray); min-width:40px; }
+.rate-input { width:100px; padding:6px 10px; border:1px solid var(--canvas); border-radius:6px; font-size:14px; text-align:right; }
+.rate-input:focus { outline:none; border-color:var(--ocean); }
+
+/* Section headers */
+.section-title { font-size:16px; font-weight:700; color:var(--abyss); margin:24px 0 12px; }
+
+/* View toggle pill */
+.view-toggle { display:inline-flex; background:var(--canvas); border-radius:20px; overflow:hidden; margin-left:12px; vertical-align:middle; }
+.view-toggle-btn { padding:5px 14px; font-size:11px; cursor:pointer; transition:background .15s, color .15s; color:var(--mid-gray); font-weight:500; border:none; background:none; }
+.view-toggle-btn.active { background:var(--ocean); color:var(--white); border-radius:20px; }
+
+/* Cascade detail */
+.cascade-detail { background:var(--light-gray); border-radius:8px; padding:14px; margin:12px 0; font-size:12px; color:var(--mid-gray); }
+.cascade-detail strong { color:var(--abyss); }
+
+/* Resource Allocation */
+.res-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:20px; }
+.res-stat { background:var(--white); border:1px solid var(--canvas); border-radius:10px; padding:18px 20px; }
+.res-stat .rs-label { font-size:10px; text-transform:uppercase; letter-spacing:1.2px; color:var(--mid-gray); margin-bottom:4px; }
+.res-stat .rs-value { font-size:28px; font-weight:700; letter-spacing:-.5px; color:var(--abyss); }
+.res-stat .rs-unit { font-size:12px; font-weight:400; color:var(--mid-gray); margin-left:2px; }
+.res-stat .rs-detail { font-size:11px; color:var(--mid-gray); margin-top:3px; }
+.week-timeline { display:flex; flex-direction:column; gap:6px; margin-bottom:20px; }
+.week-row { background:var(--white); border:1px solid var(--canvas); border-radius:6px; padding:12px 18px; display:grid; grid-template-columns:140px 70px 1fr; gap:16px; align-items:center; }
+.week-row.current-week { border-color:var(--ocean); border-width:2px; }
+.week-label { font-size:12px; font-weight:500; }
+.week-label .wd { display:block; font-size:10px; color:var(--mid-gray); font-weight:400; margin-top:1px; }
+.week-hrs { font-size:16px; font-weight:700; color:var(--abyss); text-align:right; font-variant-numeric:tabular-nums; }
+.week-hrs .wu { font-size:10px; font-weight:400; color:var(--mid-gray); }
+.week-bar-wrap { display:flex; flex-direction:column; }
+.week-bar { height:10px; background:var(--light-gray); border-radius:5px; overflow:hidden; display:flex; }
+.week-bar .wb-seg { height:100%; }
+.week-bar .wb-seg:first-child { border-radius:5px 0 0 5px; }
+.week-bar .wb-seg:last-child { border-radius:0 5px 5px 0; }
+.week-bar .wb-seg:only-child { border-radius:5px; }
+.week-people { display:flex; gap:8px; margin-top:4px; flex-wrap:wrap; }
+.week-person { font-size:10px; color:var(--mid-gray); display:flex; align-items:center; gap:3px; }
+.week-person .pd { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+.team-table { background:var(--white); border:1px solid var(--canvas); border-radius:10px; overflow:hidden; margin-bottom:20px; }
+.team-row { display:grid; grid-template-columns:160px 80px 80px 1fr; padding:10px 18px; border-bottom:1px solid var(--light-gray); align-items:center; font-size:12px; }
+.team-row:last-child { border-bottom:none; }
+.team-row.team-hdr { background:var(--light-gray); font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--mid-gray); font-weight:500; }
+.team-name { font-weight:500; display:flex; align-items:center; gap:6px; }
+.team-total { font-weight:700; color:var(--abyss); text-align:right; font-variant-numeric:tabular-nums; }
+.team-recent { color:var(--mid-gray); text-align:right; font-variant-numeric:tabular-nums; }
+.tmb { height:5px; background:var(--light-gray); border-radius:3px; overflow:hidden; }
+.tmb-fill { height:100%; border-radius:3px; }
+.proj-callout { background:var(--abyss); color:var(--white); border-radius:10px; padding:22px 26px; margin-top:16px; }
+.proj-callout .pc-title { font-size:10px; text-transform:uppercase; letter-spacing:1.5px; opacity:.55; margin-bottom:8px; }
+.proj-callout .pc-main { font-size:16px; font-weight:500; line-height:1.5; }
+.proj-callout .pc-hl { color:var(--sand); font-weight:700; }
+.proj-callout .pc-detail { font-size:12px; opacity:.55; margin-top:6px; line-height:1.5; }
+/* Resource Tracker */
+.rt-card { background:var(--white); border:1px solid var(--canvas); border-radius:10px; padding:20px 24px; margin-bottom:16px; }
+.rt-card h3 { font-size:14px; color:var(--abyss); margin-bottom:14px; }
+.rt-row { display:grid; grid-template-columns:150px 80px 80px 80px 1fr 60px; gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid var(--light-gray); font-size:13px; }
+.rt-row.rt-proj { grid-template-columns:150px 90px 80px 80px 80px 1fr 60px; }
+.rt-row:last-child { border-bottom:none; }
+.rt-row.rt-hdr { font-size:10px; text-transform:uppercase; letter-spacing:.8px; color:var(--mid-gray); font-weight:500; padding-bottom:10px; }
+.rt-name { font-weight:600; color:var(--abyss); }
+.rt-num { text-align:right; font-variant-numeric:tabular-nums; }
+.rt-bar-wrap { height:14px; background:var(--light-gray); border-radius:7px; overflow:hidden; position:relative; }
+.rt-bar-pred { height:100%; background:var(--canvas); border-radius:7px; position:absolute; top:0; left:0; opacity:.5; }
+.rt-bar-act { height:100%; border-radius:7px; position:absolute; top:0; left:0; }
+.rt-acc { font-weight:700; text-align:right; font-variant-numeric:tabular-nums; font-size:12px; }
+.rt-acc.high { color:#2E7D32; }
+.rt-acc.mid { color:var(--honey); }
+.rt-acc.low { color:var(--ember); }
+.rt-summary { display:grid; grid-template-columns:repeat(4, 1fr); gap:16px; margin-bottom:24px; }
+.rt-scard { background:var(--white); border:1px solid var(--canvas); border-radius:10px; padding:18px 22px; text-align:center; }
+.rt-scard .rs-label { font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--mid-gray); margin-bottom:6px; }
+.rt-scard .rs-val { font-size:28px; font-weight:700; color:var(--abyss); }
+.rt-scard .rs-sub { font-size:11px; color:var(--mid-gray); margin-top:4px; }
+.rt-week-label { font-size:12px; color:var(--mid-gray); text-transform:uppercase; letter-spacing:1px; margin-bottom:16px; }
+.rt-tabs { display:flex; gap:8px; margin-bottom:20px; }
+.rt-tab { padding:6px 16px; border-radius:16px; border:1px solid var(--canvas); background:var(--white); cursor:pointer; font-size:12px; font-weight:500; }
+.rt-tab.active { background:var(--abyss); color:var(--white); border-color:var(--abyss); }
+
+/* Hour Type Breakdown */
+.hour-type-section { margin-bottom:28px; }
+.hour-type-cards { display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; margin-bottom:16px; }
+.ht-card { background:var(--white); border-radius:10px; padding:16px 18px; box-shadow:0 1px 4px rgba(0,0,0,.06); border-top:3px solid var(--mid-gray); }
+.ht-card.ht-billable { border-top-color:#2E7D32; }
+.ht-card.ht-bizdev { border-top-color:var(--ocean); }
+.ht-card.ht-ops { border-top-color:var(--honey); }
+.ht-card .ht-label { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--mid-gray); margin-bottom:6px; }
+.ht-card .ht-value { font-size:22px; font-weight:700; color:var(--abyss); }
+.ht-card .ht-sub { font-size:11px; color:var(--mid-gray); margin-top:2px; }
+.ht-card .ht-count { font-size:11px; color:var(--mid-gray); margin-top:4px; }
+.stacked-bar-container { background:var(--white); border-radius:10px; padding:18px 20px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+.stacked-bar-title { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--mid-gray); margin-bottom:10px; }
+.stacked-bar { height:28px; border-radius:8px; overflow:hidden; display:flex; background:var(--light-gray); }
+.sb-seg { height:100%; transition:width .4s; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#fff; min-width:0; overflow:hidden; }
+.sb-seg.sb-billable { background:#2E7D32; }
+.sb-seg.sb-bizdev { background:var(--ocean); }
+.sb-seg.sb-ops { background:var(--honey); }
+.stacked-bar-legend { display:flex; gap:20px; margin-top:10px; }
+.sb-legend-item { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--mid-gray); }
+.sb-legend-dot { width:10px; height:10px; border-radius:3px; flex-shrink:0; }
+.sb-legend-dot.sb-billable { background:#2E7D32; }
+.sb-legend-dot.sb-bizdev { background:var(--ocean); }
+.sb-legend-dot.sb-ops { background:var(--honey); }
+.badge-billable { background:#E8F5E9; color:#2E7D32; }
+.badge-bizdev { background:#E3F2FD; color:var(--ocean); }
+.badge-ops { background:#FFF3E0; color:var(--honey); }
+
+/* Snapshot Financials */
+.snapshot-banner { background:var(--abyss); color:var(--white); border-radius:10px; padding:18px 22px; margin-bottom:20px; }
+.snapshot-banner .snap-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+.snapshot-banner .snap-title { font-size:10px; text-transform:uppercase; letter-spacing:1.5px; opacity:.55; }
+.snapshot-banner .snap-version { font-size:10px; opacity:.45; }
+.snap-financials { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px,1fr)); gap:12px; }
+.snap-fin-item { text-align:center; }
+.snap-fin-item .sf-label { font-size:9px; text-transform:uppercase; letter-spacing:.8px; opacity:.5; margin-bottom:4px; }
+.snap-fin-item .sf-value { font-size:20px; font-weight:700; }
+.snap-fin-item .sf-sub { font-size:10px; opacity:.45; margin-top:2px; }
+.snap-fin-item .sf-green { color:#81C784; }
+.snap-fin-item .sf-gold { color:var(--sand); }
+
+/* Labor vs OOP bar */
+.labor-oop-bar { margin-top:14px; }
+.labor-oop-bar .lob-title { font-size:9px; text-transform:uppercase; letter-spacing:.8px; opacity:.5; margin-bottom:6px; }
+.lob-bar { height:20px; border-radius:6px; overflow:hidden; display:flex; background:rgba(255,255,255,.1); }
+.lob-seg { height:100%; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; }
+.lob-seg.lob-labor { background:var(--ocean); }
+.lob-seg.lob-oop { background:var(--sand); color:var(--abyss); }
+.lob-legend { display:flex; gap:16px; margin-top:6px; }
+.lob-legend-item { font-size:10px; opacity:.6; display:flex; align-items:center; gap:4px; }
+.lob-legend-dot { width:8px; height:8px; border-radius:2px; }
+
+/* Per-person phase table */
+.person-phase-section { margin-top:24px; }
+.pp-phase-block { background:var(--white); border:1px solid var(--canvas); border-radius:10px; padding:16px 20px; margin-bottom:12px; }
+.pp-phase-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; cursor:pointer; }
+.pp-phase-title { font-size:14px; font-weight:700; color:var(--abyss); }
+.pp-phase-totals { font-size:12px; color:var(--mid-gray); }
+.pp-row { display:grid; grid-template-columns:24px 1fr 70px 70px 70px 100px; gap:8px; align-items:center; padding:5px 0; border-bottom:1px solid var(--light-gray); font-size:12px; }
+.pp-row:last-child { border-bottom:none; }
+.pp-row.pp-hdr { font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:var(--mid-gray); font-weight:500; border-bottom:2px solid var(--canvas); padding-bottom:8px; }
+.pp-dept-dot { width:8px; height:8px; border-radius:50%; }
+.pp-name { font-weight:500; color:var(--abyss); }
+.pp-num { text-align:right; font-variant-numeric:tabular-nums; }
+.pp-bar-wrap { height:6px; background:var(--light-gray); border-radius:3px; overflow:hidden; }
+.pp-bar-fill { height:100%; border-radius:3px; }
+
+/* Manage Allocations Page */
+.alloc-layout { display:grid; grid-template-columns:220px 1fr 340px; gap:0; height:calc(100vh - 120px); }
+.alloc-proj-sidebar { background:var(--white); border-right:1px solid var(--canvas); overflow-y:auto; }
+.alloc-proj-sidebar .aps-header { padding:12px 14px; font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--mid-gray); font-weight:600; border-bottom:1px solid var(--canvas); position:sticky; top:0; background:var(--white); z-index:1; }
+.alloc-proj-sidebar .aps-search { width:calc(100% - 20px); margin:8px 10px; padding:7px 10px; border:1px solid var(--canvas); border-radius:6px; font-size:12px; font-family:inherit; outline:none; background:var(--light-gray); }
+.alloc-proj-sidebar .aps-search:focus { border-color:var(--ocean); background:var(--white); }
+.aps-client { padding:6px 14px 2px; font-size:9px; text-transform:uppercase; letter-spacing:.8px; color:var(--mid-gray); font-weight:600; margin-top:4px; }
+.aps-item { padding:7px 14px; font-size:12px; cursor:pointer; transition:background .1s; display:flex; align-items:center; gap:6px; border-left:3px solid transparent; }
+.aps-item:hover { background:var(--light-gray); }
+.aps-item.active { background:rgba(48,109,124,.08); border-left-color:var(--ocean); font-weight:600; }
+.aps-item .aps-code { font-size:9px; color:var(--mid-gray); font-family:monospace; }
+.aps-item .aps-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+
+/* Calendar Grid */
+.alloc-grid-area { display:flex; flex-direction:column; overflow:hidden; }
+.alloc-toolbar { display:flex; align-items:center; gap:12px; padding:12px 18px; border-bottom:1px solid var(--canvas); background:var(--white); flex-shrink:0; }
+.alloc-toolbar button { background:var(--white); border:1px solid var(--canvas); border-radius:6px; padding:5px 12px; cursor:pointer; font-size:12px; color:var(--abyss); font-family:inherit; }
+.alloc-toolbar button:hover { background:var(--light-gray); }
+.alloc-toolbar .at-label { font-size:14px; font-weight:700; color:var(--abyss); min-width:200px; text-align:center; }
+.alloc-view-toggle { display:inline-flex; background:var(--canvas); border-radius:14px; overflow:hidden; margin-left:auto; }
+.alloc-view-toggle button { border:none; padding:5px 14px; font-size:11px; cursor:pointer; background:none; color:var(--mid-gray); font-weight:500; font-family:inherit; }
+.alloc-view-toggle button.active { background:var(--ocean); color:var(--white); border-radius:14px; }
+.alloc-save-status { font-size:11px; color:var(--mid-gray); font-style:italic; }
+
+.alloc-grid-scroll { flex:1; overflow:auto; background:var(--light-gray); }
+.alloc-grid { display:grid; min-width:100%; }
+.ag-corner { background:var(--white); border-bottom:2px solid var(--canvas); border-right:1px solid var(--canvas); padding:8px 12px; position:sticky; left:0; top:0; z-index:3; font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--mid-gray); }
+.ag-col-hdr { background:var(--white); border-bottom:2px solid var(--canvas); padding:8px 6px; text-align:center; font-size:11px; font-weight:600; color:var(--abyss); position:sticky; top:0; z-index:2; }
+.ag-col-hdr .ag-day { font-size:9px; color:var(--mid-gray); font-weight:400; display:block; }
+.ag-row-hdr { background:var(--white); border-right:1px solid var(--canvas); border-bottom:1px solid var(--light-gray); padding:6px 12px; position:sticky; left:0; z-index:1; font-size:12px; font-weight:500; color:var(--abyss); display:flex; align-items:center; gap:6px; min-width:150px; }
+.ag-row-hdr .ag-person-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.ag-row-hdr .ag-person-total { font-size:10px; color:var(--mid-gray); margin-left:auto; font-weight:400; font-variant-numeric:tabular-nums; }
+.ag-cell { border-bottom:1px solid var(--light-gray); border-right:1px solid rgba(0,0,0,.04); padding:4px; min-height:36px; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:background .1s; }
+.ag-cell:hover { background:rgba(48,109,124,.06); }
+.ag-cell-filled { background:rgba(48,109,124,.1); }
+.ag-cell-val { background:var(--ocean); color:var(--white); border-radius:4px; padding:2px 8px; font-size:12px; font-weight:700; font-variant-numeric:tabular-nums; min-width:32px; text-align:center; cursor:pointer; }
+.ag-cell-val:hover { background:var(--abyss); }
+.ag-cell-empty { width:100%; height:100%; border-radius:4px; border:1px dashed transparent; }
+.ag-cell:hover .ag-cell-empty { border-color:var(--canvas); }
+.ag-cell-input { width:50px; padding:3px 6px; border:2px solid var(--ocean); border-radius:4px; font-size:12px; font-weight:700; text-align:center; outline:none; font-family:inherit; }
+
+/* Capacity Panel */
+.cap-panel { overflow-y:auto; background:var(--white); border-left:1px solid var(--canvas); padding:16px; }
+.cap-panel h3 { font-size:13px; color:var(--abyss); margin-bottom:4px; }
+.cap-panel .cap-sub { font-size:10px; color:var(--mid-gray); margin-bottom:14px; }
+.cap-person { padding:5px 0; border-bottom:1px solid var(--light-gray); }
+.cap-person:last-child { border-bottom:none; }
+.cap-person-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:3px; }
+.cap-person-name { font-size:11px; font-weight:600; color:var(--abyss); display:flex; align-items:center; gap:5px; }
+.cap-person-name .cp-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+.cap-person-hrs { font-size:11px; font-weight:700; font-variant-numeric:tabular-nums; }
+.cap-bar { height:14px; background:var(--light-gray); border-radius:3px; overflow:hidden; display:flex; }
+.cap-bar-seg { height:100%; transition:width .25s; }
+.cap-bar-seg:first-child { border-radius:3px 0 0 3px; }
+.cap-bar-seg:last-child { border-radius:0 3px 3px 0; }
+.cap-bar-seg:only-child { border-radius:3px; }
+.cap-projects { font-size:9px; color:var(--mid-gray); margin-top:2px; line-height:1.4; }
+.cap-green { color:#2E7D32; }
+.cap-yellow { color:var(--honey); }
+.cap-red { color:var(--ember); }
+
+/* ── DARK MODE TOGGLE ── */
+.dark-toggle { display:flex; align-items:center; gap:8px; padding:10px 16px; cursor:pointer; font-size:12px; color:rgba(255,255,255,.6); transition:color .15s; user-select:none; }
+.dark-toggle:hover { color:rgba(255,255,255,.9); }
+.dark-toggle .dt-switch { width:36px; height:20px; border-radius:10px; background:rgba(255,255,255,.2); position:relative; transition:background .2s; }
+.dark-toggle .dt-knob { width:16px; height:16px; border-radius:50%; background:var(--white); position:absolute; top:2px; left:2px; transition:left .2s; }
+html.dark .dark-toggle .dt-switch { background:var(--ocean); }
+html.dark .dark-toggle .dt-knob { left:18px; }
+
+/* ── DARK MODE ── */
+html.dark { --dm-bg: #1a1a1a; --dm-surface: #242424; --dm-surface2: #2e2e2e; --dm-border: #3a3a3a; --dm-text: #e0e0e0; --dm-text-muted: #888; }
+html.dark body { background:var(--dm-bg); color:var(--dm-text); }
+html.dark .sidebar { background:#0f2a30; }
+html.dark .main-content { background:var(--dm-bg); }
+html.dark .stat-card { background:var(--dm-surface); box-shadow:0 1px 4px rgba(0,0,0,.3); }
+html.dark .stat-card .label { color:var(--dm-text-muted); }
+html.dark .stat-card .sub { color:var(--dm-text-muted); }
+html.dark .project-card { background:var(--dm-surface); box-shadow:0 1px 4px rgba(0,0,0,.3); }
+html.dark .project-card .card-client { color:var(--dm-text-muted); }
+html.dark .project-card .card-code { color:var(--dm-text-muted); }
+html.dark .phase-table th { color:var(--dm-text-muted); border-bottom-color:var(--dm-border); }
+html.dark .phase-table td { border-bottom-color:var(--dm-border); color:var(--dm-text); }
+html.dark .phase-table tr:hover td { background:var(--dm-surface2); }
+html.dark .settings-card { background:var(--dm-surface); box-shadow:0 1px 4px rgba(0,0,0,.3); }
+html.dark .settings-card h3 { color:var(--dm-text); }
+html.dark .rate-input { background:var(--dm-surface2); border-color:var(--dm-border); color:var(--dm-text); }
+html.dark .flagged-card { background:var(--dm-surface); box-shadow:0 1px 4px rgba(0,0,0,.3); }
+html.dark .page-title { color:var(--dm-text); }
+html.dark .page-subtitle { color:var(--dm-text-muted); }
+html.dark .section-title { color:var(--dm-text); }
+html.dark .toggle-btn { background:var(--dm-surface2); color:var(--dm-text-muted); border-color:var(--dm-border); }
+html.dark .toggle-btn.active { background:var(--ocean); color:var(--white); }
+html.dark .view-toggle-btn { color:var(--dm-text-muted); }
+html.dark .view-toggle-btn.active { background:var(--ocean); color:var(--white); }
+html.dark .cascade-detail { background:var(--dm-surface2); color:var(--dm-text-muted); }
+html.dark .progress-bar { background:var(--dm-surface2); }
+html.dark .progress-meta { color:var(--dm-text-muted); }
+html.dark input, html.dark select { background:var(--dm-surface2); border-color:var(--dm-border); color:var(--dm-text); }
+html.dark .week-row { background:var(--dm-surface); border-color:var(--dm-border); }
+html.dark .week-row:hover { background:var(--dm-surface2); }
+html.dark .week-row.current-week { border-color:var(--ocean); }
+html.dark .week-label .wd { color:var(--dm-text-muted); }
+html.dark .week-hrs .wu { color:var(--dm-text-muted); }
+html.dark .res-stat { background:var(--dm-surface); }
+html.dark .res-stat .rs-label { color:var(--dm-text-muted); }
+html.dark .res-stat .rs-detail { color:var(--dm-text-muted); }
+html.dark .alloc-proj-sidebar { background:var(--dm-surface); border-color:var(--dm-border); }
+html.dark .aps-search { background:var(--dm-surface2); border-color:var(--dm-border); color:var(--dm-text); }
+html.dark .aps-item { color:var(--dm-text); }
+html.dark .aps-item:hover { background:var(--dm-surface2); }
+html.dark .aps-item.active { background:rgba(48,109,124,.25); }
+html.dark .aps-client { color:var(--dm-text-muted); }
+html.dark .aps-code { color:var(--dm-text-muted); }
+html.dark .alloc-grid { color:var(--dm-text); }
+html.dark .ag-corner, html.dark .ag-col-hdr, html.dark .ag-row-hdr { background:var(--dm-surface); color:var(--dm-text-muted); border-color:var(--dm-border); }
+html.dark .ag-cell { background:var(--dm-bg); border-color:var(--dm-border); }
+html.dark .ag-cell:hover { background:var(--dm-surface2); }
+html.dark .ag-total { background:var(--dm-surface); border-color:var(--dm-border); }
+html.dark .cap-panel { background:var(--dm-surface); border-color:var(--dm-border); }
+html.dark .cap-person { border-color:var(--dm-border); }
+html.dark .cap-projects { color:var(--dm-text-muted); }
+html.dark .cap-bar { background:var(--dm-surface2); }
+html.dark table { color:var(--dm-text); }
+html.dark th { color:var(--dm-text-muted); }
+html.dark td { color:var(--dm-text); }
+html.dark hr { border-color:var(--dm-border); }
+html.dark .lob-legend-item { color:var(--dm-text-muted); }
+
+/* ── DARK MODE: Resource Tracker ── */
+html.dark .rt-card { background:var(--dm-surface); border-color:var(--dm-border); box-shadow:0 1px 4px rgba(0,0,0,.3); }
+html.dark .rt-card h3 { color:var(--dm-text); }
+html.dark .rt-scard { background:var(--dm-surface); border-color:var(--dm-border); }
+html.dark .rt-scard .rs-val { color:var(--dm-text); }
+html.dark .rt-scard .rs-sub { color:var(--dm-text-muted); }
+html.dark .rt-tab { background:var(--dm-surface2); border-color:var(--dm-border); color:var(--dm-text); }
+html.dark .rt-tab.active { background:var(--abyss); color:var(--white); border-color:var(--abyss); }
+html.dark .rt-row { border-bottom-color:var(--dm-border); color:var(--dm-text); }
+html.dark .rt-row.rt-hdr { color:var(--dm-text-muted); }
+html.dark .rt-name { color:var(--dm-text); }
+html.dark .rt-bar-wrap { background:var(--dm-surface2); }
+html.dark .rt-bar-pred { background:var(--dm-border); }
+html.dark .rt-week-label { color:var(--dm-text-muted); }
+
+/* ── DARK MODE: Hour Type Cards & Stacked Bar ── */
+html.dark .ht-card { background:var(--dm-surface); box-shadow:0 1px 4px rgba(0,0,0,.3); }
+html.dark .ht-card .ht-value { color:var(--dm-text); }
+html.dark .ht-card .ht-label { color:var(--dm-text-muted); }
+html.dark .ht-card .ht-sub { color:var(--dm-text-muted); }
+html.dark .stacked-bar-container { background:var(--dm-surface); box-shadow:0 1px 4px rgba(0,0,0,.3); }
+html.dark .stacked-bar-title { color:var(--dm-text-muted); }
+html.dark .stacked-bar { background:var(--dm-surface2); }
+html.dark .sb-legend-item { color:var(--dm-text-muted); }
+
+/* ── DARK MODE: Badges ── */
+html.dark .badge-billable { background:rgba(46,125,50,.2); color:#81C784; }
+html.dark .badge-bizdev { background:rgba(48,109,124,.2); color:#5dade2; }
+html.dark .badge-ops { background:rgba(227,166,94,.2); color:var(--honey); }
+
+/* ── DARK MODE: Team Table ── */
+html.dark .team-table { background:var(--dm-surface); border-color:var(--dm-border); }
+html.dark .team-row { border-bottom-color:var(--dm-border); color:var(--dm-text); }
+html.dark .team-row.team-hdr { background:var(--dm-surface2); color:var(--dm-text-muted); }
+html.dark .team-name { color:var(--dm-text); }
+html.dark .team-total { color:var(--dm-text); }
+html.dark .team-recent { color:var(--dm-text-muted); }
+html.dark .tmb { background:var(--dm-surface2); }
+
+/* ── DARK MODE: Per-Person Phase Table ── */
+html.dark .pp-phase-block { background:var(--dm-surface); border-color:var(--dm-border); }
+html.dark .pp-phase-title { color:var(--dm-text); }
+html.dark .pp-phase-totals { color:var(--dm-text-muted); }
+html.dark .pp-row { border-bottom-color:var(--dm-border); color:var(--dm-text); }
+html.dark .pp-row.pp-hdr { color:var(--dm-text-muted); border-bottom-color:var(--dm-border); }
+html.dark .pp-name { color:var(--dm-text); }
+html.dark .pp-bar-wrap { background:var(--dm-surface2); }
+
+/* ── DARK MODE: Allocation Toolbar & Grid ── */
+html.dark .alloc-toolbar { background:var(--dm-surface); border-bottom-color:var(--dm-border); }
+html.dark .alloc-toolbar button { background:var(--dm-surface2); border-color:var(--dm-border); color:var(--dm-text); }
+html.dark .alloc-toolbar button:hover { background:var(--dm-bg); }
+html.dark .alloc-toolbar .at-label { color:var(--dm-text); }
+html.dark .alloc-view-toggle { background:var(--dm-surface2); }
+html.dark .alloc-view-toggle button { color:var(--dm-text-muted); }
+html.dark .alloc-grid-scroll { background:var(--dm-bg); }
+html.dark .alloc-proj-sidebar .aps-header { background:var(--dm-surface); border-bottom-color:var(--dm-border); }
+html.dark .alloc-proj-sidebar .aps-search:focus { background:var(--dm-surface); }
+html.dark .aps-item:hover { background:var(--dm-surface2); }
+
+/* ── DARK MODE: Global Toolbar & Selects ── */
+html.dark #globalToolbar { border-bottom-color:var(--dm-border); }
+html.dark #globalToolbar select { background:var(--dm-surface2); border-color:var(--dm-border); color:var(--dm-text); }
+html.dark #globalToolbar label { color:var(--dm-text-muted); }
+html.dark #globalToolbar input[type="date"] { background:var(--dm-surface2); border-color:var(--dm-border); color:var(--dm-text); }
+
+/* ── DARK MODE: Snapshot Banner (already dark, but text colors) ── */
+html.dark .proj-callout { background:#0f2a30; }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-header">
+    <h2>FURNACE</h2>
+    <p>Forge Portfolio Tracker</p>
+    <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
+  </div>
+  <div class="sidebar-nav" id="sidebarNav"></div>
+  <div class="toggle-bar">
+    <div class="toggle-wrap">
+      <div class="toggle-btn active" onclick="setUnit('hours')" id="toggleHours">Hours</div>
+      <div class="toggle-btn" onclick="setUnit('money')" id="toggleMoney">Revenue</div>
+    </div>
+  </div>
+  <div class="dark-toggle" onclick="toggleDarkMode()">
+    <div class="dt-switch"><div class="dt-knob"></div></div>
+    <span>Dark Mode</span>
+  </div>
+</div>
+
+<div class="main">
+  <div id="globalToolbar" style="display:flex;align-items:center;gap:12px;margin-bottom:0px;padding:10px 0 14px;border-bottom:1px solid var(--light-gray)">
+    <div style="display:flex;align-items:center;gap:8px">
+      <label style="font-size:11px;font-weight:600;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px">Date Range</label>
+      <select id="dateFilterSelect" onchange="onDateFilterChange(this.value)" style="font-size:12px;padding:5px 10px;border:1px solid var(--canvas);border-radius:6px;background:var(--white);color:var(--abyss);cursor:pointer;font-family:inherit">
+        <option value="all">All Time</option>
+        <option value="today">Today</option>
+        <option value="yesterday">Yesterday</option>
+        <option value="current_week">Current Week</option>
+        <option value="last_week">Last Week</option>
+        <option value="current_month">Current Month</option>
+        <option value="last_month">Last Month</option>
+        <option value="current_year">Current Year</option>
+        <option value="last_year">Last Year</option>
+        <option value="custom">Custom Range...</option>
+      </select>
+    </div>
+    <div id="customDateRange" style="display:none;align-items:center;gap:6px">
+      <input type="date" id="dateFilterStart" onchange="applyCustomDateRange()" style="font-size:12px;padding:4px 8px;border:1px solid var(--canvas);border-radius:6px;font-family:inherit">
+      <span style="font-size:11px;color:var(--mid-gray)">to</span>
+      <input type="date" id="dateFilterEnd" onchange="applyCustomDateRange()" style="font-size:12px;padding:4px 8px;border:1px solid var(--canvas);border-radius:6px;font-family:inherit">
+    </div>
+    <div id="dateFilterLabel" style="font-size:11px;color:var(--mid-gray);font-style:italic"></div>
+  </div>
+  <div id="mainContent"></div>
+</div>
+
+<script>
+/* ── STATE ── */
+let currentView = 'master';
+let displayUnit = 'hours';
+let openClients = {};
+let showFinalized = false;
+let showInactiveClients = false;
+
+/* ── GLOBAL DATE FILTER ── */
+var globalDateFilter = 'all'; /* all | today | yesterday | current_week | last_week | current_month | last_month | current_year | last_year | custom */
+var globalDateStart = null; /* Date object or null */
+var globalDateEnd = null;   /* Date object or null */
+var masterSortCol = 'name'; /* name | client | budget | labor | oop | profit | margin */
+var masterSortDir = 'asc';  /* asc | desc */
+function toggleMasterSort(col) {
+  if (masterSortCol === col) { masterSortDir = masterSortDir === 'asc' ? 'desc' : 'asc'; }
+  else { masterSortCol = col; masterSortDir = col === 'name' || col === 'client' ? 'asc' : 'desc'; }
+  navigate(currentView);
+}
+
+function getToday() {
+  var d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function getDateRange(filter) {
+  /* Returns {start: Date, end: Date} or null for 'all' */
+  if (filter === 'all') return null;
+  var today = getToday();
+  var y = today.getFullYear(), m = today.getMonth(), d = today.getDate();
+  var dow = today.getDay(); /* 0=Sun */
+  switch(filter) {
+    case 'today':
+      return {start: today, end: today};
+    case 'yesterday':
+      var yd = new Date(y, m, d - 1);
+      return {start: yd, end: yd};
+    case 'current_week':
+      var sun = new Date(y, m, d - dow);
+      var sat = new Date(y, m, d - dow + 6);
+      return {start: sun, end: sat};
+    case 'last_week':
+      var lsun = new Date(y, m, d - dow - 7);
+      var lsat = new Date(y, m, d - dow - 1);
+      return {start: lsun, end: lsat};
+    case 'current_month':
+      return {start: new Date(y, m, 1), end: new Date(y, m + 1, 0)};
+    case 'last_month':
+      return {start: new Date(y, m - 1, 1), end: new Date(y, m, 0)};
+    case 'current_year':
+      return {start: new Date(y, 0, 1), end: new Date(y, 11, 31)};
+    case 'last_year':
+      return {start: new Date(y - 1, 0, 1), end: new Date(y - 1, 11, 31)};
+    case 'custom':
+      if (globalDateStart && globalDateEnd) return {start: globalDateStart, end: globalDateEnd};
+      return null;
+    default:
+      return null;
+  }
+}
+
+function weekOverlapsRange(weekSunday, range) {
+  /* Check if a week (Sun-Sat) overlaps with the date range */
+  if (!range) return true;
+  var wStart = new Date(weekSunday + 'T00:00:00');
+  var wEnd = new Date(wStart);
+  wEnd.setDate(wEnd.getDate() + 6);
+  return wStart <= range.end && wEnd >= range.start;
+}
+
+function getFilteredWeekIndices() {
+  /* Returns indices of RT_WEEKS within the current date filter */
+  var range = getDateRange(globalDateFilter);
+  if (!range) {
+    var all = [];
+    for (var i = 0; i < RT_WEEKS.length; i++) all.push(i);
+    return all;
+  }
+  var indices = [];
+  for (var i = 0; i < RT_WEEKS.length; i++) {
+    if (weekOverlapsRange(RT_WEEKS[i].sunday, range)) indices.push(i);
+  }
+  return indices;
+}
+
+function getFilteredRTData() {
+  /* Returns a single aggregated week object for the current date filter */
+  var indices = getFilteredWeekIndices();
+  if (indices.length === 0) return {label: 'No data', sunday: '', people: {}};
+  if (indices.length === 1) {
+    var wk = RT_WEEKS[indices[0]];
+    return {label: wk.label, sunday: wk.sunday, people: wk.people};
+  }
+  return rtAggregateWeeks(indices);
+}
+
+function getFilteredProjectHours(projectName) {
+  /* Sum actual hours for a project across filtered weeks, respecting aliases */
+  var range = getDateRange(globalDateFilter);
+  if (!range) return null; /* null means "use default phase data" */
+  var total = 0;
+  var indices = getFilteredWeekIndices();
+  var aliasTarget = RT_BUDGET_ALIASES[projectName] || projectName;
+  for (var w = 0; w < indices.length; w++) {
+    var wk = RT_WEEKS[indices[w]];
+    for (var pn in wk.people) {
+      var projs = wk.people[pn].projects || {};
+      for (var pk in projs) {
+        var resolved = RT_BUDGET_ALIASES[pk] || pk;
+        if (resolved === projectName || resolved === aliasTarget || pk === projectName) {
+          total += projs[pk].a || 0;
+        }
+      }
+    }
+  }
+  return total;
+}
+
+function filteredProjectSpent(proj) {
+  /* Returns spent hours: filtered from RT if date filter active, otherwise from phases */
+  if (globalDateFilter === 'all') return projectSpent(proj);
+  var rtHours = getFilteredProjectHours(proj.name);
+  return rtHours !== null ? rtHours : 0;
+}
+
+function onDateFilterChange(val) {
+  globalDateFilter = val;
+  var customEl = document.getElementById('customDateRange');
+  if (val === 'custom') {
+    customEl.style.display = 'flex';
+    /* Set defaults to current month if not set */
+    var startInput = document.getElementById('dateFilterStart');
+    var endInput = document.getElementById('dateFilterEnd');
+    if (!startInput.value) {
+      var today = getToday();
+      startInput.value = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-01';
+      endInput.value = today.toISOString().split('T')[0];
+      globalDateStart = new Date(startInput.value + 'T00:00:00');
+      globalDateEnd = new Date(endInput.value + 'T00:00:00');
+    }
+  } else {
+    customEl.style.display = 'none';
+  }
+  updateDateFilterLabel();
+  navigate(currentView);
+}
+
+function applyCustomDateRange() {
+  var startVal = document.getElementById('dateFilterStart').value;
+  var endVal = document.getElementById('dateFilterEnd').value;
+  if (startVal && endVal) {
+    globalDateStart = new Date(startVal + 'T00:00:00');
+    globalDateEnd = new Date(endVal + 'T00:00:00');
+    updateDateFilterLabel();
+    navigate(currentView);
+  }
+}
+
+function updateDateFilterLabel() {
+  var label = document.getElementById('dateFilterLabel');
+  if (!label) return;
+  var range = getDateRange(globalDateFilter);
+  if (!range) { label.textContent = ''; return; }
+  var indices = getFilteredWeekIndices();
+  var opts = {month:'short', day:'numeric', year:'numeric'};
+  label.textContent = range.start.toLocaleDateString('en-US', opts) + ' – ' + range.end.toLocaleDateString('en-US', opts) + ' (' + indices.length + ' week' + (indices.length !== 1 ? 's' : '') + ')';
+}
+
+/* ── SETTINGS (localStorage) ── */
+let clientRates = {};
+try { clientRates = JSON.parse(localStorage.getItem('forgeRates') || '{}'); } catch(e) {}
+function getRate(clientId) { return clientRates[clientId] || 0; }
+function saveRates() { try { localStorage.setItem('forgeRates', JSON.stringify(clientRates)); } catch(e) {} }
+
+/* ── DATA (loaded from data/portfolio.json) ── */
+var CLIENTS = [];
+var FLAGGED_NO_STRUCTURE = [];
+var FLAGGED_DATA_MISMATCH = [];
+var PC = {};
+var RES = {};
+var METADATA = {};
+
+/* ── NATIVE ALLOCATION DATA ── */
+var ALLOCATIONS = { version: 1, allocations: [], team: [], weeklyCapacity: 40 };
+var ACTUALS = { version: 1, weeks: [], lastImport: null };
+var allocWeekOf = null; /* currently selected week (Monday ISO string) */
+var allocProject = ''; /* currently selected project for entry */
+var allocPendingRows = []; /* in-progress person rows before save */
+var allocSaveTimer = null;
+
+/* ── RESOURCE HELPERS ── */
+function getWeekMon(ds) {
+  /* Now returns Sunday of the week (Sun-Sat boundaries) */
+  var d = new Date(ds+'T00:00:00'); var day = d.getDay();
+  d.setDate(d.getDate() - day); return d.toISOString().slice(0,10);
+}
+function getWeekFri(sun) { /* Returns Saturday from Sunday */ var d = new Date(sun+'T00:00:00'); d.setDate(d.getDate()+6); return d.toISOString().slice(0,10); }
+function getSaturday(sun) { var d = new Date(sun+'T00:00:00'); d.setDate(d.getDate()+6); return d.toISOString().slice(0,10); }
+function fmtDateShort(ds) { var d = new Date(ds+'T00:00:00'); return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
+function getISOWeek(ds) { var d = new Date(ds+'T00:00:00'); var thu = new Date(d); thu.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7)); var jan4 = new Date(thu.getFullYear(), 0, 4); return 1 + Math.round(((thu - jan4) / 86400000 - 3 + ((jan4.getDay() + 6) % 7)) / 7); }
+
+function expandAlloc(a) {
+  var days = [];
+  var s = new Date(a.s+'T00:00:00'), e = new Date(a.e+'T00:00:00');
+  for (var d = new Date(s); d <= e; d.setDate(d.getDate()+1)) {
+    var dow = d.getDay();
+    if (dow >= 1 && dow <= 5) days.push({person:a.p, date:d.toISOString().slice(0,10), hours:a.h});
+  }
+  return days;
+}
+
+function buildWeeks(projId) {
+  var allocs = RES[projId] || [];
+  if (!allocs.length) return [];
+  var daily = [];
+  for (var i = 0; i < allocs.length; i++) { daily = daily.concat(expandAlloc(allocs[i])); }
+  var wm = {};
+  for (var i = 0; i < daily.length; i++) {
+    var wk = getWeekMon(daily[i].date);
+    if (!wm[wk]) wm[wk] = {total:0, people:{}};
+    wm[wk].total += daily[i].hours;
+    if (!wm[wk].people[daily[i].person]) wm[wk].people[daily[i].person] = 0;
+    wm[wk].people[daily[i].person] += daily[i].hours;
+  }
+  var keys = Object.keys(wm).sort();
+  var out = [];
+  for (var i = 0; i < keys.length; i++) out.push({sunday:keys[i], saturday:getWeekFri(keys[i]), total:wm[keys[i]].total, people:wm[keys[i]].people});
+  return out;
+}
+
+function buildTeam(projId) {
+  var allocs = RES[projId] || [];
+  var t = {};
+  var fourAgo = new Date(); fourAgo.setDate(fourAgo.getDate()-28);
+  for (var i = 0; i < allocs.length; i++) {
+    var a = allocs[i];
+    var daily = expandAlloc(a);
+    var tot = 0; for (var j = 0; j < daily.length; j++) tot += daily[j].hours;
+    if (!t[a.p]) t[a.p] = {total:0, recent:0};
+    t[a.p].total += tot;
+    var sd = new Date(a.s+'T00:00:00');
+    if (sd >= fourAgo) t[a.p].recent += tot;
+  }
+  var arr = [];
+  for (var k in t) { if (k !== 'Unknown') arr.push({name:k, total:t[k].total, recent:t[k].recent}); }
+  arr.sort(function(a,b){return b.total - a.total;});
+  return arr;
+}
+
+/* ── HELPERS ── */
+function fmtNum(v) {
+  if (displayUnit === 'money') return '$' + Math.round(v).toLocaleString('en-US');
+  return v.toFixed(1) + ' hrs';
+}
+function toDisplayVal(hrs, clientId) {
+  if (displayUnit === 'money') return hrs * getRate(clientId);
+  return hrs;
+}
+function fmt(hrs, clientId) { return fmtNum(toDisplayVal(hrs, clientId)); }
+function pct(a, b) { return b > 0 ? Math.min(Math.round((a / b) * 100), 100) : 0; }
+function barColor(p) {
+  if (p >= 100) return '#2E7D32';
+  if (p >= 75) return 'var(--ocean)';
+  if (p >= 40) return 'var(--honey)';
+  return 'var(--ember)';
+}
+function badgeHTML(status) {
+  const map = { completed:'badge-completed', active:'badge-active', future:'badge-future', na:'badge-na', attention:'badge-attention' };
+  const labels = { completed:'Completed', active:'Active', future:'Upcoming', na:'N/A', attention:'Needs Attention' };
+  return '<span class="badge ' + (map[status] || 'badge-future') + '">' + (labels[status] || status) + '</span>';
+}
+
+/* ── CASCADE ── */
+function computeCascade(project) {
+  if (!project.hasBudgetData) return project.phases.map(function(p) { return Object.assign({}, p, {adjusted:p.planned, variance:0, cascadeNote:''}); });
+  var total = project.totalBudget;
+  var completedActual = 0;
+  var phases = project.phases;
+  var activeIdx = -1;
+  for (var i = 0; i < phases.length; i++) {
+    if (phases[i].status === 'na') continue;
+    if (phases[i].status === 'completed') completedActual += phases[i].spent;
+    else if (phases[i].status === 'active' && activeIdx === -1) activeIdx = i;
+  }
+  var futureReserved = 0;
+  for (var i = 0; i < phases.length; i++) {
+    if (phases[i].status === 'future') futureReserved += phases[i].planned;
+  }
+  var result = [];
+  for (var i = 0; i < phases.length; i++) {
+    var p = phases[i];
+    if (p.status === 'na') {
+      result.push(Object.assign({}, p, {adjusted:0, variance:0, cascadeNote:'Phase not applicable'}));
+    } else if (p.status === 'completed') {
+      var v = p.planned - p.spent;
+      result.push(Object.assign({}, p, {adjusted:p.spent, variance:v, cascadeNote: v >= 0 ? 'Saved ' + v.toFixed(1) + ' hrs' : 'Over by ' + Math.abs(v).toFixed(1) + ' hrs'}));
+    } else if (i === activeIdx) {
+      var adj = total - completedActual - futureReserved;
+      var v = adj - p.planned;
+      result.push(Object.assign({}, p, {adjusted:adj, variance:v, cascadeNote:'Adjusted from ' + p.planned + ' to ' + adj.toFixed(1) + ' hrs'}));
+    } else {
+      result.push(Object.assign({}, p, {adjusted:p.planned, variance:0, cascadeNote:''}));
+    }
+  }
+  return result;
+}
+
+/* ── AGGREGATE HELPERS ── */
+function projectSpent(proj) {
+  var s = 0;
+  for (var i = 0; i < proj.phases.length; i++) {
+    if (proj.phases[i].status !== 'na') s += proj.phases[i].spent;
+  }
+  return s;
+}
+function isProjectCompleted(p) {
+  if (p.status === 'finished') return true;
+  var nonNa = [];
+  for (var i = 0; i < p.phases.length; i++) { if (p.phases[i].status !== 'na') nonNa.push(p.phases[i]); }
+  if (nonNa.length === 0) return false;
+  for (var i = 0; i < nonNa.length; i++) { if (nonNa[i].status !== 'completed' && nonNa[i].status !== 'complete') return false; }
+  return true;
+}
+function allProjects() {
+  var out = [];
+  for (var i = 0; i < CLIENTS.length; i++) {
+    var c = CLIENTS[i];
+    for (var j = 0; j < c.projects.length; j++) {
+      var p = c.projects[j];
+      out.push(Object.assign({}, p, {clientId:c.id, clientName:c.name, clientCode:c.code, clientColor:c.color}));
+    }
+  }
+  return out;
+}
+function activeProjects() {
+  var all = allProjects();
+  var forecast = (ALLOCATIONS && ALLOCATIONS.forecastProjects) || [];
+  var out = [];
+  for (var i = 0; i < all.length; i++) {
+    if (isProjectCompleted(all[i])) continue;
+    if (forecast.length > 0 && forecast.indexOf(all[i].name) < 0) continue;
+    out.push(all[i]);
+  }
+  return out;
+}
+function completedProjects() {
+  var all = allProjects();
+  var out = [];
+  for (var i = 0; i < all.length; i++) { if (isProjectCompleted(all[i])) out.push(all[i]); }
+  return out;
+}
+function clientById(id) {
+  for (var i = 0; i < CLIENTS.length; i++) { if (CLIENTS[i].id === id) return CLIENTS[i]; }
+  return null;
+}
+function projectById(id) {
+  for (var i = 0; i < CLIENTS.length; i++) {
+    var c = CLIENTS[i];
+    for (var j = 0; j < c.projects.length; j++) {
+      if (c.projects[j].id === id) return Object.assign({}, c.projects[j], {clientId:c.id, clientName:c.name, clientCode:c.code, clientColor:c.color});
+    }
+  }
+  return null;
+}
+
+/* ── SIDEBAR ── */
+function renderSidebar() {
+  var html = '';
+  html += '<div class="nav-item ' + (currentView === 'master' ? 'active' : '') + '" onclick="navigate(\'master\')"><span class="icon">&#9673;</span> Master Dashboard</div>';
+  html += '<div class="nav-item ' + (currentView === 'flagged' ? 'active' : '') + '" onclick="navigate(\'flagged\')"><span class="icon">&#9888;</span> Needs Attention</div>';
+  html += '<div class="nav-item ' + (currentView === 'completed' ? 'active' : '') + '" onclick="navigate(\'completed\')"><span class="icon">&#10003;</span> Completed Projects</div>';
+  html += '<div class="nav-item ' + (currentView === 'resource' ? 'active' : '') + '" onclick="navigate(\'resource\')"><span class="icon">&#9202;</span> Resource Tracker</div>';
+  html += '<div class="nav-item ' + (currentView === 'allocations' ? 'active' : '') + '" onclick="navigate(\'allocations\')"><span class="icon">&#9997;</span> Manage Allocations</div>';
+  html += '<div class="nav-item ' + (currentView === 'settings' ? 'active' : '') + '" onclick="navigate(\'settings\')"><span class="icon">&#9881;</span> Settings</div>';
+  html += '<div class="nav-divider"></div>';
+
+  /* Split clients into active and inactive */
+  var activeClients = [], inactiveClients = [];
+  for (var ci = 0; ci < CLIENTS.length; ci++) {
+    if (CLIENTS[ci].status === 'inactive') { inactiveClients.push(CLIENTS[ci]); }
+    else { activeClients.push(CLIENTS[ci]); }
+  }
+
+  function renderClientGroup(clients) {
+    var out = '';
+    for (var ci = 0; ci < clients.length; ci++) {
+      var c = clients[ci];
+      var isOpen = openClients[c.id];
+      var isClientView = currentView === 'client:' + c.id;
+      out += '<div class="client-group">';
+      out += '<div class="client-header" onclick="toggleClient(\'' + c.id + '\')"><span class="arrow ' + (isOpen ? 'open' : '') + '">&#9654;</span><span style="color:' + c.color + '">&#9679;</span> ' + c.code + ' ' + c.name + '</div>';
+      out += '<div class="client-projects ' + (isOpen ? 'open' : '') + '">';
+      out += '<div class="nav-item ' + (isClientView ? 'active' : '') + '" onclick="navigate(\'client:' + c.id + '\')"><span class="icon">&#9635;</span> Overview</div>';
+      var sorted = c.projects.slice().sort(function(a,b){ return a.code < b.code ? -1 : a.code > b.code ? 1 : 0; });
+      for (var pi = 0; pi < sorted.length; pi++) {
+        var p = sorted[pi];
+        if (isProjectCompleted(p)) continue;
+        var isActive = currentView === 'project:' + p.id;
+        out += '<div class="nav-item ' + (isActive ? 'active' : '') + '" onclick="navigate(\'project:' + p.id + '\')"><span class="icon">&mdash;</span> <span><span class="proj-code">' + p.code + '</span>' + p.name + '</span></div>';
+      }
+      out += '</div></div>';
+    }
+    return out;
+  }
+
+  /* Active Clients */
+  html += '<div style="padding:6px 16px 4px;font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:rgba(255,255,255,.35);font-weight:600">Active Clients</div>';
+  html += renderClientGroup(activeClients);
+
+  /* Inactive Clients (collapsible) */
+  if (inactiveClients.length) {
+    html += '<div class="nav-divider"></div>';
+    html += '<div style="padding:6px 16px 4px;font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:rgba(255,255,255,.25);font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="showInactiveClients=!showInactiveClients;renderSidebar()"><span class="arrow ' + (showInactiveClients ? 'open' : '') + '" style="font-size:8px">&#9654;</span>Inactive Clients (' + inactiveClients.length + ')</div>';
+    if (showInactiveClients) {
+      html += '<div style="opacity:.6">';
+      html += renderClientGroup(inactiveClients);
+      html += '</div>';
+    }
+  }
+
+  document.getElementById('sidebarNav').innerHTML = html;
+}
+
+function toggleClient(id) { openClients[id] = !openClients[id]; renderSidebar(); }
+
+/* ── HOUR TYPE HELPERS ── */
+function computeHourTypes(projects) {
+  var ht = {billable:{budget:0,spent:0,count:0}, bizdev:{budget:0,spent:0,count:0}, ops:{budget:0,spent:0,count:0}};
+  for (var i = 0; i < projects.length; i++) {
+    var p = projects[i];
+    var type = p.hourType || 'billable';
+    var sp = filteredProjectSpent(p);
+    if (!ht[type]) ht[type] = {budget:0,spent:0,count:0};
+    ht[type].budget += (p.totalBudget || 0);
+    ht[type].spent += sp;
+    ht[type].count++;
+  }
+  ht.total = {budget: ht.billable.budget + ht.bizdev.budget + ht.ops.budget, spent: ht.billable.spent + ht.bizdev.spent + ht.ops.spent};
+  return ht;
+}
+
+function renderHourTypeSection(ht, clientId) {
+  var h = '<div class="hour-type-section">';
+  h += '<div class="section-title">Hours by Type</div>';
+  h += '<div class="hour-type-cards">';
+  /* Billable */
+  h += '<div class="ht-card ht-billable"><div class="ht-label">Billable</div>';
+  h += '<div class="ht-value">' + ht.billable.budget.toFixed(1) + ' hrs</div>';
+  h += '<div class="ht-sub">' + ht.billable.spent.toFixed(1) + ' hrs spent</div>';
+  h += '<div class="ht-count">' + ht.billable.count + ' project' + (ht.billable.count !== 1 ? 's' : '') + '</div></div>';
+  /* Biz Dev — always show spent as primary */
+  h += '<div class="ht-card ht-bizdev"><div class="ht-label">Business Dev</div>';
+  h += '<div class="ht-value">' + ht.bizdev.spent.toFixed(1) + ' hrs spent</div>';
+  if (ht.bizdev.budget > 0) h += '<div class="ht-sub">' + ht.bizdev.budget.toFixed(1) + ' hrs budgeted</div>';
+  h += '<div class="ht-count">' + ht.bizdev.count + ' project' + (ht.bizdev.count !== 1 ? 's' : '') + '</div></div>';
+  /* Ops — always show spent as primary */
+  h += '<div class="ht-card ht-ops"><div class="ht-label">Operations</div>';
+  h += '<div class="ht-value">' + ht.ops.spent.toFixed(1) + ' hrs spent</div>';
+  if (ht.ops.budget > 0) h += '<div class="ht-sub">' + ht.ops.budget.toFixed(1) + ' hrs budgeted</div>';
+  h += '<div class="ht-count">' + ht.ops.count + ' project' + (ht.ops.count !== 1 ? 's' : '') + '</div></div>';
+  h += '</div>';
+  /* Stacked bar */
+  var totalBudget = ht.total.budget || 1;
+  var bPct = Math.round((ht.billable.budget / totalBudget) * 100);
+  var dPct = Math.round((ht.bizdev.budget / totalBudget) * 100);
+  var oPct = 100 - bPct - dPct;
+  h += '<div class="stacked-bar-container">';
+  h += '<div class="stacked-bar-title">Budget Distribution by Hour Type</div>';
+  h += '<div class="stacked-bar">';
+  if (bPct > 0) h += '<div class="sb-seg sb-billable" style="width:' + bPct + '%">' + (bPct >= 8 ? bPct + '%' : '') + '</div>';
+  if (dPct > 0) h += '<div class="sb-seg sb-bizdev" style="width:' + dPct + '%">' + (dPct >= 8 ? dPct + '%' : '') + '</div>';
+  if (oPct > 0) h += '<div class="sb-seg sb-ops" style="width:' + oPct + '%">' + (oPct >= 8 ? oPct + '%' : '') + '</div>';
+  h += '</div>';
+  h += '<div class="stacked-bar-legend">';
+  h += '<div class="sb-legend-item"><div class="sb-legend-dot sb-billable"></div>Billable ' + bPct + '%</div>';
+  h += '<div class="sb-legend-item"><div class="sb-legend-dot sb-bizdev"></div>Biz Dev ' + dPct + '%</div>';
+  h += '<div class="sb-legend-item"><div class="sb-legend-dot sb-ops"></div>Ops ' + oPct + '%</div>';
+  h += '</div></div></div>';
+  return h;
+}
+
+/* ── RENDER: MASTER ── */
+function renderMaster() {
+  var all = showFinalized ? allProjects() : activeProjects();
+  var doneCount = completedProjects().length;
+  var noSnapshotCount = 0;
+  for (var i = 0; i < all.length; i++) { if (all[i].dataSource === 'no_snapshot') noSnapshotCount++; }
+
+  /* Aggregate financials from all visible projects with snapshots */
+  var totalBudgetHrs = 0, totalSpentHrs = 0;
+  var totalDollarBudget = 0, totalLaborMU = 0, totalLaborCost = 0, totalOOP = 0;
+  var totalProfit = 0, snapshotCount = 0, billableCount = 0, bizdevCount = 0;
+  for (var i = 0; i < all.length; i++) {
+    var p = all[i];
+    var sp = filteredProjectSpent(p);
+    totalBudgetHrs += p.totalBudget || 0;
+    totalSpentHrs += sp;
+    if (p.dataSource === 'snapshot') {
+      totalDollarBudget += p.dollarBudget || 0;
+      totalLaborMU += p.laborCost || 0;
+      totalLaborCost += (p.laborCost || 0) * 0.833;
+      totalOOP += p.oopCost || 0;
+      totalProfit += p.profit || 0;
+      snapshotCount++;
+    }
+    if (p.projectType === 'bizdev') bizdevCount++; else billableCount++;
+  }
+  var remainingHrs = Math.max(0, totalBudgetHrs - totalSpentHrs);
+  var totalEstPrice = totalLaborMU + totalOOP;
+  var profitDollar = totalDollarBudget - totalEstPrice;
+  var overallProfitPct = totalDollarBudget > 0 ? ((totalProfit / totalDollarBudget) * 100).toFixed(1) : 0;
+  var costPerHr = totalBudgetHrs > 0 ? totalLaborCost / totalBudgetHrs : 0;
+  var spentDollar = totalSpentHrs * costPerHr;
+  var estRemainDollar = remainingHrs * costPerHr;
+
+  /* Header */
+  var h = '<h1 class="page-title">Master Dashboard';
+  h += '<span class="view-toggle"><button class="view-toggle-btn ' + (!showFinalized ? 'active' : '') + '" onclick="showFinalized=false;navigate(currentView)">Active</button>';
+  h += '<button class="view-toggle-btn ' + (showFinalized ? 'active' : '') + '" onclick="showFinalized=true;navigate(currentView)">All</button></span>';
+  h += '</h1>';
+  h += '<p class="page-subtitle">' + (showFinalized ? all.length + ' total projects across Forge clients' : all.length + ' active projects &middot; ' + doneCount + ' completed &middot; ' + billableCount + ' billable, ' + bizdevCount + ' biz dev') + '</p>';
+
+  /* Date filter indicator */
+  if (globalDateFilter !== 'all') {
+    var _r = getDateRange(globalDateFilter);
+    var _opts = {month:'short', day:'numeric', year:'numeric'};
+    var _lbl = _r ? (_r.start.toLocaleDateString('en-US', _opts) + ' – ' + _r.end.toLocaleDateString('en-US', _opts)) : '';
+    h += '<div style="background:#E3F2FD;border-left:4px solid var(--ocean);border-radius:8px;padding:10px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px">';
+    h += '<span style="font-size:12px;color:var(--ocean);font-weight:600">Filtered View</span>';
+    h += '<span style="font-size:12px;color:var(--abyss)">' + _lbl + '</span>';
+    h += '<span style="font-size:11px;color:var(--mid-gray)">Hours shown reflect tracked time in this period only. Budgets remain cumulative.</span>';
+    h += '</div>';
+  }
+
+  /* Needs Attention alert */
+  if (noSnapshotCount > 0) {
+    h += '<div style="background:#FFF8E1;border-left:4px solid var(--honey);border-radius:8px;padding:14px 16px;margin-bottom:20px">';
+    h += '<div style="font-weight:600;color:#F57F17;margin-bottom:6px">&#9888; Needs Attention: ' + noSnapshotCount + ' project' + (noSnapshotCount !== 1 ? 's' : '') + ' missing snapshots</div>';
+    h += '<div style="font-size:12px;color:#F57F17">Cannot verify budget data without snapshots. <a href="#" onclick="navigate(\'flagged\');return false" style="color:#F57F17;text-decoration:underline;font-weight:600;cursor:pointer">View flagged projects &rarr;</a></div>';
+    h += '</div>';
+  }
+
+  /* ── PORTFOLIO FINANCIALS BANNER ── */
+  if (snapshotCount > 0) {
+    h += '<div class="snapshot-banner">';
+    h += '<div class="snap-header"><div class="snap-title">Portfolio Financials</div><div class="snap-version">' + snapshotCount + ' project' + (snapshotCount !== 1 ? 's' : '') + ' with snapshots</div></div>';
+
+    /* Row 1: Dollar financials */
+    h += '<div class="snap-financials">';
+    h += '<div class="snap-fin-item"><div class="sf-label">Total Client Budget</div><div class="sf-value sf-gold">$' + totalDollarBudget.toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">FMG Labor</div><div class="sf-value">$' + totalLaborMU.toLocaleString() + '</div><div class="sf-sub">Cost: $' + Math.round(totalLaborCost).toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Out-of-Pocket</div><div class="sf-value">$' + totalOOP.toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Portfolio Profit</div><div class="sf-value ' + (totalProfit >= 0 ? 'sf-green' : '') + '">$' + totalProfit.toLocaleString() + '</div><div class="sf-sub">' + overallProfitPct + '%</div></div>';
+    h += '</div>';
+
+    /* Row 2: Hours tracking */
+    h += '<div class="snap-financials" style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1)">';
+    h += '<div class="snap-fin-item"><div class="sf-label">Total Hours Budget</div><div class="sf-value">' + totalBudgetHrs.toFixed(1) + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Hours Spent</div><div class="sf-value" style="color:var(--ember)">' + totalSpentHrs.toFixed(1) + '</div><div class="sf-sub">' + pct(totalSpentHrs, totalBudgetHrs) + '% of budget</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Hours Remaining</div><div class="sf-value">' + remainingHrs.toFixed(1) + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Labor $ Spent</div><div class="sf-value" style="color:var(--ember)">$' + Math.round(spentDollar).toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Labor $ Remaining</div><div class="sf-value">$' + Math.round(estRemainDollar).toLocaleString() + '</div></div>';
+    h += '</div>';
+
+    /* Profitability gauge */
+    var profPctNum = parseFloat(overallProfitPct);
+    var gaugeColor = profPctNum >= 30 ? '#81C784' : profPctNum >= 15 ? 'var(--honey)' : profPctNum >= 0 ? 'var(--sand)' : '#C62828';
+    h += '<div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:20px">';
+    h += '<div style="font-size:11px;font-weight:600;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px">Portfolio Profitability</div>';
+    h += '<div style="flex:1;height:12px;background:rgba(255,255,255,.08);border-radius:6px;overflow:hidden"><div style="height:100%;width:' + Math.min(Math.max(profPctNum, 0), 100) + '%;background:' + gaugeColor + ';border-radius:6px;transition:width .3s"></div></div>';
+    h += '<div style="font-size:18px;font-weight:700;color:' + gaugeColor + '">' + overallProfitPct + '%</div>';
+    h += '</div>';
+
+    /* Budget breakdown bar */
+    var barTotal = spentDollar + estRemainDollar + Math.max(0, profitDollar) + totalOOP;
+    if (barTotal <= 0) barTotal = 1;
+    var spentPct = Math.round((spentDollar / barTotal) * 100);
+    var estPct = Math.round((estRemainDollar / barTotal) * 100);
+    var oopBarPct = Math.round((totalOOP / barTotal) * 100);
+    var profBarPct = Math.max(0, 100 - spentPct - estPct - oopBarPct);
+    h += '<div class="labor-oop-bar" style="margin-top:16px">';
+    h += '<div class="lob-title">Budget Breakdown</div>';
+    h += '<div class="lob-bar">';
+    if (spentPct > 0) h += '<div class="lob-seg" style="width:' + spentPct + '%;background:var(--ember)">' + (spentPct >= 8 ? '$' + Math.round(spentDollar).toLocaleString() : '') + '</div>';
+    if (estPct > 0) h += '<div class="lob-seg" style="width:' + estPct + '%;background:var(--ocean)">' + (estPct >= 8 ? '$' + Math.round(estRemainDollar).toLocaleString() : '') + '</div>';
+    if (oopBarPct > 0) h += '<div class="lob-seg" style="width:' + oopBarPct + '%;background:var(--sand);color:var(--abyss)">' + (oopBarPct >= 8 ? '$' + totalOOP.toLocaleString() : '') + '</div>';
+    if (profBarPct > 0) h += '<div class="lob-seg" style="width:' + profBarPct + '%;background:#81C784">' + (profBarPct >= 8 ? '$' + Math.round(profitDollar).toLocaleString() : '') + '</div>';
+    h += '</div>';
+    h += '<div class="lob-legend">';
+    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ember)"></div>Labor Spent</div>';
+    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ocean)"></div>Labor Remaining</div>';
+    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--sand)"></div>OOP</div>';
+    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Profit</div>';
+    h += '</div></div>';
+    h += '</div>';
+  }
+
+  /* ── PROJECT TABLE WITH SORTING ── */
+  /* Pre-compute sort values for each project */
+  var rows = [];
+  for (var i = 0; i < all.length; i++) {
+    var p = all[i];
+    var sp = filteredProjectSpent(p);
+    var pBudget = p.dollarBudget || 0;
+    var pLabor = p.laborCost || 0;
+    var pOOP = p.oopCost || 0;
+    var pProfit = p.profit || 0;
+    var pMarginNum = pBudget > 0 ? (pProfit / pBudget) * 100 : 0;
+    rows.push({ p:p, budget:pBudget, labor:pLabor, oop:pOOP, profit:pProfit, margin:pMarginNum, spent:sp });
+  }
+  /* Sort */
+  var dir = masterSortDir === 'asc' ? 1 : -1;
+  rows.sort(function(a, b) {
+    var va, vb;
+    switch (masterSortCol) {
+      case 'name': va = a.p.code || ''; vb = b.p.code || ''; return va < vb ? -dir : va > vb ? dir : 0;
+      case 'client': va = (a.p.clientName||'').toLowerCase(); vb = (b.p.clientName||'').toLowerCase(); return va < vb ? -dir : va > vb ? dir : 0;
+      case 'budget': return (a.budget - b.budget) * dir;
+      case 'labor': return (a.labor - b.labor) * dir;
+      case 'oop': return (a.oop - b.oop) * dir;
+      case 'profit': return (a.profit - b.profit) * dir;
+      case 'margin': return (a.margin - b.margin) * dir;
+      default: return 0;
+    }
+  });
+
+  var sortArrow = function(col) {
+    if (masterSortCol !== col) return ' <span style="opacity:.3;font-size:10px">&#9650;&#9660;</span>';
+    return masterSortDir === 'asc' ? ' <span style="font-size:10px">&#9650;</span>' : ' <span style="font-size:10px">&#9660;</span>';
+  };
+  var thStyle = 'cursor:pointer;user-select:none;white-space:nowrap';
+
+  h += '<div class="section-title" style="margin-top:28px">Projects</div>';
+  h += '<table class="phase-table"><thead><tr>';
+  h += '<th style="' + thStyle + '" onclick="toggleMasterSort(\'name\')">Project' + sortArrow('name') + '</th>';
+  h += '<th style="' + thStyle + '" onclick="toggleMasterSort(\'client\')">Client' + sortArrow('client') + '</th>';
+  h += '<th style="' + thStyle + '" onclick="toggleMasterSort(\'budget\')">Budget' + sortArrow('budget') + '</th>';
+  h += '<th style="' + thStyle + '" onclick="toggleMasterSort(\'labor\')">Labor' + sortArrow('labor') + '</th>';
+  h += '<th style="' + thStyle + '" onclick="toggleMasterSort(\'oop\')">OOP' + sortArrow('oop') + '</th>';
+  h += '<th style="' + thStyle + '" onclick="toggleMasterSort(\'profit\')">Profit' + sortArrow('profit') + '</th>';
+  h += '<th style="' + thStyle + '" onclick="toggleMasterSort(\'margin\')">Profitability' + sortArrow('margin') + '</th>';
+  h += '</tr></thead><tbody>';
+
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i], p = r.p;
+    var pMargin = r.margin.toFixed(1);
+    var mColor = r.margin >= 30 ? '#81C784' : r.margin >= 15 ? 'var(--honey)' : r.margin >= 0 ? 'var(--sand)' : '#C62828';
+
+    h += '<tr onclick="navigate(\'project:' + p.id + '\')" style="cursor:pointer">';
+    h += '<td><div style="font-size:11px;color:var(--mid-gray)">' + p.code + '</div><div style="font-weight:600">' + p.name + '</div></td>';
+    h += '<td style="font-size:12px;color:var(--mid-gray)">' + (p.clientName || '') + '</td>';
+    h += '<td>' + (r.budget > 0 ? '$' + r.budget.toLocaleString() : '$0') + '</td>';
+    h += '<td>' + (r.labor > 0 ? '$' + r.labor.toLocaleString() : '—') + '</td>';
+    h += '<td>' + (r.oop > 0 ? '$' + r.oop.toLocaleString() : '—') + '</td>';
+    h += '<td style="color:' + (r.profit >= 0 ? '' : '#C62828') + '">' + (r.budget > 0 || r.profit !== 0 ? '$' + r.profit.toLocaleString() : '—') + '</td>';
+    h += '<td><div style="display:flex;align-items:center;gap:8px">';
+    h += '<div style="height:8px;width:80px;background:rgba(0,0,0,.06);border-radius:4px;overflow:hidden"><div style="height:100%;width:' + Math.min(Math.max(r.margin, 0), 100) + '%;background:' + mColor + ';border-radius:4px"></div></div>';
+    h += '<span style="font-size:12px;font-weight:600;color:' + mColor + '">' + pMargin + '%</span>';
+    h += '</div></td>';
+    h += '</tr>';
+  }
+  h += '</tbody></table>';
+
+  document.getElementById('mainContent').innerHTML = h;
+}
+
+/* ── RENDER: CLIENT ── */
+function renderClient(clientId) {
+  var c = clientById(clientId);
+  if (!c) return;
+  /* Split active vs completed */
+  var activeList = [], doneList = [];
+  for (var i = 0; i < c.projects.length; i++) {
+    if (isProjectCompleted(c.projects[i])) doneList.push(c.projects[i]);
+    else activeList.push(c.projects[i]);
+  }
+  var visibleList = showFinalized ? c.projects : activeList;
+  var rate = getRate(c.id);
+
+  /* Aggregate financials from snapshots */
+  var totalBudget = 0, totalSpent = 0;
+  var totalDollarBudget = 0, totalLaborMU = 0, totalLaborCost = 0, totalOOP = 0;
+  var totalEstProfit = 0, totalActiveProfit = 0, snapshotCount = 0;
+  for (var i = 0; i < visibleList.length; i++) {
+    var p = visibleList[i];
+    totalBudget += p.totalBudget || 0;
+    totalSpent += filteredProjectSpent(p);
+    if (p.dataSource === 'snapshot') {
+      totalDollarBudget += p.dollarBudget || 0;
+      totalLaborMU += p.laborCost || 0;
+      totalLaborCost += (p.laborCost || 0) * 0.833;
+      totalOOP += p.oopCost || 0;
+      totalEstProfit += p.profit || 0;
+      totalActiveProfit += p.profit || 0;
+      snapshotCount++;
+    }
+  }
+
+  var h = '<h1 class="page-title">' + c.code + ' ' + c.name;
+  h += '<span class="view-toggle"><button class="view-toggle-btn ' + (!showFinalized ? 'active' : '') + '" onclick="showFinalized=false;navigate(currentView)">Active</button>';
+  h += '<button class="view-toggle-btn ' + (showFinalized ? 'active' : '') + '" onclick="showFinalized=true;navigate(currentView)">All</button></span>';
+  h += '</h1>';
+  var label = showFinalized ? (visibleList.length + ' total project' + (visibleList.length !== 1 ? 's' : '')) : (activeList.length + ' active project' + (activeList.length !== 1 ? 's' : '') + (doneList.length ? ' &middot; ' + doneList.length + ' completed' : ''));
+  h += '<p class="page-subtitle">' + label + ' &middot; Rate: ' + (rate > 0 ? '$' + rate + '/hr' : 'Not set') + '</p>';
+
+  /* ── CLIENT FINANCIALS BANNER (snapshot-based) ── */
+  if (snapshotCount > 0) {
+    var costPerHr = totalBudget > 0 ? totalLaborCost / totalBudget : 0;
+    var spentDollar = totalSpent * costPerHr;
+    var remainingHrs = Math.max(0, totalBudget - totalSpent);
+    var estRemainDollar = remainingHrs * costPerHr;
+    var totalEstPrice = totalLaborMU + totalOOP;
+    var profitDollar = totalDollarBudget - totalEstPrice;
+    var estProfitPct = totalDollarBudget > 0 ? Math.round((totalEstProfit / totalDollarBudget) * 10000) / 100 : 0;
+    var actProfitPct = totalDollarBudget > 0 ? Math.round((totalActiveProfit / totalDollarBudget) * 10000) / 100 : 0;
+
+    h += '<div class="snapshot-banner">';
+    h += '<div class="snap-header"><div class="snap-title">Client Financials</div><div class="snap-version">' + snapshotCount + ' project' + (snapshotCount !== 1 ? 's' : '') + ' with snapshots</div></div>';
+
+    /* Row 1: Dollar financials */
+    h += '<div class="snap-financials">';
+    h += '<div class="snap-fin-item"><div class="sf-label">Total Client Budget</div><div class="sf-value sf-gold">$' + totalDollarBudget.toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">FMG Labor</div><div class="sf-value">$' + totalLaborMU.toLocaleString() + '</div><div class="sf-sub">Cost: $' + totalLaborCost.toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Out-of-Pocket</div><div class="sf-value">$' + totalOOP.toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Est. Profit</div><div class="sf-value sf-green">$' + totalEstProfit.toLocaleString() + '</div><div class="sf-sub">' + estProfitPct + '%</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Active Profit</div><div class="sf-value sf-green">$' + totalActiveProfit.toLocaleString() + '</div><div class="sf-sub">' + actProfitPct + '%</div></div>';
+    h += '</div>';
+
+    /* Row 2: Hours tracking */
+    h += '<div class="snap-financials" style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1)">';
+    h += '<div class="snap-fin-item"><div class="sf-label">Total Hours Budget</div><div class="sf-value">' + totalBudget.toFixed(1) + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Hours Spent</div><div class="sf-value" style="color:var(--ember)">' + totalSpent.toFixed(1) + '</div><div class="sf-sub">' + pct(totalSpent, totalBudget) + '% of budget</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Hours Remaining</div><div class="sf-value">' + remainingHrs.toFixed(1) + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Labor $ Spent</div><div class="sf-value" style="color:var(--ember)">$' + Math.round(spentDollar).toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Labor $ Remaining</div><div class="sf-value">$' + Math.round(estRemainDollar).toLocaleString() + '</div></div>';
+    h += '</div>';
+
+    /* Budget breakdown bar */
+    var barTotal = spentDollar + estRemainDollar + profitDollar + totalOOP;
+    if (barTotal <= 0) barTotal = 1;
+    var spentPct = Math.round((spentDollar / barTotal) * 100);
+    var estPct = Math.round((estRemainDollar / barTotal) * 100);
+    var oopBarPct = Math.round((totalOOP / barTotal) * 100);
+    var profPct = Math.max(0, 100 - spentPct - estPct - oopBarPct);
+    h += '<div class="labor-oop-bar" style="margin-top:16px">';
+    h += '<div class="lob-title">Budget Breakdown</div>';
+    h += '<div class="lob-bar">';
+    if (spentPct > 0) h += '<div class="lob-seg" style="width:' + spentPct + '%;background:var(--ember)">' + (spentPct >= 8 ? '$' + Math.round(spentDollar).toLocaleString() : '') + '</div>';
+    if (estPct > 0) h += '<div class="lob-seg" style="width:' + estPct + '%;background:var(--ocean)">' + (estPct >= 8 ? '$' + Math.round(estRemainDollar).toLocaleString() : '') + '</div>';
+    if (oopBarPct > 0) h += '<div class="lob-seg" style="width:' + oopBarPct + '%;background:var(--sand);color:var(--abyss)">' + (oopBarPct >= 8 ? '$' + totalOOP.toLocaleString() : '') + '</div>';
+    if (profPct > 0) h += '<div class="lob-seg" style="width:' + profPct + '%;background:#81C784">' + (profPct >= 8 ? '$' + Math.round(profitDollar).toLocaleString() : '') + '</div>';
+    h += '</div>';
+    h += '<div class="lob-legend">';
+    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ember)"></div>Labor Spent</div>';
+    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ocean)"></div>Labor Remaining</div>';
+    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--sand)"></div>OOP</div>';
+    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Profit</div>';
+    h += '</div></div>';
+    h += '</div>';
+  } else {
+    /* Fallback for clients without any snapshots */
+    h += '<div class="stats-row">';
+    h += '<div class="stat-card"><div class="label">Client Budget</div><div class="value">' + fmt(totalBudget, c.id) + '</div></div>';
+    h += '<div class="stat-card"><div class="label">Spent</div><div class="value">' + fmt(totalSpent, c.id) + '</div><div class="sub">' + pct(totalSpent, totalBudget) + '%</div></div>';
+    h += '<div class="stat-card"><div class="label">Remaining</div><div class="value">' + fmt(totalBudget - totalSpent, c.id) + '</div></div>';
+    if (rate > 0) { h += '<div class="stat-card"><div class="label">Revenue (Spent)</div><div class="value">$' + Math.round(totalSpent * rate).toLocaleString() + '</div></div>'; }
+    h += '</div>';
+  }
+
+  /* ── PROJECT STATUS TABLE ── */
+  h += '<div class="section-title" style="margin-top:28px">Projects</div>';
+  h += '<table class="phase-table"><thead><tr>';
+  h += '<th>Project</th><th>Type</th><th>Current Phase</th><th>Budget</th><th>Spent</th><th>Hours Progress</th>';
+  h += '</tr></thead><tbody>';
+
+  for (var i = 0; i < visibleList.length; i++) {
+    var p = visibleList[i];
+    var isDone = isProjectCompleted(p);
+    var spent = filteredProjectSpent(p);
+    var prog = isDone ? 100 : pct(spent, p.totalBudget);
+
+    /* Find current phase */
+    var curPhase = '—';
+    for (var j = 0; j < p.phases.length; j++) {
+      if (p.phases[j].status === 'active') { curPhase = p.phases[j].name; break; }
+    }
+    if (isDone) curPhase = '<span class="badge badge-completed">Complete</span>';
+
+    /* Hour type badge */
+    var typeBadge = '<span class="badge badge-billable">Billable</span>';
+    if (p.hourType === 'bizdev') typeBadge = '<span class="badge badge-bizdev">Biz Dev</span>';
+    else if (p.hourType === 'ops') typeBadge = '<span class="badge badge-ops">Ops</span>';
+
+    var isOver = spent > p.totalBudget && p.totalBudget > 0;
+
+    h += '<tr onclick="navigate(\'project:' + p.id + '\')" style="cursor:pointer">';
+    h += '<td><div style="font-weight:600">' + p.name + '</div><div style="font-size:11px;color:var(--mid-gray)">' + p.code + '</div></td>';
+    h += '<td>' + typeBadge + '</td>';
+    h += '<td style="font-size:12px">' + curPhase + '</td>';
+    h += '<td>' + (p.totalBudget > 0 ? p.totalBudget.toFixed(1) : '—') + '</td>';
+    h += '<td style="' + (isOver ? 'color:#C62828;font-weight:700' : '') + '">' + spent.toFixed(1) + '</td>';
+    h += '<td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-wrap" style="height:10px;width:140px;display:inline-block;vertical-align:middle"><div class="progress-bar-fill" style="width:' + Math.min(prog, 100) + '%;background:' + (isDone ? '#2E7D32' : isOver ? '#C62828' : barColor(prog)) + '"></div></div><span style="font-size:11px;color:' + (isOver ? '#C62828' : 'var(--mid-gray)') + '">' + prog + '%</span></div></td>';
+    h += '</tr>';
+  }
+  h += '</tbody></table>';
+
+  /* ── UPCOMING RESOURCE ALLOCATION (this week + next week) ── */
+  var todayStr = new Date().toISOString().slice(0,10);
+  var curWeekSun = getWeekMon(todayStr);
+  var curWeekSat = getSaturday(curWeekSun);
+  var curWeekNum = getISOWeek(curWeekSun);
+  var nwDate = new Date(curWeekSun + 'T00:00:00');
+  nwDate.setDate(nwDate.getDate() + 7);
+  var nextWeekSun = nwDate.toISOString().slice(0,10);
+  var nextWeekSat = getSaturday(nextWeekSun);
+  var nextWeekNum = getISOWeek(nextWeekSun);
+
+  /* Show two weeks: current and next */
+  var weekPairs = [
+    { sun: curWeekSun, sat: curWeekSat, num: curWeekNum, label: 'This Week' },
+    { sun: nextWeekSun, sat: nextWeekSat, num: nextWeekNum, label: 'Next Week' }
+  ];
+
+  for (var wpi = 0; wpi < weekPairs.length; wpi++) {
+    var wp = weekPairs[wpi];
+    h += '<div class="section-title" style="margin-top:' + (wpi === 0 ? '28' : '20') + 'px">' + wp.label + ' — Week ' + wp.num + ' <span style="font-size:11px;font-weight:400;color:var(--mid-gray)">(' + fmtDateShort(wp.sun) + ' – ' + fmtDateShort(wp.sat) + ')</span></div>';
+
+    var anyAlloc = false;
+    for (var i = 0; i < visibleList.length; i++) {
+      var p = visibleList[i];
+      if (isProjectCompleted(p)) continue;
+      var weeks = buildWeeks(p.id);
+      var wk = null;
+      for (var wi = 0; wi < weeks.length; wi++) {
+        if (weeks[wi].sunday === wp.sun) { wk = weeks[wi]; break; }
+      }
+      if (!wk) continue;
+      anyAlloc = true;
+
+      var ppl = [];
+      for (var pk in wk.people) ppl.push([pk, wk.people[pk]]);
+      ppl.sort(function(a,b){ return b[1] - a[1]; });
+
+      h += '<div style="margin-bottom:16px;padding:14px 16px;background:var(--cloud);border-radius:10px;border-left:3px solid ' + c.color + '">';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+      h += '<div><span style="font-weight:700;font-size:13px;color:var(--abyss)">' + p.name + '</span> <span style="font-size:11px;color:var(--mid-gray)">' + p.code + '</span></div>';
+      h += '<div style="font-weight:700;font-size:14px;color:var(--ocean)">' + wk.total.toFixed(1) + ' hrs</div>';
+      h += '</div>';
+
+      h += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+      for (var si = 0; si < ppl.length; si++) {
+        if (ppl[si][0] === 'Unknown') continue;
+        var fn = ppl[si][0].split(' ')[0];
+        h += '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:rgba(255,255,255,.7);border-radius:12px;font-size:11px;color:var(--abyss)"><span style="width:6px;height:6px;border-radius:50%;background:' + (PC[ppl[si][0]] || '#9B9590') + '"></span>' + fn + ' ' + ppl[si][1].toFixed(1) + 'h</span>';
+      }
+      h += '</div></div>';
+    }
+
+    if (!anyAlloc) {
+      h += '<div style="font-size:13px;color:var(--mid-gray);padding:16px;background:var(--cloud);border-radius:8px">No allocations for ' + wp.label.toLowerCase() + ' <span style="font-weight:600">(' + fmtDateShort(wp.sun) + ' – ' + fmtDateShort(wp.sat) + ')</span></div>';
+    }
+  }
+
+  /* Hour Type Breakdown for this client */
+  var clientHt = computeHourTypes(visibleList);
+  if (clientHt.bizdev.count > 0 || clientHt.ops.count > 0) {
+    h += renderHourTypeSection(clientHt, c.id);
+  }
+
+  document.getElementById('mainContent').innerHTML = h;
+}
+
+/* ── RENDER: PROJECT ── */
+function renderProject(projectId) {
+  var p = projectById(projectId);
+  if (!p) return;
+  var cascaded = computeCascade(p);
+  var spent = filteredProjectSpent(p);
+  var prog = pct(spent, p.totalBudget);
+  var rate = getRate(p.clientId);
+
+  var h = '<p class="page-subtitle" style="margin-bottom:2px;font-family:monospace;font-size:12px;letter-spacing:.5px;color:var(--mid-gray)">' + p.code + '</p>';
+  h += '<h1 class="page-title">' + p.name + '</h1>';
+  h += '<p class="page-subtitle">' + p.clientCode + ' ' + p.clientName + ' &middot; Rate: ' + (rate > 0 ? '$' + rate + '/hr' : 'Not set') + '</p>';
+
+  if (!p.hasBudgetData && p.dataSource !== 'snapshot') {
+    h += '<div class="flagged-card" style="margin-bottom:16px"><div class="flag-title">&#9888; No Budget Data</div><div class="flag-reason">This project has no planned effort or snapshot. Time tracked against it will still appear below.</div></div>';
+  }
+
+  var isBizDev = p.projectType === 'bizdev';
+  var isSmallProj = p.projectType === 'small_projects';
+
+  if (isSmallProj && p.subSnapshots && p.subSnapshots.length > 0) {
+    /* ── SMALL PROJECTS: Aggregated header + individual sub-snapshots ── */
+    var subs = p.subSnapshots;
+    var aggBudget = 0, aggLabor = 0, aggOop = 0, aggProfit = 0, aggHrsBudget = 0, aggHrsSpent = 0;
+    for (var si = 0; si < subs.length; si++) {
+      aggBudget += subs[si].dollarBudget || 0;
+      aggLabor += subs[si].laborCost || 0;
+      aggOop += subs[si].oopCost || 0;
+      aggProfit += subs[si].profit || 0;
+      aggHrsBudget += subs[si].totalBudget || 0;
+      aggHrsSpent += subs[si].timesheetHours || 0;
+    }
+    var aggMargin = aggBudget > 0 ? ((aggProfit / aggBudget) * 100).toFixed(1) : 0;
+    var unallocHrs = Math.max(0, spent - aggHrsSpent);
+
+    /* Aggregated top-level financials */
+    h += '<div class="snapshot-banner">';
+    h += '<div class="snap-header"><div class="snap-title">Portfolio Financials (Aggregated)</div><div class="snap-version">' + subs.length + ' Sub-Project' + (subs.length !== 1 ? 's' : '') + '</div></div>';
+    h += '<div class="snap-financials">';
+    h += '<div class="snap-fin-item"><div class="sf-label">Total Client Budget</div><div class="sf-value sf-gold">$' + aggBudget.toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Total FMG Labor</div><div class="sf-value">$' + aggLabor.toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Total OOP</div><div class="sf-value">$' + aggOop.toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Total Profit</div><div class="sf-value ' + (aggProfit >= 0 ? 'sf-green' : '') + '">$' + aggProfit.toLocaleString() + '</div><div class="sf-sub">' + aggMargin + '%</div></div>';
+    h += '</div>';
+    h += '<div class="snap-financials" style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1)">';
+    h += '<div class="snap-fin-item"><div class="sf-label">Hours Budgeted</div><div class="sf-value">' + aggHrsBudget.toFixed(1) + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Hours Tracked (Timesheet)</div><div class="sf-value" style="color:var(--ember)">' + spent.toFixed(1) + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Allocated to Sub-Projects</div><div class="sf-value">' + aggHrsSpent.toFixed(1) + '</div></div>';
+    if (unallocHrs > 0) {
+      h += '<div class="snap-fin-item"><div class="sf-label">Unallocated Hours</div><div class="sf-value" style="color:var(--sand)">' + unallocHrs.toFixed(1) + '</div></div>';
+    }
+    h += '</div></div>';
+
+    /* Individual sub-snapshot cards */
+    h += '<div class="section-title" style="margin-top:24px">Sub-Project Breakdown</div>';
+    for (var si = 0; si < subs.length; si++) {
+      var ss = subs[si];
+      var ssMargin = ss.dollarBudget > 0 ? ((ss.profit / ss.dollarBudget) * 100).toFixed(1) : 0;
+      var ssHrsSpent = ss.timesheetHours || 0;
+      var ssHrsBudget = ss.totalBudget || 0;
+      var ssHrsProg = ssHrsBudget > 0 ? Math.round((ssHrsSpent / ssHrsBudget) * 100) : 0;
+      h += '<div class="snapshot-banner" style="margin-bottom:12px;padding:16px 20px">';
+      h += '<div class="snap-header"><div class="snap-title" style="font-size:14px">' + (ss.code ? ss.code + ' — ' : '') + ss.name + '</div></div>';
+      h += '<div class="snap-financials" style="margin-top:10px">';
+      h += '<div class="snap-fin-item"><div class="sf-label">Budget</div><div class="sf-value sf-gold" style="font-size:18px">$' + (ss.dollarBudget || 0).toLocaleString() + '</div></div>';
+      h += '<div class="snap-fin-item"><div class="sf-label">FMG Labor</div><div class="sf-value" style="font-size:18px">$' + (ss.laborCost || 0).toLocaleString() + '</div></div>';
+      h += '<div class="snap-fin-item"><div class="sf-label">OOP</div><div class="sf-value" style="font-size:18px">$' + (ss.oopCost || 0).toLocaleString() + '</div></div>';
+      h += '<div class="snap-fin-item"><div class="sf-label">Profit</div><div class="sf-value ' + ((ss.profit || 0) >= 0 ? 'sf-green' : '') + '" style="font-size:18px">$' + (ss.profit || 0).toLocaleString() + '</div><div class="sf-sub">' + ssMargin + '%</div></div>';
+      h += '</div>';
+      h += '<div class="snap-financials" style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08)">';
+      h += '<div class="snap-fin-item"><div class="sf-label">Hrs Budgeted</div><div class="sf-value" style="font-size:16px">' + ssHrsBudget.toFixed(1) + '</div></div>';
+      h += '<div class="snap-fin-item"><div class="sf-label">Hrs Spent</div><div class="sf-value" style="font-size:16px;color:var(--ember)">' + ssHrsSpent.toFixed(1) + '</div><div class="sf-sub">' + ssHrsProg + '% of budget</div></div>';
+      h += '</div></div>';
+    }
+
+    /* Unallocated bucket if applicable */
+    if (unallocHrs > 0) {
+      h += '<div class="snapshot-banner" style="margin-bottom:12px;padding:16px 20px;border-left:3px solid var(--sand)">';
+      h += '<div class="snap-header"><div class="snap-title" style="font-size:14px">Unallocated Hours</div><div class="snap-version">No snapshot linked</div></div>';
+      h += '<div class="snap-financials" style="margin-top:10px">';
+      h += '<div class="snap-fin-item"><div class="sf-label">Hours Tracked</div><div class="sf-value" style="font-size:18px;color:var(--sand)">' + unallocHrs.toFixed(1) + '</div></div>';
+      h += '<div class="snap-fin-item"><div class="sf-label">Budget</div><div class="sf-value" style="font-size:18px">—</div></div>';
+      h += '<div class="snap-fin-item"><div class="sf-label">Profit</div><div class="sf-value" style="font-size:18px">—</div></div>';
+      h += '</div></div>';
+    }
+
+  } else if (p.dataSource === 'snapshot' && isBizDev) {
+    /* ── BIZ DEV HEADER — $200/hr labor tracking, no budget ── */
+    var bdLabor = spent * 200;
+    h += '<div class="snapshot-banner">';
+    h += '<div class="snap-header"><div class="snap-title">Business Development</div><div class="snap-version">Labor @ $200/hr</div></div>';
+    h += '<div class="snap-financials">';
+    h += '<div class="snap-fin-item"><div class="sf-label">Labor Hours</div><div class="sf-value" style="color:var(--ember)">' + spent.toFixed(1) + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Labor Investment</div><div class="sf-value" style="color:var(--ember)">$' + Math.round(bdLabor).toLocaleString() + '</div><div class="sf-sub">@ $200/hr</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Team Members</div><div class="sf-value">' + (p.people ? p.people.length : 0) + '</div></div>';
+    h += '</div>';
+    h += '</div>';
+
+  } else if (p.dataSource === 'snapshot') {
+    /* ── SNAPSHOT-BASED HEADER ── */
+    var db = p.dollarBudget || 0;
+    var lm = p.laborCost || 0;
+    var lc = lm * 0.833;
+    var oop = p.oopCost || 0;
+    var tp = p.totalPrice || 0;
+    var proft = p.profit || 0;
+    var pm = p.profitMargin || 0;
+    var costPerHr = p.totalBudget > 0 ? lc / p.totalBudget : 0;
+    var spentDollar = spent * costPerHr;
+    var remainingHrs = Math.max(0, p.totalBudget - spent);
+    var estRemainDollar = remainingHrs * costPerHr;
+    var profitDollar = db - tp;
+
+    h += '<div class="snapshot-banner">';
+    h += '<div class="snap-header"><div class="snap-title">Project Financials</div><div class="snap-version">From Snapshot</div></div>';
+
+    /* Row 1: Dollar financials */
+    h += '<div class="snap-financials">';
+    h += '<div class="snap-fin-item"><div class="sf-label">Client Budget</div><div class="sf-value sf-gold">$' + db.toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">FMG Labor</div><div class="sf-value">$' + lm.toLocaleString() + '</div><div class="sf-sub">Cost: $' + Math.round(lc).toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Out-of-Pocket</div><div class="sf-value">$' + oop.toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Est. Profit</div><div class="sf-value ' + (proft >= 0 ? 'sf-green' : '') + '">$' + proft.toLocaleString() + '</div><div class="sf-sub">' + pm + '%</div></div>';
+    h += '</div>';
+
+    /* Row 2: Hours tracking */
+    h += '<div class="snap-financials" style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1)">';
+    h += '<div class="snap-fin-item"><div class="sf-label">Labor Hours Budget</div><div class="sf-value">' + p.totalBudget.toFixed(1) + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Hours Spent</div><div class="sf-value" style="color:var(--ember)">' + spent.toFixed(1) + '</div><div class="sf-sub">' + prog + '% of budget</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Hours Remaining</div><div class="sf-value">' + remainingHrs.toFixed(1) + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Labor $ Spent</div><div class="sf-value" style="color:var(--ember)">$' + Math.round(spentDollar).toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Labor $ Remaining</div><div class="sf-value">$' + Math.round(estRemainDollar).toLocaleString() + '</div></div>';
+    h += '</div>';
+
+    /* Budget breakdown bar */
+    var barTotal = spentDollar + estRemainDollar + Math.max(0, profitDollar) + oop;
+    if (barTotal <= 0) barTotal = 1;
+    var spentPct = Math.round((spentDollar / barTotal) * 100);
+    var estPct = Math.round((estRemainDollar / barTotal) * 100);
+    var oopBarPct = Math.round((oop / barTotal) * 100);
+    var profPct = Math.max(0, 100 - spentPct - estPct - oopBarPct);
+    h += '<div class="labor-oop-bar" style="margin-top:16px">';
+    h += '<div class="lob-title">Budget Breakdown</div>';
+    h += '<div class="lob-bar">';
+    if (spentPct > 0) h += '<div class="lob-seg" style="width:' + spentPct + '%;background:var(--ember)">' + (spentPct >= 10 ? '$' + Math.round(spentDollar).toLocaleString() : '') + '</div>';
+    if (estPct > 0) h += '<div class="lob-seg" style="width:' + estPct + '%;background:var(--ocean)">' + (estPct >= 10 ? '$' + Math.round(estRemainDollar).toLocaleString() : '') + '</div>';
+    if (oopBarPct > 0) h += '<div class="lob-seg" style="width:' + oopBarPct + '%;background:var(--sand);color:var(--abyss)">' + (oopBarPct >= 10 ? '$' + oop.toLocaleString() : '') + '</div>';
+    if (profPct > 0) h += '<div class="lob-seg" style="width:' + profPct + '%;background:#81C784">' + (profPct >= 10 ? '$' + Math.round(profitDollar).toLocaleString() : '') + '</div>';
+    h += '</div>';
+    h += '<div class="lob-legend">';
+    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ember)"></div>Labor Spent $' + Math.round(spentDollar).toLocaleString() + '</div>';
+    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ocean)"></div>Labor Remaining $' + Math.round(estRemainDollar).toLocaleString() + '</div>';
+    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--sand)"></div>OOP $' + oop.toLocaleString() + '</div>';
+    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Profit $' + Math.round(profitDollar).toLocaleString() + '</div>';
+    h += '</div></div>';
+    h += '</div>';
+  } else {
+    /* ── FALLBACK: Standard stats for projects without snapshots ── */
+    h += '<div class="stats-row">';
+    h += '<div class="stat-card"><div class="label">Total Budget</div><div class="value">' + fmt(p.totalBudget, p.clientId) + '</div></div>';
+    h += '<div class="stat-card"><div class="label">Spent</div><div class="value">' + fmt(spent, p.clientId) + '</div><div class="sub">' + prog + '%</div></div>';
+    h += '<div class="stat-card"><div class="label">Remaining</div><div class="value">' + fmt(p.totalBudget - spent, p.clientId) + '</div></div>';
+    if (rate > 0) {
+      h += '<div class="stat-card"><div class="label">Revenue (Spent)</div><div class="value">$' + Math.round(spent * rate).toLocaleString() + '</div></div>';
+    }
+    h += '</div>';
+  }
+
+  if (isBizDev) {
+    /* ── BIZ DEV: Per-Person Hours Breakdown ── */
+    var bdPeople = p.people || [];
+    if (bdPeople.length > 0) {
+      var maxPersonHrs = 0;
+      for (var i = 0; i < bdPeople.length; i++) { if (bdPeople[i].spent > maxPersonHrs) maxPersonHrs = bdPeople[i].spent; }
+      if (maxPersonHrs === 0) maxPersonHrs = 1;
+      h += '<div class="section-title" style="margin-top:24px">Team Investment</div>';
+      h += '<table class="phase-table"><thead><tr>';
+      h += '<th>Team Member</th><th style="text-align:right">Hours</th><th style="text-align:right">Labor Cost</th><th style="text-align:right">% of Total</th><th>Distribution</th>';
+      h += '</tr></thead><tbody>';
+      for (var i = 0; i < bdPeople.length; i++) {
+        var bp = bdPeople[i];
+        var bpCost = bp.spent * 200;
+        var bpPct = spent > 0 ? Math.round(bp.spent / spent * 100) : 0;
+        var barW = Math.round(bp.spent / maxPersonHrs * 100);
+        var pc = PC[bp.name] || 'var(--ocean)';
+        h += '<tr>';
+        h += '<td style="font-weight:600"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + pc + ';margin-right:8px"></span>' + bp.name + '</td>';
+        h += '<td style="text-align:right">' + bp.spent.toFixed(1) + '</td>';
+        h += '<td style="text-align:right">$' + Math.round(bpCost).toLocaleString() + '</td>';
+        h += '<td style="text-align:right;color:var(--mid-gray)">' + bpPct + '%</td>';
+        h += '<td><div class="progress-bar-wrap" style="height:8px;width:140px;display:inline-block;vertical-align:middle"><div class="progress-bar-fill" style="width:' + barW + '%;background:' + pc + '"></div></div></td>';
+        h += '</tr>';
+      }
+      h += '</tbody></table>';
+    }
+  } else {
+    /* ── STANDARD: Progress bar + Phase table ── */
+    h += '<div class="progress-bar-wrap" style="height:14px;margin-bottom:20px"><div class="progress-bar-fill" style="width:' + prog + '%;background:' + barColor(prog) + '"></div></div>';
+
+    /* Phase table */
+    h += '<table class="phase-table"><thead><tr>';
+    h += '<th>Phase</th><th>Status</th><th>Planned</th><th>Adjusted</th><th>Spent</th><th>Variance</th><th>Progress</th>';
+    h += '</tr></thead><tbody>';
+    for (var i = 0; i < cascaded.length; i++) {
+      var ph = cascaded[i];
+      if (ph.status === 'na') continue;
+      var base = ph.adjusted > 0 ? ph.adjusted : ph.planned;
+      var phPct = pct(ph.spent, base);
+      var isOver = ph.spent > ph.adjusted && ph.adjusted > 0;
+      h += '<tr>';
+      h += '<td style="font-weight:600">' + ph.name + '</td>';
+      h += '<td>' + badgeHTML(ph.status) + '</td>';
+      h += '<td>' + fmt(ph.planned, p.clientId) + '</td>';
+      h += '<td>' + fmt(ph.adjusted, p.clientId) + '</td>';
+      h += '<td>' + (isOver ? '<span class="badge badge-over">' : '') + fmt(ph.spent, p.clientId) + (isOver ? '</span>' : '') + '</td>';
+      h += '<td style="color:' + (ph.variance >= 0 ? '#2E7D32' : '#C62828') + '">' + (ph.variance >= 0 ? '+' : '') + fmt(ph.variance, p.clientId) + '</td>';
+      h += '<td><div class="progress-bar-wrap" style="height:8px;width:120px;display:inline-block;vertical-align:middle"><div class="progress-bar-fill" style="width:' + Math.min(phPct, 100) + '%;background:' + (isOver ? '#C62828' : barColor(phPct)) + '"></div></div> <span style="font-size:11px;color:var(--mid-gray)">' + phPct + '%</span></td>';
+      h += '</tr>';
+    }
+    h += '</tbody></table>';
+
+    /* Cascade explanation */
+    var activePhase = null;
+    for (var i = 0; i < cascaded.length; i++) { if (cascaded[i].status === 'active') { activePhase = cascaded[i]; break; } }
+    if (activePhase && activePhase.cascadeNote) {
+      h += '<div class="cascade-detail"><strong>Cascade Budget:</strong> ' + activePhase.cascadeNote + '. Completed phases lock at actual spend; net variance flows to the active phase.</div>';
+    }
+  }
+
+  /* Per-Person Phase Breakdown (from detailed Snapshot data, if available) */
+  var _sn = p.snapshot || null;
+  if (_sn && _sn.phases) {
+    var deptColors = {'Executive/Admin':'var(--ember)','Account':'var(--ocean)','Creative':'var(--sand)','Post':'var(--honey)'};
+    var deptOrder = ['Executive/Admin','Account','Creative','Post'];
+    var snPhases = _sn.phases;
+    var phaseKeys = Object.keys(snPhases);
+
+    /* Map snapshot phase keys to portfolio phase spent via phase number prefix */
+    var snapshotPhasePrefix = {
+      'Phase 1 - Initiation':'P1','Phase 2 - Ideation':'P2','Phase 2 - Research and strategy':'P2',
+      'Phase 3.1 - Execution (Pre Pro)':'P3.1','Phase 3.1 Web Design - (user experience development)':'P3.1',
+      'Phase 3.2 - Execution (Production)':'P3.2','Phase 3.2 -  (User Interface & Content development)':'P3.2',
+      'Phase 4 - Compilation (Post)':'P4','Phase 4 - Development (QC testing & launch)':'P4',
+      'Phase 5 - Resolution':'P5'
+    };
+    /* Build map from prefix to portfolio phase spent */
+    var prefixSpentMap = {};
+    for (var pi2 = 0; pi2 < p.phases.length; pi2++) {
+      var pName = p.phases[pi2].name;
+      var prefix = pName.match(/^P[\d.]+/);
+      if (prefix) prefixSpentMap[prefix[0]] = p.phases[pi2].spent;
+    }
+
+    h += '<div class="person-phase-section">';
+    h += '<div class="section-title">Team Allocation by Phase <span style="font-size:11px;font-weight:400;color:var(--mid-gray);margin-left:8px">Estimates from Snapshot ' + (_sn.snapshotVersion || '') + ' &middot; Spent from Timesheets</span></div>';
+
+    /* Department legend */
+    h += '<div style="display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap">';
+    for (var di = 0; di < deptOrder.length; di++) {
+      h += '<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--mid-gray)"><div style="width:10px;height:10px;border-radius:50%;background:' + deptColors[deptOrder[di]] + '"></div>' + deptOrder[di] + '</div>';
+    }
+    h += '</div>';
+
+    for (var phi = 0; phi < phaseKeys.length; phi++) {
+      var phKey = phaseKeys[phi];
+      var phData = snPhases[phKey];
+      if (!phData.people || !phData.people.length) continue;
+
+      /* Get actual spent from portfolio (most current) via phase number prefix */
+      var phPrefix = snapshotPhasePrefix[phKey] || phKey.match(/Phase (\d[\d.]*)/);
+      if (phPrefix && typeof phPrefix === 'object') phPrefix = 'P' + phPrefix[1];
+      var portfolioPhaseSpent = (phPrefix && prefixSpentMap[phPrefix]) || 0;
+
+      var shortName = phKey.replace('Phase ','P').replace(' - ',': ').replace(' (Pre Pro)','').replace(' (Post)','').replace('Compilation','Post');
+      var phaseOverall = phData.estimated > 0 ? Math.round((portfolioPhaseSpent / phData.estimated) * 100) : 0;
+      h += '<div class="pp-phase-block">';
+      h += '<div class="pp-phase-header"><div class="pp-phase-title">' + shortName + '</div>';
+      h += '<div class="pp-phase-totals">Est: ' + phData.estimated.toFixed(1) + ' &middot; Spent: ' + portfolioPhaseSpent.toFixed(1) + ' hrs <span style="font-size:11px;color:' + (phaseOverall > 100 ? '#C62828' : phaseOverall > 75 ? 'var(--ocean)' : 'var(--mid-gray)') + '">(' + phaseOverall + '%)</span></div></div>';
+
+      /* Group estimated people by department */
+      var byDept = {};
+      for (var pi = 0; pi < phData.people.length; pi++) {
+        var per = phData.people[pi];
+        var dept = per.dept || 'Other';
+        if (!byDept[dept]) byDept[dept] = [];
+        byDept[dept].push({ name: per.name, estimated: per.estimated, isUnplanned: false });
+      }
+
+      /* Always distribute portfolio phase spent by estimate share (snapshot actuals are always stale) */
+      h += '<div class="pp-row pp-hdr" style="grid-template-columns:24px 1fr 70px 70px 120px"><div></div><div>Name</div><div style="text-align:right">Est.</div><div style="text-align:right">Spent</div><div>Progress</div></div>';
+
+      for (var di = 0; di < deptOrder.length; di++) {
+        var deptName = deptOrder[di];
+        var deptPeople = byDept[deptName];
+        if (!deptPeople || !deptPeople.length) continue;
+
+        var deptEst = 0;
+        for (var dpi = 0; dpi < deptPeople.length; dpi++) { deptEst += deptPeople[dpi].estimated; }
+        /* Dept spent = proportional share of portfolio phase spent */
+        var deptSpent = phData.estimated > 0 ? Math.round((deptEst / phData.estimated) * portfolioPhaseSpent * 100) / 100 : 0;
+        var dc = deptColors[deptName] || 'var(--mid-gray)';
+        var deptPct = deptEst > 0 ? Math.round((deptSpent / deptEst) * 100) : (deptSpent > 0 ? 100 : 0);
+        var deptOver = deptSpent > deptEst && deptEst > 0;
+
+        /* Department sub-header with progress bar */
+        h += '<div style="display:grid;grid-template-columns:24px 1fr 70px 70px 120px;gap:8px;align-items:center;padding:8px 0 4px;border-bottom:2px solid ' + dc + '">';
+        h += '<div><div style="width:10px;height:10px;border-radius:50%;background:' + dc + '"></div></div>';
+        h += '<div style="font-size:12px;font-weight:700;color:var(--abyss)">' + deptName + '</div>';
+        h += '<div class="pp-num" style="font-weight:700">' + deptEst.toFixed(1) + '</div>';
+        h += '<div class="pp-num" style="font-weight:700;' + (deptOver ? 'color:#C62828' : '') + '">' + deptSpent.toFixed(1) + '</div>';
+        h += '<div style="display:flex;align-items:center;gap:6px"><div class="pp-bar-wrap" style="flex:1"><div class="pp-bar-fill" style="width:' + Math.min(deptPct, 100) + '%;background:' + (deptOver ? '#C62828' : dc) + '"></div></div><span style="font-size:10px;color:' + (deptOver ? '#C62828' : 'var(--mid-gray)') + ';min-width:30px">' + deptPct + '%</span></div>';
+        h += '</div>';
+
+        /* People within department */
+        for (var dpi = 0; dpi < deptPeople.length; dpi++) {
+          var per2 = deptPeople[dpi];
+          /* Distribute portfolio spent by estimate share — snapshot actuals ignored */
+          var scaledSpent = (portfolioPhaseSpent > 0 && phData.estimated > 0 && per2.estimated > 0)
+            ? Math.round((per2.estimated / phData.estimated) * portfolioPhaseSpent * 100) / 100
+            : 0;
+          var perPct = per2.estimated > 0 ? Math.round((scaledSpent / per2.estimated) * 100) : (scaledSpent > 0 ? 100 : 0);
+          var perOver = scaledSpent > per2.estimated && per2.estimated > 0;
+          h += '<div class="pp-row" style="grid-template-columns:24px 1fr 70px 70px 120px">';
+          h += '<div></div>';
+          h += '<div class="pp-name">' + per2.name + (per2.isUnplanned ? ' <span style="font-size:9px;color:var(--ember);font-weight:400">unplanned</span>' : '') + '</div>';
+          h += '<div class="pp-num">' + (per2.estimated > 0 ? per2.estimated.toFixed(1) : '<span style="color:var(--mid-gray)">—</span>') + '</div>';
+          h += '<div class="pp-num" style="' + (perOver ? 'color:#C62828;font-weight:700' : '') + '">' + (scaledSpent > 0 ? scaledSpent.toFixed(1) : '<span style="color:var(--mid-gray)">—</span>') + '</div>';
+          h += '<div style="display:flex;align-items:center;gap:6px"><div class="pp-bar-wrap" style="flex:1"><div class="pp-bar-fill" style="width:' + Math.min(perPct, 100) + '%;background:' + (perOver ? '#C62828' : per2.isUnplanned ? 'var(--mid-gray)' : dc) + '"></div></div><span style="font-size:10px;color:' + (perOver ? '#C62828' : 'var(--mid-gray)') + ';min-width:30px">' + (per2.estimated > 0 || scaledSpent > 0 ? perPct + '%' : '') + '</span></div>';
+          h += '</div>';
+        }
+      }
+      h += '</div>';
+    }
+    h += '</div>';
+  }
+
+  /* Resource Allocation Section — upcoming weeks only */
+  var weeks = buildWeeks(projectId);
+  var todayStr = new Date().toISOString().slice(0,10);
+  var curMon = getWeekMon(todayStr);
+  var upcoming = [];
+  for (var i = 0; i < weeks.length; i++) { if (weeks[i].sunday >= curMon) upcoming.push(weeks[i]); }
+
+  h += '<div class="section-title" style="margin-top:32px">Upcoming Resource Allocation</div>';
+
+  if (upcoming.length > 0) {
+    var upcomingTotal = 0;
+    for (var i = 0; i < upcoming.length; i++) upcomingTotal += upcoming[i].total;
+    var maxWkHrs = 1;
+    for (var i = 0; i < upcoming.length; i++) { if (upcoming[i].total > maxWkHrs) maxWkHrs = upcoming[i].total; }
+
+    h += '<div style="font-size:12px;color:var(--mid-gray);margin-bottom:14px">' + upcoming.length + ' week' + (upcoming.length !== 1 ? 's' : '') + ' &middot; ' + upcomingTotal.toFixed(1) + ' hrs allocated</div>';
+
+    /* Weekly timeline */
+    h += '<div class="week-timeline">';
+    for (var wi = 0; wi < upcoming.length; wi++) {
+      var w = upcoming[wi];
+      var isCur = w.sunday === curMon;
+      var ppl = [];
+      for (var pk in w.people) ppl.push([pk, w.people[pk]]);
+      ppl.sort(function(a,b){return b[1]-a[1];});
+      var segs = '';
+      for (var si = 0; si < ppl.length; si++) {
+        var sw = (ppl[si][1] / w.total) * (w.total / maxWkHrs) * 100;
+        var sc = PC[ppl[si][0]] || '#9B9590';
+        segs += '<div class="wb-seg" style="width:' + sw + '%;background:' + sc + '" title="' + ppl[si][0] + ': ' + ppl[si][1].toFixed(1) + 'h"></div>';
+      }
+      var ptags = '';
+      for (var si = 0; si < ppl.length; si++) {
+        if (ppl[si][0] === 'Unknown') continue;
+        var fn = ppl[si][0].split(' ')[0];
+        ptags += '<span class="week-person"><span class="pd" style="background:' + (PC[ppl[si][0]]||'#9B9590') + '"></span>' + fn + ' ' + ppl[si][1].toFixed(1) + 'h</span>';
+      }
+      h += '<div class="week-row' + (isCur ? ' current-week' : '') + '">';
+      h += '<div class="week-label">' + (isCur ? '&#9654; ' : '') + 'Week ' + getISOWeek(w.sunday) + '<span class="wd">' + fmtDateShort(w.sunday) + ' – ' + fmtDateShort(getSaturday(w.sunday)) + '</span></div>';
+      h += '<div class="week-hrs">' + w.total.toFixed(1) + '<span class="wu"> hrs</span></div>';
+      h += '<div class="week-bar-wrap"><div class="week-bar">' + segs + '</div><div class="week-people">' + ptags + '</div></div>';
+      h += '</div>';
+    }
+    h += '</div>';
+  } else {
+    /* No upcoming allocations — show current week date range */
+    var curSunStr = curMon;
+    var curSatDate = getSaturday(curSunStr);
+    h += '<div style="font-size:13px;color:var(--mid-gray);margin-top:8px;padding:16px;background:var(--cloud);border-radius:8px">No allocations for upcoming week <span style="font-weight:600">(' + fmtDateShort(curSunStr) + ' – ' + fmtDateShort(curSatDate) + ')</span></div>';
+  }
+
+  document.getElementById('mainContent').innerHTML = h;
+}
+
+/* ── RENDER: FLAGGED ── */
+function renderFlagged() {
+  var h = '<h1 class="page-title">Needs Attention</h1>';
+  h += '<p class="page-subtitle">Projects missing data or requiring team input</p>';
+
+  var all = allProjects();
+
+  /* Missing Snapshots section at TOP */
+  var noSnapshot = [];
+  for (var i = 0; i < all.length; i++) {
+    if (all[i].dataSource === 'no_snapshot') noSnapshot.push(all[i]);
+  }
+
+  if (noSnapshot.length) {
+    h += '<div class="section-title" style="color:var(--honey)">Missing Snapshots</div>';
+    var byClient = {};
+    for (var i = 0; i < noSnapshot.length; i++) {
+      var p = noSnapshot[i];
+      if (!byClient[p.clientId]) byClient[p.clientId] = {name:p.clientName, code:p.clientCode, projects:[]};
+      byClient[p.clientId].projects.push(p);
+    }
+    for (var cid in byClient) {
+      var g = byClient[cid];
+      h += '<div style="margin-bottom:12px"><div style="font-size:12px;font-weight:600;color:var(--mid-gray);margin-bottom:6px">' + g.code + ' ' + g.name + ' (' + g.projects.length + ')</div>';
+      for (var j = 0; j < g.projects.length; j++) {
+        var p = g.projects[j];
+        h += '<div class="flagged-card" style="border-left-color:var(--honey);margin-bottom:8px"><div class="flag-title">' + p.name + '</div><div class="flag-reason" style="color:var(--honey)">No snapshot found on Monday.com board — cannot verify budget data</div><div class="flag-client">' + p.code + '</div></div>';
+      }
+      h += '</div>';
+    }
+  }
+
+  if (FLAGGED_NO_STRUCTURE.length) {
+    h += '<div class="section-title">No Phase Structure</div>';
+    for (var i = 0; i < FLAGGED_NO_STRUCTURE.length; i++) {
+      var f = FLAGGED_NO_STRUCTURE[i];
+      h += '<div class="flagged-card"><div class="flag-title">' + f.name + '</div><div class="flag-reason">' + f.reason + '</div><div class="flag-client">' + f.clientCode + ' ' + f.client + ' &middot; ' + f.code + '</div></div>';
+    }
+  }
+
+  /* Possibly Finished — over budget or all phases complete but still marked active */
+  var possiblyDone = [];
+  for (var i = 0; i < all.length; i++) {
+    var p = all[i];
+    if (isProjectCompleted(p)) continue;
+    if (!p.hasBudgetData) continue;
+    var totalPlanned = 0, totalSpent = 0;
+    for (var j = 0; j < p.phases.length; j++) { totalPlanned += p.phases[j].planned; totalSpent += p.phases[j].spent; }
+    if (totalPlanned > 0 && totalSpent >= totalPlanned * 0.95) {
+      possiblyDone.push({name:p.name, code:p.code, clientName:p.clientName, clientCode:p.clientCode, spent:Math.round(totalSpent), planned:Math.round(totalPlanned), pct:Math.round(totalSpent/totalPlanned*100)});
+    }
+  }
+  if (possiblyDone.length) {
+    h += '<div class="section-title" style="color:#1565C0">Possibly Finished — Confirm Status</div>';
+    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">These projects have consumed 95%+ of their budgeted hours and may be finished. Please confirm so they can be moved to the Completed tab.</p>';
+    for (var i = 0; i < possiblyDone.length; i++) {
+      var f = possiblyDone[i];
+      h += '<div class="flagged-card" style="border-left-color:#1565C0"><div class="flag-title">' + f.name + '</div><div class="flag-reason" style="color:#1565C0">Budget ' + f.pct + '% consumed (' + f.spent + '/' + f.planned + ' hrs)</div><div class="flag-client">' + f.clientCode + ' ' + f.clientName + ' &middot; ' + f.code + '</div></div>';
+    }
+  }
+
+  if (!noSnapshot.length && !FLAGGED_NO_STRUCTURE.length && !possiblyDone.length) {
+    h += '<div style="text-align:center;color:var(--mid-gray);padding:60px 0"><p style="font-size:40px;margin-bottom:12px">&#10003;</p><p>All projects have complete data</p></div>';
+  }
+  document.getElementById('mainContent').innerHTML = h;
+}
+
+/* ── RENDER: COMPLETED ── */
+function renderCompleted() {
+  var done = completedProjects();
+  var h = '<h1 class="page-title">Completed Projects</h1>';
+  h += '<p class="page-subtitle">' + done.length + ' projects completed across all clients</p>';
+
+  // Group by client
+  var byClient = {};
+  for (var i = 0; i < done.length; i++) {
+    var p = done[i];
+    if (!byClient[p.clientId]) byClient[p.clientId] = {name:p.clientName, code:p.clientCode, color:p.clientColor, projects:[]};
+    byClient[p.clientId].projects.push(p);
+  }
+
+  for (var cid in byClient) {
+    var g = byClient[cid];
+    g.projects.sort(function(a,b){ return a.code < b.code ? -1 : a.code > b.code ? 1 : 0; });
+    h += '<div class="section-title" style="display:flex;align-items:center;gap:8px"><span style="color:' + g.color + '">&#9679;</span> ' + g.code + ' ' + g.name + ' <span style="font-weight:400;color:var(--mid-gray);font-size:12px">(' + g.projects.length + ')</span></div>';
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin-bottom:20px">';
+    for (var j = 0; j < g.projects.length; j++) {
+      var p = g.projects[j];
+      var spent = filteredProjectSpent(p);
+      h += '<div class="project-card" onclick="navigate(\'project:' + p.id + '\')" style="border-left-color:' + g.color + ';opacity:.85">';
+      h += '<div class="card-code" style="margin-bottom:2px">' + p.code + '</div>';
+      h += '<div class="card-title" style="font-size:13px">' + p.name + '</div>';
+      h += '<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:100%;background:#2E7D32"></div></div>';
+      h += '<div class="progress-meta"><span>' + (spent > 0 ? fmt(spent, cid) + ' spent' : 'No hours tracked') + '</span><span class="badge badge-completed">Complete</span></div>';
+      h += '</div>';
+    }
+    h += '</div>';
+  }
+
+  if (done.length === 0) {
+    h += '<div style="text-align:center;color:var(--mid-gray);padding:60px 0"><p style="font-size:40px;margin-bottom:12px">&#128230;</p><p>No completed projects yet</p></div>';
+  }
+  document.getElementById('mainContent').innerHTML = h;
+}
+
+/* ── RENDER: SETTINGS ── */
+function renderSettings() {
+  var h = '<h1 class="page-title">Settings</h1>';
+  h += '<p class="page-subtitle">Configure hourly rates per client for revenue calculations</p>';
+  h += '<div class="settings-grid">';
+  for (var i = 0; i < CLIENTS.length; i++) {
+    var c = CLIENTS[i];
+    var rate = getRate(c.id);
+    h += '<div class="settings-card">';
+    h += '<h3 style="display:flex;align-items:center;gap:8px"><span style="color:' + c.color + '">&#9679;</span> ' + c.code + ' ' + c.name + '</h3>';
+    h += '<div class="rate-input-wrap"><label>$/hr</label><input type="number" class="rate-input" id="rate-' + c.id + '" value="' + (rate || '') + '" placeholder="0" min="0" step="5" onchange="updateRate(\'' + c.id + '\', this.value)"></div>';
+    h += '<div style="font-size:11px;color:var(--mid-gray);margin-top:8px">' + c.projects.length + ' project' + (c.projects.length !== 1 ? 's' : '') + '</div>';
+    h += '</div>';
+  }
+  h += '</div>';
+  h += '<div style="margin-top:20px;font-size:12px;color:var(--mid-gray)">Rates are saved locally in your browser and apply across all dashboard views when toggled to Revenue mode.</div>';
+  document.getElementById('mainContent').innerHTML = h;
+}
+
+function updateRate(clientId, val) {
+  clientRates[clientId] = parseFloat(val) || 0;
+  saveRates();
+}
+
+/* ── RESOURCE TRACKER STATE ── */
+var RT_WEEKS = [];
+var RT_LEADERSHIP = [];
+var rtView = 'people';
+var rtShowLeadership = false;
+var rtSortBy = 'project';
+var rtWeekIdx = -1; /* -1 = latest week with actuals */
+var rtTimeMode = 'week'; /* week | month */
+
+function rtGetCurrentIdx() {
+  if (rtWeekIdx >= 0 && rtWeekIdx < RT_WEEKS.length) return rtWeekIdx;
+  /* Default: latest week with actual hours */
+  for (var i = RT_WEEKS.length - 1; i >= 0; i--) {
+    var tot = 0;
+    for (var p in RT_WEEKS[i].people) tot += RT_WEEKS[i].people[p].actual || 0;
+    if (tot > 0) return i;
+  }
+  return RT_WEEKS.length - 1;
+}
+function rtNav(dir) {
+  var idx = rtGetCurrentIdx();
+  if (rtTimeMode === 'week') {
+    rtWeekIdx = Math.max(0, Math.min(RT_WEEKS.length - 1, idx + dir));
+  } else {
+    /* Jump to next/prev month */
+    var curMon = RT_WEEKS[idx].sunday.substring(0, 7);
+    if (dir > 0) {
+      for (var i = idx + 1; i < RT_WEEKS.length; i++) {
+        if (RT_WEEKS[i].sunday.substring(0, 7) !== curMon) { rtWeekIdx = i; break; }
+      }
+    } else {
+      for (var i = idx - 1; i >= 0; i--) {
+        if (RT_WEEKS[i].sunday.substring(0, 7) !== curMon) {
+          /* Find first week of that month */
+          var tgtMon = RT_WEEKS[i].sunday.substring(0, 7);
+          for (var j = 0; j <= i; j++) {
+            if (RT_WEEKS[j].sunday.substring(0, 7) === tgtMon) { rtWeekIdx = j; break; }
+          }
+          break;
+        }
+      }
+    }
+  }
+  renderResource();
+}
+function rtGetMonthWeeks(startIdx) {
+  /* Get all weeks in the same month as startIdx */
+  var mon = RT_WEEKS[startIdx].sunday.substring(0, 7);
+  var indices = [];
+  for (var i = 0; i < RT_WEEKS.length; i++) {
+    if (RT_WEEKS[i].sunday.substring(0, 7) === mon) indices.push(i);
+  }
+  return indices;
+}
+function rtAggregateWeeks(indices) {
+  /* Combine multiple weeks into one virtual week */
+  var combined = {label:'', sunday:'', people:{}};
+  var labels = [];
+  for (var w = 0; w < indices.length; w++) {
+    var wk = RT_WEEKS[indices[w]];
+    labels.push(wk.label);
+    for (var pn in wk.people) {
+      if (!combined.people[pn]) combined.people[pn] = {predicted:0, actual:0, projects:{}};
+      combined.people[pn].predicted += wk.people[pn].predicted || 0;
+      combined.people[pn].actual += wk.people[pn].actual || 0;
+      var projs = wk.people[pn].projects || {};
+      for (var pk in projs) {
+        if (!combined.people[pn].projects[pk]) combined.people[pn].projects[pk] = {p:0, a:0};
+        combined.people[pn].projects[pk].p += projs[pk].p || 0;
+        combined.people[pn].projects[pk].a += projs[pk].a || 0;
+      }
+    }
+  }
+  var d = new Date(RT_WEEKS[indices[0]].sunday + 'T00:00:00');
+  combined.label = d.toLocaleDateString('en-US', {month:'long', year:'numeric'});
+  combined.sunday = RT_WEEKS[indices[0]].sunday;
+  return combined;
+}
+
+function rtCalcAcc(predicted, actual) {
+  return Math.max(predicted, actual) > 0 ? Math.min(predicted, actual) / Math.max(predicted, actual) * 100 : 100;
+}
+function rtCalcAccProject(predicted, actual) {
+  if (predicted === 0 && actual === 0) return 100;
+  if (predicted === 0) {
+    if (actual <= 0.5) return 50;
+    if (actual <= 1.0) return 25;
+    return 0;
+  }
+  return Math.min(predicted, actual) / Math.max(predicted, actual) * 100;
+}
+
+function isFutureWk(wk) {
+  for (var pn in wk.people) { if ((wk.people[pn].actual || 0) > 0) return false; }
+  return true;
+}
+
+function rtFilterNames(allNames) {
+  if (rtShowLeadership) return allNames;
+  var out = [];
+  for (var i = 0; i < allNames.length; i++) {
+    if (RT_LEADERSHIP.indexOf(allNames[i]) === -1) out.push(allNames[i]);
+  }
+  return out;
+}
+
+function renderResource() {
+  if (!RT_WEEKS || RT_WEEKS.length === 0) {
+    document.getElementById('mainContent').innerHTML = '<h1 class="page-title">Resource Tracker</h1><p style="color:var(--mid-gray);margin-top:12px">No resource tracker data available yet.</p>';
+    return;
+  }
+
+  var useGlobalFilter = (globalDateFilter !== 'all');
+  var idx = rtGetCurrentIdx();
+  var wk;
+  if (useGlobalFilter) {
+    wk = getFilteredRTData();
+  } else if (rtTimeMode === 'month') {
+    var monthIndices = rtGetMonthWeeks(idx);
+    wk = rtAggregateWeeks(monthIndices);
+  } else {
+    wk = RT_WEEKS[idx];
+  }
+
+  var isFuture = true;
+  for (var pn in wk.people) { if ((wk.people[pn].actual || 0) > 0) { isFuture = false; break; } }
+
+  var ppl = wk.people;
+  var allNames = Object.keys(ppl).sort(function(a,b){ return (ppl[b].actual||0) - (ppl[a].actual||0); });
+  var names = rtFilterNames(allNames);
+
+  /* Aggregate totals */
+  var totPred = 0, totAct = 0;
+  for (var i = 0; i < names.length; i++) { totPred += ppl[names[i]].predicted || 0; totAct += ppl[names[i]].actual || 0; }
+  var totalAcc = rtCalcAcc(totPred, totAct);
+  var onTarget = 0;
+  for (var i = 0; i < names.length; i++) {
+    var p = ppl[names[i]].predicted || 0, a = ppl[names[i]].actual || 0;
+    if (rtCalcAcc(p, a) >= 80) onTarget++;
+  }
+
+  var h = '<h1 class="page-title">Resource Tracker</h1>';
+  h += '<p class="page-subtitle">Comparing resource planner predictions vs actual hours logged</p>';
+
+  if (useGlobalFilter) {
+    /* When global date filter is active, show filtered label instead of week nav */
+    var range = getDateRange(globalDateFilter);
+    var opts = {month:'short', day:'numeric', year:'numeric'};
+    var rangeLabel = range ? (range.start.toLocaleDateString('en-US', opts) + ' – ' + range.end.toLocaleDateString('en-US', opts)) : 'Filtered';
+    var filteredIndices = getFilteredWeekIndices();
+    h += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:10px 16px;background:var(--light-gray);border-radius:8px">';
+    h += '<span style="font-size:12px;color:var(--mid-gray)">Showing data for:</span>';
+    h += '<span style="font-size:14px;font-weight:600;color:var(--abyss)">' + rangeLabel + '</span>';
+    h += '<span style="font-size:11px;color:var(--mid-gray)">(' + filteredIndices.length + ' week' + (filteredIndices.length !== 1 ? 's' : '') + ')</span>';
+    h += '</div>';
+  } else {
+    /* ── Standard Time navigation bar ── */
+    var canPrev = (rtTimeMode === 'week') ? idx > 0 : rtGetMonthWeeks(idx)[0] > 0;
+    var canNext = (rtTimeMode === 'week') ? idx < RT_WEEKS.length - 1 : rtGetMonthWeeks(idx).slice(-1)[0] < RT_WEEKS.length - 1;
+
+    h += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">';
+    h += '<div style="display:flex;gap:4px">';
+    h += '<div class="rt-tab' + (rtTimeMode === 'week' ? ' active' : '') + '" onclick="rtTimeMode=\'week\';renderResource()" style="font-size:11px;padding:4px 12px">Weekly</div>';
+    h += '<div class="rt-tab' + (rtTimeMode === 'month' ? ' active' : '') + '" onclick="rtTimeMode=\'month\';renderResource()" style="font-size:11px;padding:4px 12px">Monthly</div>';
+    h += '</div>';
+    h += '<div style="display:flex;align-items:center;gap:8px;flex:1;justify-content:center">';
+    h += '<div onclick="' + (canPrev ? 'rtNav(-1)' : '') + '" style="width:28px;height:28px;border-radius:50%;border:1px solid ' + (canPrev ? 'var(--canvas)' : 'var(--light-gray)') + ';display:flex;align-items:center;justify-content:center;cursor:' + (canPrev ? 'pointer' : 'default') + ';color:' + (canPrev ? 'var(--abyss)' : 'var(--canvas)') + ';font-size:14px;user-select:none' + (canPrev ? ';background:var(--white)' : '') + '">&#9664;</div>';
+    h += '<div style="font-size:14px;font-weight:600;color:var(--abyss);min-width:200px;text-align:center">';
+    if (isFuture) h += '<span style="font-size:9px;background:var(--ocean);color:var(--white);padding:2px 6px;border-radius:3px;margin-right:6px;vertical-align:middle">UPCOMING</span>';
+    h += wk.label + '</div>';
+    h += '<div onclick="' + (canNext ? 'rtNav(1)' : '') + '" style="width:28px;height:28px;border-radius:50%;border:1px solid ' + (canNext ? 'var(--canvas)' : 'var(--light-gray)') + ';display:flex;align-items:center;justify-content:center;cursor:' + (canNext ? 'pointer' : 'default') + ';color:' + (canNext ? 'var(--abyss)' : 'var(--canvas)') + ';font-size:14px;user-select:none' + (canNext ? ';background:var(--white)' : '') + '">&#9654;</div>';
+    h += '</div>';
+    h += '<div style="width:120px"></div>'; /* spacer to balance layout */
+    h += '</div>';
+  }
+
+  /* Summary cards */
+  h += '<div class="rt-summary">';
+  h += '<div class="rt-scard"><div class="rs-label">Predicted</div><div class="rs-val">' + totPred.toFixed(1) + '</div><div class="rs-sub">total hrs planned</div></div>';
+  if (isFuture) {
+    h += '<div class="rt-scard"><div class="rs-label">Status</div><div class="rs-val" style="font-size:18px;color:var(--ocean)">Upcoming</div><div class="rs-sub">actuals will fill in</div></div>';
+  } else {
+    h += '<div class="rt-scard"><div class="rs-label">Actual</div><div class="rs-val">' + totAct.toFixed(1) + '</div><div class="rs-sub">total hrs logged</div></div>';
+  }
+  h += '<div class="rt-scard"><div class="rs-label">' + (isFuture ? 'People' : 'Accuracy') + '</div><div class="rs-val" style="color:' + (isFuture ? 'var(--abyss)' : accColor(totalAcc)) + '">' + (isFuture ? names.length : totalAcc.toFixed(1) + '%') + '</div><div class="rs-sub">' + (isFuture ? 'with planned allocations' : (totAct > totPred ? '+' : '') + (totAct - totPred).toFixed(1) + ' hrs variance') + '</div></div>';
+  h += '<div class="rt-scard"><div class="rs-label">' + (isFuture ? 'Projects' : 'On Target') + '</div>';
+  if (isFuture) {
+    var projCount;
+    if (wk.billableProjects !== undefined) {
+      projCount = wk.billableProjects;
+    } else {
+      var projSet = {};
+      for (var i = 0; i < names.length; i++) { var pr = ppl[names[i]].projects || {}; for (var pk in pr) { projSet[pk] = true; } }
+      projCount = Object.keys(projSet).length;
+    }
+    h += '<div class="rs-val">' + projCount + '</div><div class="rs-sub">billable projects</div>';
+  } else {
+    h += '<div class="rs-val">' + onTarget + '/' + names.length + '</div><div class="rs-sub">people within 80% accuracy</div>';
+  }
+  h += '</div></div>';
+
+  /* View toggle + leadership */
+  h += '<div class="rt-tabs">';
+  h += '<div class="rt-tab' + (rtView === 'people' ? ' active' : '') + '" onclick="rtView=\'people\';renderResource()">By Person</div>';
+  h += '<div class="rt-tab' + (rtView === 'projects' ? ' active' : '') + '" onclick="rtView=\'projects\';renderResource()">By Project</div>';
+  h += '<div style="margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mid-gray)">';
+  h += '<span>Include Leadership</span>';
+  h += '<div onclick="rtShowLeadership=!rtShowLeadership;renderResource()" style="width:36px;height:20px;border-radius:10px;background:' + (rtShowLeadership ? 'var(--ocean)' : 'var(--canvas)') + ';cursor:pointer;position:relative;transition:background .2s"><div style="width:16px;height:16px;border-radius:50%;background:var(--white);position:absolute;top:2px;' + (rtShowLeadership ? 'left:18px' : 'left:2px') + ';transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></div></div>';
+  h += '</div>';
+  h += '</div>';
+
+  if (rtView === 'people') {
+    h += renderRTPeople(wk);
+  } else {
+    h += renderRTProjects(wk);
+  }
+  document.getElementById('mainContent').innerHTML = h;
+}
+
+function accColor(v) { return v >= 80 ? '#2E7D32' : v >= 50 ? 'var(--honey)' : 'var(--ember)'; }
+function accClass(v) { return v >= 80 ? 'high' : v >= 50 ? 'mid' : 'low'; }
+
+function renderRTPeople(wk) {
+  var ppl = wk.people;
+  var allFiltered = rtFilterNames(Object.keys(ppl));
+  var names;
+  if (rtSortBy === 'accuracy') {
+    names = allFiltered.sort(function(a,b){ return rtCalcAcc(ppl[b].predicted||0,ppl[b].actual||0) - rtCalcAcc(ppl[a].predicted||0,ppl[a].actual||0); });
+  } else {
+    names = allFiltered.sort(function(a,b){ return (ppl[b].actual||ppl[b].predicted||0) - (ppl[a].actual||ppl[a].predicted||0); });
+  }
+  var maxHrs = 1;
+  for (var i = 0; i < names.length; i++) { var m = Math.max(ppl[names[i]].predicted||0, ppl[names[i]].actual||0); if (m > maxHrs) maxHrs = m; }
+
+  var sortIcon = rtSortBy === 'accuracy' ? ' &#9650;' : '';
+  var h = '<div class="rt-card"><h3>Team ' + (isFutureWk(wk) ? 'Plan' : 'Accuracy') + '</h3>';
+  h += '<div class="rt-row rt-hdr"><div>Person</div><div class="rt-num">Predicted</div><div class="rt-num">Actual</div><div class="rt-num">Diff</div><div>Comparison</div><div class="rt-acc" style="cursor:pointer;user-select:none" onclick="rtSortBy=rtSortBy===\'accuracy\'?\'actual\':\'accuracy\';renderResource()">' + (isFutureWk(wk) ? 'Planned' : 'Accuracy' + sortIcon) + '</div></div>';
+  for (var i = 0; i < names.length; i++) {
+    var n = names[i], d = ppl[n];
+    var pred = d.predicted || 0, act = d.actual || 0;
+    var acc = rtCalcAcc(pred, act);
+    var diff = act - pred;
+    var predW = (pred / maxHrs) * 100;
+    var actW = (act / maxHrs) * 100;
+    var pc = PC[n] || '#9B9590';
+    h += '<div class="rt-row">';
+    h += '<div class="rt-name"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + pc + ';margin-right:6px"></span>' + n + '</div>';
+    h += '<div class="rt-num" style="color:var(--mid-gray)">' + pred.toFixed(1) + '</div>';
+    h += '<div class="rt-num" style="font-weight:600">' + act.toFixed(1) + '</div>';
+    h += '<div class="rt-num" style="color:' + (diff >= 0 ? '#2E7D32' : 'var(--ember)') + '">' + (diff >= 0 ? '+' : '') + diff.toFixed(1) + '</div>';
+    h += '<div class="rt-bar-wrap"><div class="rt-bar-pred" style="width:' + predW + '%"></div><div class="rt-bar-act" style="width:' + actW + '%;background:' + pc + '"></div></div>';
+    h += '<div class="rt-acc ' + accClass(acc) + '">' + acc.toFixed(0) + '%</div>';
+    h += '</div>';
+  }
+  h += '</div>';
+
+  /* Per-person project breakdown */
+  h += '<div class="rt-card"><h3>Per-Person Project Breakdown</h3>';
+  for (var i = 0; i < names.length; i++) {
+    var n = names[i], d = ppl[n];
+    var pred = d.predicted || 0, act = d.actual || 0;
+    var acc = rtCalcAcc(pred, act);
+    var pc = PC[n] || '#9B9590';
+    h += '<div style="margin-bottom:20px;padding:14px 0;border-bottom:1px solid var(--light-gray)">';
+    h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + pc + '"></span><strong>' + n + '</strong><span style="font-size:11px;color:var(--mid-gray)">' + pred.toFixed(1) + 'h predicted → ' + act.toFixed(1) + 'h actual</span><span class="rt-acc ' + accClass(acc) + '" style="margin-left:auto">' + acc.toFixed(0) + '%</span></div>';
+    var projs = d.projects || {};
+    var pkeys = Object.keys(projs).sort(function(a,b){ return Math.max(projs[b].p||0,projs[b].a||0) - Math.max(projs[a].p||0,projs[a].a||0); });
+    h += '<div style="display:grid;grid-template-columns:200px 60px 60px 60px 1fr;gap:6px;font-size:11px;padding-left:18px">';
+    h += '<div style="color:var(--mid-gray)">Project</div><div style="color:var(--mid-gray);text-align:right">Pred</div><div style="color:var(--mid-gray);text-align:right">Act</div><div style="color:var(--mid-gray);text-align:right">Diff</div><div></div>';
+    for (var j = 0; j < pkeys.length; j++) {
+      var pk = pkeys[j], pv = projs[pk];
+      var pp = pv.p || 0, pa = pv.a || 0;
+      var pdiff = pa - pp;
+      h += '<div style="font-weight:500">' + pk + '</div>';
+      h += '<div style="text-align:right;color:var(--mid-gray)">' + pp.toFixed(1) + '</div>';
+      h += '<div style="text-align:right;font-weight:600">' + pa.toFixed(1) + '</div>';
+      h += '<div style="text-align:right;color:' + (pdiff >= 0 ? '#2E7D32' : 'var(--ember)') + '">' + (pdiff >= 0 ? '+' : '') + pdiff.toFixed(1) + '</div>';
+      var mh = Math.max(pp, pa); if (mh === 0) mh = 1;
+      h += '<div style="display:flex;gap:2px;align-items:center"><div style="height:6px;border-radius:3px;background:var(--canvas);width:' + (pp/mh*100) + '%"></div><div style="height:6px;border-radius:3px;background:' + pc + ';width:' + (pa/mh*100) + '%"></div></div>';
+    }
+    h += '</div></div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function renderRTProjects(wk) {
+  var ppl = wk.people;
+  /* Aggregate by project across all people */
+  var projAgg = {};
+  var names = rtFilterNames(Object.keys(ppl));
+  for (var i = 0; i < names.length; i++) {
+    var projs = ppl[names[i]].projects || {};
+    for (var pk in projs) {
+      if (!projAgg[pk]) projAgg[pk] = {predicted:0, actual:0, people:{}};
+      projAgg[pk].predicted += projs[pk].p || 0;
+      projAgg[pk].actual += projs[pk].a || 0;
+      if ((projs[pk].p||0) > 0 || (projs[pk].a||0) > 0) {
+        projAgg[pk].people[names[i]] = {p:projs[pk].p||0, a:projs[pk].a||0};
+      }
+    }
+  }
+  /* Enrich projAgg with code and remaining */
+  var projKeys = Object.keys(projAgg);
+  for (var i = 0; i < projKeys.length; i++) {
+    var pk = projKeys[i];
+    projAgg[pk].code = PROJECT_CODES[pk] || '';
+    var bud = PROJECT_BUDGETS[pk];
+    projAgg[pk].remaining = bud ? bud.remaining : null;
+    projAgg[pk].acc = rtCalcAccProject(projAgg[pk].predicted, projAgg[pk].actual);
+    projAgg[pk].diff = projAgg[pk].actual - projAgg[pk].predicted;
+  }
+
+  /* Sort helpers — expose globally for onclick */
+  window.rtProjSort = function(field) { rtSortBy = (rtSortBy === field) ? field + '_asc' : field; renderResource(); };
+  var desc = rtSortBy.indexOf('_asc') === -1;
+  var sortField = rtSortBy.replace('_asc','');
+  function sIcon(f) { return sortField === f ? (desc ? ' &#9660;' : ' &#9650;') : ''; }
+  var hdrStyle = 'cursor:pointer;user-select:none';
+
+  if (sortField === 'project') {
+    projKeys.sort(function(a,b){ return desc ? (projAgg[b].code||'').localeCompare(projAgg[a].code||'') : (projAgg[a].code||'').localeCompare(projAgg[b].code||''); });
+  } else if (sortField === 'remaining') {
+    projKeys.sort(function(a,b){ var ra = projAgg[a].remaining === null ? -99999 : projAgg[a].remaining; var rb = projAgg[b].remaining === null ? -99999 : projAgg[b].remaining; return desc ? rb - ra : ra - rb; });
+  } else if (sortField === 'predicted') {
+    projKeys.sort(function(a,b){ return desc ? projAgg[b].predicted - projAgg[a].predicted : projAgg[a].predicted - projAgg[b].predicted; });
+  } else if (sortField === 'actual') {
+    projKeys.sort(function(a,b){ return desc ? projAgg[b].actual - projAgg[a].actual : projAgg[a].actual - projAgg[b].actual; });
+  } else if (sortField === 'diff') {
+    projKeys.sort(function(a,b){ return desc ? projAgg[b].diff - projAgg[a].diff : projAgg[a].diff - projAgg[b].diff; });
+  } else if (sortField === 'accuracy') {
+    projKeys.sort(function(a,b){ return desc ? projAgg[b].acc - projAgg[a].acc : projAgg[a].acc - projAgg[b].acc; });
+  } else {
+    /* Default: sort by project code ascending */
+    projKeys.sort(function(a,b){ return (projAgg[a].code||'zzz').localeCompare(projAgg[b].code||'zzz'); });
+  }
+
+  var maxHrs = 1;
+  for (var i = 0; i < projKeys.length; i++) { var m = Math.max(projAgg[projKeys[i]].predicted, projAgg[projKeys[i]].actual); if (m > maxHrs) maxHrs = m; }
+
+  /* Group projects by client code prefix and sort by project code within each group */
+  function getClientFromCode(code) {
+    if (!code) return '999_Unknown';
+    var prefix = code.replace(/[a-zA-Z]/, '').split('_')[0];
+    return prefix;
+  }
+  function getClientLabel(prefix) {
+    for (var ci = 0; ci < CLIENTS.length; ci++) { if (CLIENTS[ci].code === prefix) return CLIENTS[ci].code + ' ' + CLIENTS[ci].name; }
+    /* Check RT alias targets too */
+    if (prefix === '100') return '100 Forge';
+    return prefix;
+  }
+
+  /* Always sort by project code for grouping, then apply user sort within groups */
+  var grouped = {};
+  for (var i = 0; i < projKeys.length; i++) {
+    var pk = projKeys[i], d = projAgg[pk];
+    var code = d.code || '';
+    var clientPrefix = getClientFromCode(code);
+    if (!grouped[clientPrefix]) grouped[clientPrefix] = [];
+    grouped[clientPrefix].push(pk);
+  }
+
+  /* Sort client groups by prefix */
+  var clientPrefixes = Object.keys(grouped).sort();
+
+  /* Sort projects within each group by code */
+  for (var gi = 0; gi < clientPrefixes.length; gi++) {
+    var grp = grouped[clientPrefixes[gi]];
+    if (sortField === 'predicted') {
+      grp.sort(function(a,b){ return desc ? projAgg[b].predicted - projAgg[a].predicted : projAgg[a].predicted - projAgg[b].predicted; });
+    } else if (sortField === 'actual') {
+      grp.sort(function(a,b){ return desc ? projAgg[b].actual - projAgg[a].actual : projAgg[a].actual - projAgg[b].actual; });
+    } else if (sortField === 'diff') {
+      grp.sort(function(a,b){ return desc ? projAgg[b].diff - projAgg[a].diff : projAgg[a].diff - projAgg[b].diff; });
+    } else if (sortField === 'remaining') {
+      grp.sort(function(a,b){ var ra = projAgg[a].remaining === null ? -99999 : projAgg[a].remaining; var rb = projAgg[b].remaining === null ? -99999 : projAgg[b].remaining; return desc ? rb - ra : ra - rb; });
+    } else if (sortField === 'accuracy') {
+      grp.sort(function(a,b){ return desc ? projAgg[b].acc - projAgg[a].acc : projAgg[a].acc - projAgg[b].acc; });
+    } else {
+      /* Default: sort by project code ascending */
+      grp.sort(function(a,b){ return (projAgg[a].code||'zzz').localeCompare(projAgg[b].code||'zzz'); });
+    }
+  }
+
+  var h = '<div class="rt-card"><h3>Project Accuracy</h3>';
+  h += '<div class="rt-row rt-hdr rt-proj">';
+  h += '<div style="' + hdrStyle + '" onclick="rtProjSort(\'project\')">Project' + sIcon('project') + '</div>';
+  h += '<div class="rt-num" style="' + hdrStyle + '" onclick="rtProjSort(\'remaining\')">Remaining' + sIcon('remaining') + '</div>';
+  h += '<div class="rt-num" style="' + hdrStyle + '" onclick="rtProjSort(\'predicted\')">Predicted' + sIcon('predicted') + '</div>';
+  h += '<div class="rt-num" style="' + hdrStyle + '" onclick="rtProjSort(\'actual\')">Actual' + sIcon('actual') + '</div>';
+  h += '<div class="rt-num" style="' + hdrStyle + '" onclick="rtProjSort(\'diff\')">Diff' + sIcon('diff') + '</div>';
+  h += '<div>Comparison</div>';
+  h += '<div class="rt-acc" style="' + hdrStyle + '" onclick="rtProjSort(\'accuracy\')">Accuracy' + sIcon('accuracy') + '</div>';
+  h += '</div>';
+
+  for (var gi = 0; gi < clientPrefixes.length; gi++) {
+    var cp = clientPrefixes[gi];
+    var grp = grouped[cp];
+    /* Client group header */
+    var clientLabel = getClientLabel(cp);
+    var grpPred = 0, grpAct = 0;
+    for (var j = 0; j < grp.length; j++) { grpPred += projAgg[grp[j]].predicted; grpAct += projAgg[grp[j]].actual; }
+    h += '<div style="background:var(--abyss);padding:8px 12px;margin-top:' + (gi > 0 ? '12px' : '0') + ';border-radius:6px;display:flex;justify-content:space-between;align-items:center">';
+    h += '<div style="font-weight:700;font-size:12px;color:var(--white);letter-spacing:.3px">' + clientLabel + '</div>';
+    h += '<div style="font-size:11px;color:var(--mid-gray)">' + grp.length + ' project' + (grp.length !== 1 ? 's' : '') + ' &middot; ' + grpPred.toFixed(1) + 'h predicted &middot; ' + grpAct.toFixed(1) + 'h actual</div>';
+    h += '</div>';
+
+    for (var j = 0; j < grp.length; j++) {
+      var pk = grp[j], d = projAgg[pk];
+      var predW = (d.predicted / maxHrs) * 100;
+      var actW = (d.actual / maxHrs) * 100;
+      var remHrs = d.remaining;
+      var remColor = remHrs === null ? 'var(--mid-gray)' : remHrs < 0 ? 'var(--ember)' : (PROJECT_BUDGETS[pk] && remHrs < PROJECT_BUDGETS[pk].budget * 0.15) ? 'var(--honey)' : '#2E7D32';
+      var remText = remHrs === null ? '—' : remHrs.toFixed(1);
+      var projCode = d.code || '';
+      h += '<div class="rt-row rt-proj">';
+      h += '<div class="rt-name">' + (projCode ? '<span style="font-size:10px;color:var(--mid-gray);font-weight:400;display:block;line-height:1.2">' + projCode + '</span>' : '') + pk + '</div>';
+      h += '<div class="rt-num" style="font-weight:600;color:' + remColor + '">' + remText + '</div>';
+      h += '<div class="rt-num" style="color:var(--mid-gray)">' + d.predicted.toFixed(1) + '</div>';
+      h += '<div class="rt-num" style="font-weight:600">' + d.actual.toFixed(1) + '</div>';
+      h += '<div class="rt-num" style="color:' + (d.diff >= 0 ? '#2E7D32' : 'var(--ember)') + '">' + (d.diff >= 0 ? '+' : '') + d.diff.toFixed(1) + '</div>';
+      h += '<div class="rt-bar-wrap"><div class="rt-bar-pred" style="width:' + predW + '%"></div><div class="rt-bar-act" style="width:' + actW + '%;background:var(--ocean)"></div></div>';
+      h += '<div class="rt-acc ' + accClass(d.acc) + '">' + d.acc.toFixed(0) + '%</div>';
+      h += '</div>';
+    }
+  }
+  h += '</div>';
+
+  /* Budget remaining per project */
+  var budgetProjs = projKeys.filter(function(pk) { return !!PROJECT_BUDGETS[pk]; });
+  if (budgetProjs.length > 0) {
+    budgetProjs.sort(function(a,b) { return (PROJECT_BUDGETS[a].remaining) - (PROJECT_BUDGETS[b].remaining); });
+    h += '<div class="rt-card"><h3>Hours Remaining by Project</h3>';
+    h += '<p style="font-size:11px;color:var(--mid-gray);margin:-6px 0 14px">Total budget minus hours spent to date — helps prevent over-allocation</p>';
+    for (var i = 0; i < budgetProjs.length; i++) {
+      var pk = budgetProjs[i], b = PROJECT_BUDGETS[pk];
+      var pct = b.budget > 0 ? Math.min((b.spent / b.budget) * 100, 100) : 100;
+      var overPct = b.spent > b.budget ? Math.min(((b.spent - b.budget) / b.budget) * 100, 60) : 0;
+      var isOver = b.remaining < 0;
+      var isLow = !isOver && b.remaining < b.budget * 0.15;
+      var barColor = isOver ? 'var(--ember)' : isLow ? 'var(--honey)' : 'var(--ocean)';
+      var overBarColor = 'rgba(211,47,47,0.35)';
+      var remColor = isOver ? 'var(--ember)' : isLow ? 'var(--honey)' : '#2E7D32';
+      var statusTag = isOver ? '<span style="font-size:9px;font-weight:700;color:var(--white);background:var(--ember);padding:1px 5px;border-radius:3px;margin-left:6px">OVER</span>' : isLow ? '<span style="font-size:9px;font-weight:700;color:var(--abyss);background:var(--honey);padding:1px 5px;border-radius:3px;margin-left:6px">LOW</span>' : '';
+      h += '<div style="margin-bottom:14px">';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
+      h += '<div style="font-weight:600;font-size:13px">' + pk + statusTag + '</div>';
+      h += '<div style="font-size:12px;color:' + remColor + ';font-weight:700">' + (isOver ? '' : '+') + b.remaining.toFixed(1) + 'h remaining</div>';
+      h += '</div>';
+      h += '<div style="display:flex;align-items:center;gap:8px">';
+      h += '<div style="flex:1;height:10px;background:var(--light-gray);border-radius:5px;overflow:visible;position:relative">';
+      h += '<div style="height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:5px;position:absolute;top:0;left:0"></div>';
+      if (overPct > 0) {
+        h += '<div style="height:100%;width:' + overPct + '%;background:' + overBarColor + ';border-radius:0 5px 5px 0;position:absolute;top:0;left:' + pct + '%;border-left:2px solid var(--ember)"></div>';
+      }
+      h += '</div>';
+      h += '<div style="font-size:10px;color:var(--mid-gray);min-width:90px;text-align:right">' + b.spent.toFixed(1) + ' / ' + b.budget.toFixed(0) + 'h</div>';
+      h += '</div>';
+      h += '</div>';
+    }
+    h += '</div>';
+  }
+
+  /* Per-project people breakdown */
+  h += '<div class="rt-card"><h3>Per-Project Team Breakdown</h3>';
+  for (var i = 0; i < projKeys.length; i++) {
+    var pk = projKeys[i], d = projAgg[pk];
+    var acc = rtCalcAccProject(d.predicted, d.actual);
+    h += '<div style="margin-bottom:18px;padding:12px 0;border-bottom:1px solid var(--light-gray)">';
+    h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><strong>' + pk + '</strong><span style="font-size:11px;color:var(--mid-gray)">' + d.predicted.toFixed(1) + 'h → ' + d.actual.toFixed(1) + 'h</span><span class="rt-acc ' + accClass(acc) + '" style="margin-left:auto">' + acc.toFixed(0) + '%</span></div>';
+    var pkeys = Object.keys(d.people).sort(function(a,b){ return Math.max(d.people[b].p,d.people[b].a) - Math.max(d.people[a].p,d.people[a].a); });
+    h += '<div style="display:grid;grid-template-columns:150px 60px 60px 60px 1fr;gap:6px;font-size:11px;padding-left:18px">';
+    for (var j = 0; j < pkeys.length; j++) {
+      var pn = pkeys[j], pv = d.people[pn];
+      var pdiff = pv.a - pv.p;
+      var pc = PC[pn] || '#9B9590';
+      h += '<div style="font-weight:500;display:flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:' + pc + ';display:inline-block"></span>' + pn + '</div>';
+      h += '<div style="text-align:right;color:var(--mid-gray)">' + pv.p.toFixed(1) + '</div>';
+      h += '<div style="text-align:right;font-weight:600">' + pv.a.toFixed(1) + '</div>';
+      h += '<div style="text-align:right;color:' + (pdiff >= 0 ? '#2E7D32' : 'var(--ember)') + '">' + (pdiff >= 0 ? '+' : '') + pdiff.toFixed(1) + '</div>';
+      var mh = Math.max(pv.p, pv.a); if (mh === 0) mh = 1;
+      h += '<div style="display:flex;gap:2px;align-items:center"><div style="height:6px;border-radius:3px;background:var(--canvas);width:' + (pv.p/mh*100) + '%"></div><div style="height:6px;border-radius:3px;background:' + pc + ';width:' + (pv.a/mh*100) + '%"></div></div>';
+    }
+    h += '</div></div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+/* ── COMPUTE ENGINE (builds RT_WEEKS from native allocations + actuals) ── */
+function computeResourceWeeks() {
+  var weekMap = {};
+
+  /* 1. Process predicted hours from ALLOCATIONS (per-day format: each alloc has a .date field) */
+  var allocs = ALLOCATIONS.allocations || [];
+  for (var i = 0; i < allocs.length; i++) {
+    var a = allocs[i];
+    var dateField = a.date || a.weekOf; /* support both new per-day and old per-week format */
+    var monISO = getMondayOfWeek ? getMondayOfWeek(dateField) : (a.weekOf || dateField);
+    var mon = new Date(monISO + 'T00:00:00');
+    var sun = new Date(mon); sun.setDate(sun.getDate() - 1);
+    var sunKey = sun.toISOString().slice(0, 10);
+    var hrs = a.hoursPerDay || a.totalHours || 0;
+
+    if (!weekMap[sunKey]) weekMap[sunKey] = { people: {} };
+    var wk = weekMap[sunKey];
+    if (!wk.people[a.person]) wk.people[a.person] = { predicted: 0, actual: 0, projects: {} };
+    wk.people[a.person].predicted += hrs;
+    if (!wk.people[a.person].projects[a.project]) wk.people[a.person].projects[a.project] = { p: 0, a: 0 };
+    wk.people[a.person].projects[a.project].p += hrs;
+  }
+
+  /* 2. Process actual hours from ACTUALS */
+  var weeks = ACTUALS.weeks || [];
+  for (var i = 0; i < weeks.length; i++) {
+    var aw = weeks[i];
+    var mon = new Date(aw.weekOf + 'T00:00:00');
+    var sun = new Date(mon); sun.setDate(sun.getDate() - 1);
+    var sunKey = sun.toISOString().slice(0, 10);
+
+    if (!weekMap[sunKey]) weekMap[sunKey] = { people: {} };
+    var wk = weekMap[sunKey];
+    for (var pn in aw.people) {
+      if (!wk.people[pn]) wk.people[pn] = { predicted: 0, actual: 0, projects: {} };
+      var projs = aw.people[pn].projects || {};
+      for (var proj in projs) {
+        wk.people[pn].actual += projs[proj];
+        if (!wk.people[pn].projects[proj]) wk.people[pn].projects[proj] = { p: 0, a: 0 };
+        wk.people[pn].projects[proj].a += projs[proj];
+      }
+    }
+  }
+
+  /* 3. Also merge in any existing RT_WEEKS data from portfolio.json (for backward compat during migration) */
+  /* This keeps old actual data visible until it's migrated to actuals.json */
+
+  /* 4. Build sorted array */
+  var sundays = Object.keys(weekMap).sort();
+  var result = [];
+  for (var i = 0; i < sundays.length; i++) {
+    var s = sundays[i];
+    var sat = new Date(s + 'T00:00:00'); sat.setDate(sat.getDate() + 6);
+    var sunD = new Date(s + 'T00:00:00');
+    var label = sunD.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' – ' + sat.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    result.push({ label: label, sunday: s, people: weekMap[s].people });
+  }
+
+  /* Only replace RT_WEEKS if we have native data; otherwise keep portfolio.json data */
+  if (allocs.length > 0 || weeks.length > 0) {
+    /* Merge: keep portfolio.json weeks that aren't covered by native data */
+    var nativeSundays = {};
+    for (var i = 0; i < result.length; i++) nativeSundays[result[i].sunday] = true;
+    for (var i = 0; i < RT_WEEKS.length; i++) {
+      if (!nativeSundays[RT_WEEKS[i].sunday]) result.push(RT_WEEKS[i]);
+    }
+    result.sort(function(a, b) { return a.sunday < b.sunday ? -1 : a.sunday > b.sunday ? 1 : 0; });
+    RT_WEEKS = result;
+  }
+}
+
+/* ── ALLOCATION HELPERS ── */
+var allocViewMode = 'week'; /* 'day' or 'week' */
+var allocProjSearch = '';
+var allocEditingCell = null; /* {person, date} when inline editing */
+
+function getNextMonday() {
+  var d = new Date(); var day = d.getDay();
+  d.setDate(d.getDate() + (day === 0 ? 1 : 8 - day));
+  return d.toISOString().slice(0, 10);
+}
+function getCurrentMonday() {
+  var d = new Date(); var day = d.getDay();
+  d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+  return d.toISOString().slice(0, 10);
+}
+function shiftWeek(mondayISO, delta) {
+  var d = new Date(mondayISO + 'T00:00:00');
+  d.setDate(d.getDate() + delta * 7);
+  return d.toISOString().slice(0, 10);
+}
+function getMondayOfWeek(dateISO) {
+  var d = new Date(dateISO + 'T00:00:00'); var day = d.getDay();
+  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+  return d.toISOString().slice(0, 10);
+}
+function getWeekDays(mondayISO) {
+  var days = []; var d = new Date(mondayISO + 'T00:00:00');
+  for (var i = 0; i < 5; i++) {
+    days.push(new Date(d).toISOString().slice(0, 10));
+    d.setDate(d.getDate() + 1);
+  }
+  return days;
+}
+function fmtDayShort(iso) {
+  var d = new Date(iso + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { weekday: 'short' });
+}
+function fmtDayNum(iso) {
+  var d = new Date(iso + 'T00:00:00');
+  return d.getDate();
+}
+function fmtMonShort(iso) {
+  var d = new Date(iso + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { month: 'short' });
+}
+function getAllocWeekLabel(mondayISO) {
+  var mon = new Date(mondayISO + 'T00:00:00');
+  var fri = new Date(mon); fri.setDate(fri.getDate() + 4);
+  var wn = getISOWeek(mondayISO);
+  return 'Week ' + wn + ' &middot; ' + mon.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' – ' + fri.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function getProjectList() {
+  var forecast = (ALLOCATIONS && ALLOCATIONS.forecastProjects) || [];
+  var list = [];
+  for (var i = 0; i < CLIENTS.length; i++) {
+    var c = CLIENTS[i];
+    if (c.status === 'inactive') continue;
+    for (var j = 0; j < c.projects.length; j++) {
+      var p = c.projects[j];
+      if (p.status === 'finished' || p.status === 'closed' || p.status === 'completed' || p.status === 'complete') continue;
+      if (forecast.length > 0 && forecast.indexOf(p.name) < 0) continue;
+      list.push({ client: c.name, clientCode: c.code, clientColor: c.color, name: p.name, code: p.code, id: p.id });
+    }
+  }
+  list.sort(function(a, b) { return a.code < b.code ? -1 : a.code > b.code ? 1 : 0; });
+  return list;
+}
+
+async function saveAllocations() {
+  if (window.furnaceAPI) await window.furnaceAPI.writeAllocations(ALLOCATIONS);
+  computeResourceWeeks();
+}
+function allocDebouncedSave() {
+  if (allocSaveTimer) clearTimeout(allocSaveTimer);
+  allocSaveTimer = setTimeout(function() {
+    saveAllocations();
+    var el = document.getElementById('allocSaveStatus');
+    if (el) { el.textContent = 'Saved'; setTimeout(function() { if (el) el.textContent = ''; }, 1500); }
+  }, 400);
+}
+
+/* Get hours for a specific person+date+project */
+function getAllocHours(project, person, dateISO) {
+  var allocs = ALLOCATIONS.allocations;
+  for (var i = 0; i < allocs.length; i++) {
+    var a = allocs[i];
+    if (a.project === project && a.person === person && a.date === dateISO) return a.hoursPerDay;
+  }
+  return 0;
+}
+
+/* Get weekly total for a person on a project */
+function getAllocWeekTotal(project, person, mondayISO) {
+  var days = getWeekDays(mondayISO);
+  var total = 0;
+  var allocs = ALLOCATIONS.allocations;
+  for (var i = 0; i < allocs.length; i++) {
+    var a = allocs[i];
+    if (a.project === project && a.person === person && days.indexOf(a.date) >= 0) total += a.hoursPerDay;
+  }
+  return total;
+}
+
+/* Set hours for a cell — creates or updates or deletes allocation */
+function allocSetCell(project, person, dateISO, hours) {
+  var allocs = ALLOCATIONS.allocations;
+  var idx = -1;
+  for (var i = 0; i < allocs.length; i++) {
+    if (allocs[i].project === project && allocs[i].person === person && allocs[i].date === dateISO) { idx = i; break; }
+  }
+  if (hours <= 0) {
+    if (idx >= 0) allocs.splice(idx, 1);
+  } else if (idx >= 0) {
+    allocs[idx].hoursPerDay = hours;
+    allocs[idx].modified = new Date().toISOString();
+  } else {
+    allocs.push({
+      id: 'a_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      person: person, project: project, date: dateISO,
+      hoursPerDay: hours,
+      weekOf: getMondayOfWeek(dateISO),
+      totalHours: hours, days: 1, notes: '',
+      created: new Date().toISOString(), modified: new Date().toISOString()
+    });
+  }
+  allocDebouncedSave();
+}
+
+/* Get weekly total for person across ALL projects */
+function getPersonWeekTotal(person, mondayISO) {
+  var days = getWeekDays(mondayISO);
+  var total = 0;
+  var allocs = ALLOCATIONS.allocations;
+  for (var i = 0; i < allocs.length; i++) {
+    if (allocs[i].person === person && days.indexOf(allocs[i].date) >= 0) total += allocs[i].hoursPerDay;
+  }
+  return total;
+}
+
+/* Get daily total for person across ALL projects */
+function getPersonDayTotal(person, dateISO) {
+  var total = 0;
+  var allocs = ALLOCATIONS.allocations;
+  for (var i = 0; i < allocs.length; i++) {
+    if (allocs[i].person === person && allocs[i].date === dateISO) total += allocs[i].hoursPerDay;
+  }
+  return total;
+}
+
+/* Get people assigned to project in current week range */
+function getProjectPeople(project, mondayISO) {
+  var days = getWeekDays(mondayISO);
+  var team = ALLOCATIONS.team || [];
+  var assigned = {};
+  var allocs = ALLOCATIONS.allocations;
+  for (var i = 0; i < allocs.length; i++) {
+    if (allocs[i].project === project && days.indexOf(allocs[i].date) >= 0) assigned[allocs[i].person] = true;
+  }
+  /* Return assigned people + all team for adding new ones */
+  var result = [];
+  for (var i = 0; i < team.length; i++) {
+    if (assigned[team[i]]) result.push(team[i]);
+  }
+  return result;
+}
+
+/* ── RENDER: MANAGE ALLOCATIONS ── */
+function renderAllocations() {
+  if (!allocWeekOf) allocWeekOf = getNextMonday();
+
+  var mc = document.getElementById('mainContent');
+  var h = '';
+
+  h += '<div class="alloc-layout">';
+
+  /* ── PROJECT SIDEBAR ── */
+  h += '<div class="alloc-proj-sidebar">';
+  h += '<div class="aps-header">Projects</div>';
+  h += '<input class="aps-search" type="text" placeholder="Search projects..." value="' + (allocProjSearch || '') + '" oninput="allocProjSearch=this.value;renderAllocProjList()" id="allocProjSearchInput">';
+  h += '<div id="allocProjListInner"></div>';
+  h += '</div>';
+
+  /* ── MAIN GRID AREA ── */
+  h += '<div class="alloc-grid-area">';
+  /* Toolbar */
+  h += '<div class="alloc-toolbar">';
+  h += '<button onclick="allocWeekOf=shiftWeek(allocWeekOf,-1);renderAllocGrid();renderCapacityPanel()">&#9664;</button>';
+  h += '<div class="at-label" id="allocWeekLabel">' + getAllocWeekLabel(allocWeekOf) + '</div>';
+  h += '<button onclick="allocWeekOf=shiftWeek(allocWeekOf,1);renderAllocGrid();renderCapacityPanel()">&#9654;</button>';
+  h += '<button onclick="allocWeekOf=getCurrentMonday();renderAllocGrid();renderCapacityPanel()" style="font-size:11px">Today</button>';
+  h += '<span id="allocSaveStatus" class="alloc-save-status"></span>';
+  h += '<div class="alloc-view-toggle">';
+  h += '<button class="' + (allocViewMode === 'day' ? 'active' : '') + '" onclick="allocViewMode=\'day\';renderAllocGrid()">Day</button>';
+  h += '<button class="' + (allocViewMode === 'week' ? 'active' : '') + '" onclick="allocViewMode=\'week\';renderAllocGrid()">Week</button>';
+  h += '</div>';
+  h += '</div>';
+  /* Grid container */
+  h += '<div class="alloc-grid-scroll" id="allocGridScroll"></div>';
+  h += '</div>';
+
+  /* ── CAPACITY PANEL ── */
+  h += '<div class="cap-panel" id="allocCapPanel"></div>';
+
+  h += '</div>'; /* end alloc-layout */
+
+  mc.innerHTML = h;
+  renderAllocProjList();
+  renderAllocGrid();
+  renderCapacityPanel();
+}
+
+function renderAllocProjList() {
+  var el = document.getElementById('allocProjListInner');
+  if (!el) return;
+  var projects = getProjectList();
+  var search = (allocProjSearch || '').toLowerCase();
+  var h = '';
+  var lastClient = '';
+  for (var i = 0; i < projects.length; i++) {
+    var p = projects[i];
+    if (search && p.name.toLowerCase().indexOf(search) < 0 && p.code.toLowerCase().indexOf(search) < 0 && p.client.toLowerCase().indexOf(search) < 0) continue;
+    if (p.client !== lastClient) {
+      h += '<div class="aps-client"><span style="color:' + p.clientColor + '">&#9679;</span> ' + p.clientCode + ' ' + p.client + '</div>';
+      lastClient = p.client;
+    }
+    var isActive = allocProject === p.name;
+    h += '<div class="aps-item' + (isActive ? ' active' : '') + '" onclick="allocProject=\'' + p.name.replace(/'/g, "\\'") + '\';renderAllocProjList();renderAllocGrid()">';
+    h += '<span class="aps-code">' + p.code + '</span> ' + p.name;
+    h += '</div>';
+  }
+  if (!h) h = '<div style="padding:14px;font-size:11px;color:var(--mid-gray)">No projects match.</div>';
+  el.innerHTML = h;
+}
+
+function renderAllocGrid() {
+  var el = document.getElementById('allocGridScroll');
+  var lbl = document.getElementById('allocWeekLabel');
+  if (!el) return;
+  if (lbl) lbl.innerHTML = getAllocWeekLabel(allocWeekOf);
+
+  if (!allocProject) {
+    el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--mid-gray);font-size:14px">Select a project from the sidebar</div>';
+    return;
+  }
+
+  var team = ALLOCATIONS.team || [];
+  /* Show assigned people first, then unassigned */
+  var assigned = getProjectPeople(allocProject, allocWeekOf);
+  var unassigned = [];
+  for (var i = 0; i < team.length; i++) {
+    if (assigned.indexOf(team[i]) < 0) unassigned.push(team[i]);
+  }
+  var people = assigned.concat(unassigned);
+
+  var days, cols;
+  if (allocViewMode === 'day') {
+    days = getWeekDays(allocWeekOf);
+    cols = days.length;
+  } else {
+    /* Week view: show 4 weeks (current + 3 ahead) */
+    days = [];
+    for (var w = 0; w < 4; w++) {
+      days.push(shiftWeek(allocWeekOf, w));
+    }
+    cols = days.length;
+  }
+
+  var gridCols = '150px ' + ('1fr ').repeat(cols) + '60px'; /* extra col for row total */
+  var h = '<div class="alloc-grid" style="grid-template-columns:' + gridCols + '">';
+
+  /* Header row */
+  h += '<div class="ag-corner">People</div>';
+  if (allocViewMode === 'day') {
+    for (var c = 0; c < days.length; c++) {
+      var isToday = days[c] === new Date().toISOString().slice(0, 10);
+      h += '<div class="ag-col-hdr" style="' + (isToday ? 'background:rgba(48,109,124,.08)' : '') + '">';
+      h += '<span class="ag-day">' + fmtDayShort(days[c]) + '</span> ' + fmtDayNum(days[c]);
+      h += '</div>';
+    }
+  } else {
+    for (var c = 0; c < days.length; c++) {
+      var wn = getISOWeek(days[c]);
+      var fri = new Date(days[c] + 'T00:00:00'); fri.setDate(fri.getDate() + 4);
+      h += '<div class="ag-col-hdr">';
+      h += '<span class="ag-day">Week ' + wn + '</span>';
+      h += fmtMonShort(days[c]) + ' ' + fmtDayNum(days[c]) + '–' + fmtDayNum(fri.toISOString().slice(0, 10));
+      h += '</div>';
+    }
+  }
+  h += '<div class="ag-col-hdr" style="font-size:10px">Total</div>';
+
+  /* People rows */
+  for (var r = 0; r < people.length; r++) {
+    var person = people[r];
+    var pc = PC[person] || '#9B9590';
+    var rowTotal = 0;
+
+    /* Row header */
+    if (allocViewMode === 'day') {
+      rowTotal = getAllocWeekTotal(allocProject, person, allocWeekOf);
+    } else {
+      for (var c = 0; c < days.length; c++) rowTotal += getAllocWeekTotal(allocProject, person, days[c]);
+    }
+
+    h += '<div class="ag-row-hdr"><span class="ag-person-dot" style="background:' + pc + '"></span>' + person;
+    if (rowTotal > 0) h += '<span class="ag-person-total">' + rowTotal.toFixed(1) + 'h</span>';
+    h += '</div>';
+
+    /* Cells */
+    for (var c = 0; c < days.length; c++) {
+      var cellKey, cellVal;
+      if (allocViewMode === 'day') {
+        cellKey = days[c];
+        cellVal = getAllocHours(allocProject, person, cellKey);
+      } else {
+        cellKey = days[c]; /* Monday of that week */
+        cellVal = getAllocWeekTotal(allocProject, person, cellKey);
+      }
+
+      var isEditing = allocEditingCell && allocEditingCell.person === person && allocEditingCell.date === cellKey;
+
+      h += '<div class="ag-cell' + (cellVal > 0 ? ' ag-cell-filled' : '') + '"';
+      if (!isEditing) {
+        if (allocViewMode === 'day') {
+          h += ' onclick="allocStartEdit(\'' + person.replace(/'/g, "\\'") + '\',\'' + cellKey + '\')"';
+        } else {
+          /* In week view, clicking expands to day view for that week */
+          h += ' onclick="allocWeekOf=\'' + cellKey + '\';allocViewMode=\'day\';renderAllocGrid()"';
+        }
+      }
+      h += '>';
+
+      if (isEditing) {
+        h += '<input class="ag-cell-input" type="number" min="0" max="24" step="0.5" value="' + (cellVal || '') + '" id="allocCellInput" '
+          + 'onblur="allocFinishEdit(\'' + person.replace(/'/g, "\\'") + '\',\'' + cellKey + '\',this.value)" '
+          + 'onkeydown="if(event.key===\'Enter\')this.blur();if(event.key===\'Escape\'){allocEditingCell=null;renderAllocGrid();}" '
+          + 'autofocus>';
+      } else if (cellVal > 0) {
+        if (allocViewMode === 'day') {
+          h += '<div class="ag-cell-val" style="background:' + pc + '">' + cellVal + ' h/d</div>';
+        } else {
+          h += '<div class="ag-cell-val" style="background:' + pc + '">' + cellVal.toFixed(1) + 'h</div>';
+        }
+      } else {
+        h += '<div class="ag-cell-empty"></div>';
+      }
+      h += '</div>';
+    }
+
+    /* Row total */
+    var weekTotalAll = getPersonWeekTotal(person, allocWeekOf);
+    var cap = ALLOCATIONS.weeklyCapacity || 40;
+    var tColor = weekTotalAll > cap ? 'var(--ember)' : weekTotalAll >= cap * 0.8 ? 'var(--honey)' : 'var(--mid-gray)';
+    h += '<div class="ag-col-hdr" style="font-size:11px;font-weight:700;color:' + tColor + ';border-bottom:1px solid var(--light-gray)">' + (weekTotalAll > 0 ? weekTotalAll.toFixed(1) : '') + '</div>';
+  }
+
+  /* Add person row */
+  h += '<div class="ag-row-hdr" style="cursor:pointer;color:var(--ocean);font-size:12px" onclick="allocShowAddPerson()">+ Add person</div>';
+  for (var c = 0; c <= cols; c++) h += '<div class="ag-cell" style="border-bottom:none"></div>';
+
+  h += '</div>';
+  el.innerHTML = h;
+
+  /* Focus input if editing */
+  if (allocEditingCell) {
+    var inp = document.getElementById('allocCellInput');
+    if (inp) { inp.focus(); inp.select(); }
+  }
+}
+
+function allocStartEdit(person, dateISO) {
+  allocEditingCell = { person: person, date: dateISO };
+  renderAllocGrid();
+}
+
+function allocFinishEdit(person, dateISO, value) {
+  allocEditingCell = null;
+  var hrs = parseFloat(value) || 0;
+  allocSetCell(allocProject, person, dateISO, hrs);
+  renderAllocGrid();
+  renderCapacityPanel();
+}
+
+function allocShowAddPerson() {
+  /* Quick: add first unassigned person with 0 hours so they appear in the grid */
+  var team = ALLOCATIONS.team || [];
+  var assigned = getProjectPeople(allocProject, allocWeekOf);
+  for (var i = 0; i < team.length; i++) {
+    if (assigned.indexOf(team[i]) < 0) {
+      /* Start editing their first day cell */
+      var firstDay = getWeekDays(allocWeekOf)[0];
+      allocStartEdit(team[i], firstDay);
+      return;
+    }
+  }
+}
+
+function renderCapacityPanel() {
+  var el = document.getElementById('allocCapPanel');
+  if (!el) return;
+  var maxCap = ALLOCATIONS.weeklyCapacity || 40;
+  var team = ALLOCATIONS.team || [];
+
+  /* Build capacity data for current week */
+  var people = [];
+  for (var i = 0; i < team.length; i++) {
+    var total = getPersonWeekTotal(team[i], allocWeekOf);
+    /* Get project breakdown */
+    var projMap = {};
+    var days = getWeekDays(allocWeekOf);
+    var allocs = ALLOCATIONS.allocations;
+    for (var j = 0; j < allocs.length; j++) {
+      if (allocs[j].person === team[i] && days.indexOf(allocs[j].date) >= 0) {
+        if (!projMap[allocs[j].project]) projMap[allocs[j].project] = 0;
+        projMap[allocs[j].project] += allocs[j].hoursPerDay;
+      }
+    }
+    people.push({ name: team[i], total: total, projects: projMap });
+  }
+  people.sort(function(a, b) { return b.total - a.total; });
+
+  var totalAllocated = 0;
+  var activeCount = 0;
+  for (var i = 0; i < people.length; i++) {
+    totalAllocated += people[i].total;
+    if (people[i].total > 0) activeCount++;
+  }
+
+  var h = '';
+  h += '<h3>Team Capacity</h3>';
+  h += '<div class="cap-sub">' + totalAllocated.toFixed(1) + ' hrs &bull; ' + activeCount + ' people allocated</div>';
+
+  for (var i = 0; i < people.length; i++) {
+    var p = people[i];
+    var pct = maxCap > 0 ? (p.total / maxCap) * 100 : 0;
+    var colorClass = pct >= 100 ? 'cap-red' : pct >= 80 ? 'cap-yellow' : 'cap-green';
+    var pc = PC[p.name] || '#9B9590';
+
+    h += '<div class="cap-person">';
+    h += '<div class="cap-person-header">';
+    h += '<div class="cap-person-name"><span class="cp-dot" style="background:' + pc + '"></span>' + p.name + '</div>';
+    h += '<div class="cap-person-hrs ' + colorClass + '">' + p.total.toFixed(1) + ' / ' + maxCap + '</div>';
+    h += '</div>';
+    h += '<div class="cap-bar">';
+    var projKeys = Object.keys(p.projects).sort(function(a, b) { return p.projects[b] - p.projects[a]; });
+    var segColors = ['var(--ocean)', 'var(--honey)', 'var(--ember)', '#7A8B6F', '#9B8EC2', '#6B9DAD', '#B8948A', '#5B7FAF'];
+    for (var j = 0; j < projKeys.length; j++) {
+      var segPct = maxCap > 0 ? (p.projects[projKeys[j]] / maxCap) * 100 : 0;
+      h += '<div class="cap-bar-seg" style="width:' + Math.min(segPct, 100) + '%;background:' + segColors[j % segColors.length] + '" title="' + projKeys[j] + ': ' + p.projects[projKeys[j]].toFixed(1) + 'h"></div>';
+    }
+    h += '</div>';
+    if (projKeys.length > 0) {
+      h += '<div class="cap-projects">';
+      var parts = [];
+      for (var j = 0; j < projKeys.length; j++) parts.push(projKeys[j] + ' ' + p.projects[projKeys[j]].toFixed(1) + 'h');
+      h += parts.join(' &bull; ');
+      h += '</div>';
+    }
+    h += '</div>';
+  }
+
+  el.innerHTML = h;
+}
+
+/* ── NAVIGATION ── */
+function navigate(view) {
+  currentView = view;
+  if (view.indexOf('client:') === 0) {
+    openClients[view.split(':')[1]] = true;
+  } else if (view.indexOf('project:') === 0) {
+    var pid = view.split(':')[1];
+    for (var i = 0; i < CLIENTS.length; i++) {
+      for (var j = 0; j < CLIENTS[i].projects.length; j++) {
+        if (CLIENTS[i].projects[j].id === pid) openClients[CLIENTS[i].id] = true;
+      }
+    }
+  }
+  renderSidebar();
+  if (view === 'master') renderMaster();
+  else if (view === 'flagged') renderFlagged();
+  else if (view === 'completed') renderCompleted();
+  else if (view === 'resource') renderResource();
+  else if (view === 'allocations') renderAllocations();
+  else if (view === 'settings') renderSettings();
+  else if (view.indexOf('client:') === 0) renderClient(view.split(':')[1]);
+  else if (view.indexOf('project:') === 0) renderProject(view.split(':')[1]);
+}
+
+function setUnit(u) {
+  displayUnit = u;
+  document.getElementById('toggleHours').className = 'toggle-btn' + (u === 'hours' ? ' active' : '');
+  document.getElementById('toggleMoney').className = 'toggle-btn' + (u === 'money' ? ' active' : '');
+  navigate(currentView);
+}
+
+function toggleDarkMode() {
+  var isDark = document.documentElement.classList.toggle('dark');
+  localStorage.setItem('furnace-dark-mode', isDark ? '1' : '0');
+}
+(function() {
+  if (localStorage.getItem('furnace-dark-mode') === '1') {
+    document.documentElement.classList.add('dark');
+  }
+})();
+
+/* ── PROJECT BUDGET LOOKUP ── */
+var PROJECT_BUDGETS = {};
+var PROJECT_CODES = {};
+
+/* RT project name → portfolio project name overrides (fuzzy matches) */
+var RT_BUDGET_ALIASES = {
+  'Forge Website': 'Forge Website 2.0',
+  'Mobile App Onboarding Videos': 'Mobile App Onboarding',
+  'Provider Testimonial - CE Partners': 'Provider Testimonial CE Partners',
+  'Provider Testimonial - MGMA Orlando': 'Provider Testimonial MGMA Orlando',
+  'Provider Testimonial - Chiro': 'Provider Testimonial \u2014 Chiro',
+  'SBW Brand Blitz': 'SBW Brand Blitz Testimonials',
+  'Walmart Partnership Social Support': 'Walmart Partnership',
+  'Well U - Brief #17': 'Well U Brief #17',
+  'Well U - Brief #18': 'Well U Brief #18',
+  'Brief #16': 'Well U Brief #16',
+  'Yardtopia Website Refresh': 'Yardtopia Website',
+  'Antonio Well U Shorts': 'Well U Antonio Shorts',
+  'Well U Embedded Vertical Shorts 2026': 'Well U Embedded Vertical Shorts 2026 Article Test',
+  'CareCredit Organic Social Strategy': 'CareCredit Social Media',
+  'Synchrony Organic Social Q1 2026': 'Synchrony Q1 2026',
+  'Olson Superior Marketing': "Q1 '26 Marketing",
+  'Olson Marketing': "Q1 '26 Marketing",
+  'Consumer Research creative assets': 'Consumer Research Creative Assets',
+  'Got It Final Deliverables': 'Got It Creative Assets',
+  'AUS PR Retainer 2025-2026': 'AUS PR Retainer 2025\u20132026',
+  'NEGU Gala 2026 Video': 'NEGU Gala Video 2026',
+  'Synchrony Organic Social Q2 2026': 'Synchrony Q2 2026',
+  'Provider Testimonial - CES4 Extras': 'Provider Testimonial CES4 Extras',
+  '378_08_01 Brand & Marketing Support': 'Brand & Marketing Support',
+  'Yardtopia Winter Campaign': 'Yardtopia Winter Teaser',
+  'CES5 Development': 'CE S5 \u2014 Development',
+  'Dr. Hoefer PR Campaign': 'Dr. Hoefer PR',
+  'Small Projects': 'Peak Pro Small Projects',
+  'Internal Meetings and Skill Development': 'Non-Billable',
+  'Private/Leadership': 'Non-Billable',
+  'Time Off': 'Non-Billable',
+  '100_07_03-os-crnt': 'Non-Billable',
+  '100_07_02-forge-spark': 'Non-Billable',
+  'Forge Public Relations': 'Non-Billable',
+  'Yardtopia Content Writer': 'Non-Billable',
+  'OS Current': 'Non-Billable',
+  '102_06_Skills': 'Non-Billable',
+  'Private/Other': 'Non-Billable',
+  'Private/Untracked': 'Non-Billable',
+  'EDO Personal Brand': 'Non-Billable',
+  'General Accounts Board': 'Non-Billable',
+  'Stryke (SEO tool)': 'Non-Billable',
+  'Equine': 'Provider Testimonials (Erin Rose)',
+  'Provider Testimonial Equine': 'Provider Testimonials (Erin Rose)',
+  'EHS': 'Business Development',
+  '320 - YT Companion': 'Non-Billable',
+  'Level 10 Beta': 'Non-Billable',
+  'General Accounts': 'Non-Billable',
+  'N/A': 'Non-Billable',
+  'Provider Testimonial - Audacity': 'Provider Testimonials - AuDacity D.C.',
+  'My Story July 2025 - May 2026': 'My Story July 2025 - February 2026',
+  '503_01_01 Ravera Brand': 'Ravera Brand',
+  '503_01_02 Ravera Q1 2026 Support': 'Ravera Q1 2026 Support',
+  'Renoah': 'Client Setup',
+  'CES4 Design': 'CES4 Design & Post',
+  'CES4 Post': 'CES4 Design & Post',
+  'CE S4 - Social Media': 'CES4 Social Media',
+  'CE S4 - Social Media - Post': 'CES4 Social Media'
+};
+
+function buildProjectBudgetLookup() {
+  PROJECT_BUDGETS = {};
+  PROJECT_CODES = {};
+  /* Build lookup from portfolio client/project data */
+  var portfolioBudgets = {};
+  var portfolioCodes = {};
+  for (var i = 0; i < CLIENTS.length; i++) {
+    var projs = CLIENTS[i].projects || [];
+    for (var j = 0; j < projs.length; j++) {
+      var p = projs[j];
+      portfolioCodes[p.name] = p.code || '';
+      if (p.hasBudgetData) {
+        var spent = 0;
+        var phases = p.phases || [];
+        for (var k = 0; k < phases.length; k++) spent += phases[k].spent || 0;
+        portfolioBudgets[p.name] = { budget: p.totalBudget || 0, spent: spent, remaining: (p.totalBudget || 0) - spent };
+      }
+    }
+  }
+  /* Map RT project names to budget entries (exact + alias) */
+  var allRTNames = {};
+  for (var w = 0; w < RT_WEEKS.length; w++) {
+    var ppl = RT_WEEKS[w].people || {};
+    for (var pn in ppl) {
+      var pr = ppl[pn].projects || {};
+      for (var pk in pr) allRTNames[pk] = true;
+    }
+  }
+  for (var rtName in allRTNames) {
+    if (portfolioBudgets[rtName]) {
+      PROJECT_BUDGETS[rtName] = portfolioBudgets[rtName];
+    } else if (RT_BUDGET_ALIASES[rtName] && portfolioBudgets[RT_BUDGET_ALIASES[rtName]]) {
+      PROJECT_BUDGETS[rtName] = portfolioBudgets[RT_BUDGET_ALIASES[rtName]];
+    }
+    if (portfolioCodes[rtName]) {
+      PROJECT_CODES[rtName] = portfolioCodes[rtName];
+    } else if (RT_BUDGET_ALIASES[rtName] && portfolioCodes[RT_BUDGET_ALIASES[rtName]]) {
+      PROJECT_CODES[rtName] = portfolioCodes[RT_BUDGET_ALIASES[rtName]];
+    }
+  }
+}
+
+/* ── DATA LOADER ── */
+async function loadData() {
+  try {
+    var resp = await fetch('data/portfolio.json');
+    var data = await resp.json();
+    CLIENTS = data.clients || [];
+    FLAGGED_NO_STRUCTURE = data.flaggedNoStructure || [];
+    FLAGGED_DATA_MISMATCH = data.flaggedDataMismatch || [];
+    PC = data.personColors || {};
+    RES = data.resourceAllocations || {};
+    RT_WEEKS = data.resourceTrackerWeeks || [];
+    RT_LEADERSHIP = data.leadershipFilter || [];
+    METADATA = data.metadata || {};
+    var lu = document.getElementById('lastUpdated');
+    if (lu && data.lastUpdated) {
+      lu.textContent = 'Updated ' + new Date(data.lastUpdated).toLocaleDateString('en-US', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
+    }
+    buildProjectBudgetLookup();
+
+    /* Load native allocation data if running in Electron */
+    if (window.furnaceAPI) {
+      try {
+        var allocData = await window.furnaceAPI.readAllocations();
+        if (allocData) ALLOCATIONS = allocData;
+        var actualsData = await window.furnaceAPI.readActuals();
+        if (actualsData) ACTUALS = actualsData;
+        computeResourceWeeks();
+      } catch(ae) {
+        console.warn('Could not load native allocations:', ae);
+      }
+    }
+
+    navigate('master');
+  } catch(e) {
+    document.getElementById('mainContent').innerHTML = '<div style="padding:60px 40px;text-align:center"><h2 style="color:var(--ember)">Unable to load portfolio data</h2><p style="color:var(--mid-gray);margin-top:12px">Could not fetch data/portfolio.json</p><p style="color:var(--mid-gray);margin-top:4px;font-size:11px">' + e.message + '</p><p style="color:var(--mid-gray);margin-top:16px;font-size:12px">If running locally, start a server:<br><code style="background:#f5f3f0;padding:2px 6px;border-radius:3px">npx serve .</code></p></div>';
+  }
+}
+
+/* ── INIT ── */
+loadData();
+</script>
+</body>
+</html>
