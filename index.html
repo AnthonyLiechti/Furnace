@@ -239,6 +239,47 @@ body { font-family: Arial, 'TT Hoves Pro', sans-serif; background: var(--light-g
 .pp-bar-wrap { height:6px; background:var(--light-gray); border-radius:3px; overflow:hidden; }
 .pp-bar-fill { height:100%; border-radius:3px; }
 
+/* ── Spark Budget Editor ── */
+.spark-select { width:100%; max-width:480px; padding:10px 14px; border:1px solid var(--canvas); border-radius:8px; font-size:14px; font-family:inherit; background:var(--white); color:var(--abyss); cursor:pointer; appearance:none; background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238A8580'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 14px center; }
+.spark-select:focus { outline:none; border-color:var(--ocean); }
+.spark-phase-tabs { display:flex; gap:6px; margin-bottom:18px; flex-wrap:wrap; }
+.spark-phase-tab { padding:6px 16px; border-radius:16px; border:1px solid var(--canvas); background:var(--white); cursor:pointer; font-size:12px; font-weight:500; color:var(--mid-gray); transition:background .15s, color .15s; }
+.spark-phase-tab.active { background:var(--abyss); color:var(--white); border-color:var(--abyss); }
+.spark-phase-tab:hover:not(.active) { background:var(--light-gray); }
+.spark-labor-table { width:100%; border-collapse:collapse; }
+.spark-labor-table th { text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:var(--mid-gray); padding:8px 10px; border-bottom:2px solid var(--canvas); font-weight:500; }
+.spark-labor-table th.num { text-align:right; }
+.spark-dept-row td { padding:10px 10px; font-size:13px; font-weight:700; border-bottom:1px solid var(--canvas); }
+.spark-dept-row .spark-dept-label { display:flex; align-items:center; gap:8px; }
+.spark-dept-bar { width:4px; height:18px; border-radius:2px; flex-shrink:0; }
+.spark-person-row td { padding:7px 10px; font-size:13px; border-bottom:1px solid var(--light-gray); }
+.spark-person-row td.num { text-align:right; font-variant-numeric:tabular-nums; }
+.spark-person-row:last-child td { border-bottom:none; }
+.spark-input { width:72px; padding:5px 8px; border:1px solid var(--canvas); border-radius:5px; font-size:13px; text-align:right; font-family:inherit; font-variant-numeric:tabular-nums; background:var(--white); color:var(--abyss); }
+.spark-input:focus { outline:none; border-color:var(--ocean); box-shadow:0 0 0 2px rgba(48,109,124,.15); }
+.spark-oop-section { background:var(--white); border:1px solid var(--canvas); border-radius:10px; padding:16px 20px; margin-bottom:14px; }
+.spark-oop-cat { font-size:11px; text-transform:uppercase; letter-spacing:.8px; color:var(--mid-gray); font-weight:600; padding:10px 0 6px; border-bottom:1px solid var(--canvas); margin-bottom:4px; }
+.spark-oop-item { display:grid; grid-template-columns:1.5fr 1fr 80px 100px 100px 1.5fr; gap:8px; align-items:center; padding:7px 0; border-bottom:1px solid var(--light-gray); font-size:13px; }
+.spark-oop-item:last-child { border-bottom:none; }
+.spark-oop-item.spark-oop-hdr { font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:var(--mid-gray); font-weight:500; border-bottom:2px solid var(--canvas); padding-bottom:8px; }
+.spark-oop-item .num { text-align:right; font-variant-numeric:tabular-nums; }
+.spark-oop-markup { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-top:2px solid var(--canvas); margin-top:8px; font-size:13px; font-weight:600; color:var(--abyss); }
+.spark-summary { background:var(--abyss); color:var(--white); border-radius:10px; padding:18px 24px; margin-top:24px; display:grid; grid-template-columns:repeat(auto-fit, minmax(140px,1fr)); gap:16px; }
+.spark-summary-item { text-align:center; }
+.spark-summary-item .ss-label { font-size:9px; text-transform:uppercase; letter-spacing:.8px; opacity:.5; margin-bottom:4px; }
+.spark-summary-item .ss-value { font-size:20px; font-weight:700; }
+.spark-summary-item .ss-sub { font-size:10px; opacity:.45; margin-top:2px; }
+.spark-saving { display:inline-block; font-size:11px; color:var(--ocean); font-style:italic; margin-left:12px; opacity:0; transition:opacity .2s; }
+.spark-saving.visible { opacity:1; }
+.spark-overview-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px,1fr)); gap:12px; margin-top:12px; }
+.spark-overview-item { text-align:center; }
+.spark-overview-item .so-label { font-size:9px; text-transform:uppercase; letter-spacing:.8px; opacity:.5; margin-bottom:4px; }
+.spark-overview-item .so-value { font-size:18px; font-weight:700; }
+.spark-status-badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; }
+.spark-status-badge.active { background:rgba(129,199,132,.2); color:#81C784; }
+.spark-status-badge.proposed { background:rgba(218,195,142,.2); color:var(--sand); }
+.spark-status-badge.closeout { background:rgba(206,115,56,.2); color:var(--ember); }
+
 /* Manage Allocations Page */
 .alloc-layout { display:grid; grid-template-columns:220px 1fr 340px; gap:0; height:calc(100vh - 120px); }
 .alloc-proj-sidebar { background:var(--white); border-right:1px solid var(--canvas); overflow-y:auto; }
@@ -435,6 +476,22 @@ html.dark #globalToolbar input[type="date"] { background:var(--dm-surface2); bor
 
 /* ── DARK MODE: Snapshot Banner (already dark, but text colors) ── */
 html.dark .proj-callout { background:#0f2a30; }
+
+/* ── DARK MODE: Spark Budget Editor ── */
+html.dark .spark-select { background:var(--dm-surface2); border-color:var(--dm-border); color:var(--dm-text); background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E"); }
+html.dark .spark-phase-tab { background:var(--dm-surface2); border-color:var(--dm-border); color:var(--dm-text-muted); }
+html.dark .spark-phase-tab.active { background:var(--abyss); color:var(--white); border-color:var(--abyss); }
+html.dark .spark-phase-tab:hover:not(.active) { background:var(--dm-surface); }
+html.dark .spark-labor-table th { color:var(--dm-text-muted); border-bottom-color:var(--dm-border); }
+html.dark .spark-dept-row td { color:var(--dm-text); border-bottom-color:var(--dm-border); }
+html.dark .spark-person-row td { color:var(--dm-text); border-bottom-color:var(--dm-border); }
+html.dark .spark-input { background:var(--dm-surface2); border-color:var(--dm-border); color:var(--dm-text); }
+html.dark .spark-input:focus { border-color:var(--ocean); }
+html.dark .spark-oop-section { background:var(--dm-surface); border-color:var(--dm-border); }
+html.dark .spark-oop-cat { color:var(--dm-text-muted); border-bottom-color:var(--dm-border); }
+html.dark .spark-oop-item { color:var(--dm-text); border-bottom-color:var(--dm-border); }
+html.dark .spark-oop-item.spark-oop-hdr { color:var(--dm-text-muted); border-bottom-color:var(--dm-border); }
+html.dark .spark-oop-markup { color:var(--dm-text); border-top-color:var(--dm-border); }
 </style>
 </head>
 <body>
@@ -858,6 +915,7 @@ function renderSidebar() {
   html += '<div class="nav-item ' + (currentView === 'completed' ? 'active' : '') + '" onclick="navigate(\'completed\')"><span class="icon">&#10003;</span> Completed Projects</div>';
   html += '<div class="nav-item ' + (currentView === 'resource' ? 'active' : '') + '" onclick="navigate(\'resource\')"><span class="icon">&#9202;</span> Resource Tracker</div>';
   html += '<div class="nav-item ' + (currentView === 'allocations' ? 'active' : '') + '" onclick="navigate(\'allocations\')"><span class="icon">&#9997;</span> Manage Allocations</div>';
+  html += '<div class="nav-item ' + (currentView === 'spark' ? 'active' : '') + '" onclick="navigate(\'spark\')"><span class="icon">&#9889;</span> Spark</div>';
   html += '<div class="nav-item ' + (currentView === 'settings' ? 'active' : '') + '" onclick="navigate(\'settings\')"><span class="icon">&#9881;</span> Settings</div>';
   html += '<div class="nav-divider"></div>';
 
@@ -1963,6 +2021,497 @@ function updateRate(clientId, val) {
   saveRates();
 }
 
+/* ── SPARK BUDGET EDITOR STATE ── */
+var sparkBudgets = [];
+var sparkSelectedBudget = null;
+var sparkCurrentData = null;
+var sparkPhaseTab = 'all';
+var sparkOopTab = 'creative';
+var sparkSaveTimers = {};
+
+var SPARK_PHASES = [
+  {key:'phase1', label:'P1'},
+  {key:'phase2', label:'P2'},
+  {key:'phase3_1', label:'P3.1'},
+  {key:'phase3_2', label:'P3.2'},
+  {key:'phase4', label:'P4'},
+  {key:'phase5', label:'P5'}
+];
+
+var SPARK_DEPT_COLORS = {
+  'Executive/Admin': 'var(--ember)',
+  'Account': 'var(--ocean)',
+  'Creative': 'var(--sand)',
+  'Post': 'var(--honey)'
+};
+
+var SPARK_DEPT_ORDER = ['Executive/Admin', 'Account', 'Creative', 'Post'];
+
+function sparkFmt(n) {
+  if (n == null || isNaN(n)) return '$0';
+  return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0});
+}
+
+function sparkFmtDec(n) {
+  if (n == null || isNaN(n)) return '$0.00';
+  return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function sparkGetRate(entry) {
+  if (entry.rate_override != null && entry.rate_override > 0) return entry.rate_override;
+  if (entry.employment_type === 'Freelancer' || (entry.team_member && entry.team_member.employment_type === 'Freelancer')) {
+    return entry.ad_hoc_rate || 0;
+  }
+  return (entry.team_member && entry.team_member.billable_rate) || 0;
+}
+
+function sparkEntryHours(entry, phaseKey) {
+  if (phaseKey === 'all') {
+    var total = 0;
+    for (var i = 0; i < SPARK_PHASES.length; i++) {
+      total += (entry[SPARK_PHASES[i].key] || 0);
+    }
+    return total;
+  }
+  return entry[phaseKey] || 0;
+}
+
+function sparkEntryTotal(entry) {
+  var rate = sparkGetRate(entry);
+  var hrs = 0;
+  for (var i = 0; i < SPARK_PHASES.length; i++) {
+    hrs += (entry[SPARK_PHASES[i].key] || 0);
+  }
+  return hrs * rate;
+}
+
+function sparkSettingVal(settings, category, key, fallback) {
+  for (var i = 0; i < settings.length; i++) {
+    if (settings[i].category === category && settings[i].key === key) return parseFloat(settings[i].value) || fallback;
+  }
+  return fallback;
+}
+
+function sparkOopItemTotal(item) {
+  var rate = item.rate_override != null && item.rate_override > 0 ? item.rate_override : (item.vendor_rate || 0);
+  return (item.count || 0) * rate * (item.days || 1) * (item.head_count || 1);
+}
+
+function sparkShowSaving() {
+  var el = document.getElementById('sparkSavingIndicator');
+  if (el) { el.className = 'spark-saving visible'; }
+}
+
+function sparkHideSaving() {
+  var el = document.getElementById('sparkSavingIndicator');
+  if (el) { el.className = 'spark-saving'; }
+}
+
+async function sparkPatchLabor(entryId, phaseKey, value) {
+  sparkShowSaving();
+  var body = {};
+  body[phaseKey] = parseFloat(value) || 0;
+  await sparkFetch('labor_budget_entries', 'id=eq.' + entryId, 'PATCH', body);
+  sparkHideSaving();
+}
+
+async function sparkPatchOop(entryId, field, value) {
+  sparkShowSaving();
+  var body = {};
+  body[field] = parseFloat(value) || 0;
+  await sparkFetch('oop_budget_entries', 'id=eq.' + entryId, 'PATCH', body);
+  sparkHideSaving();
+}
+
+function sparkDebouncedPatchLabor(entryId, phaseKey, value) {
+  var timerKey = 'labor-' + entryId + '-' + phaseKey;
+  if (sparkSaveTimers[timerKey]) clearTimeout(sparkSaveTimers[timerKey]);
+  /* Update local data immediately */
+  if (sparkCurrentData && sparkCurrentData.labor) {
+    for (var i = 0; i < sparkCurrentData.labor.length; i++) {
+      if (sparkCurrentData.labor[i].id === entryId) {
+        sparkCurrentData.labor[i][phaseKey] = parseFloat(value) || 0;
+        break;
+      }
+    }
+  }
+  sparkRenderSummary();
+  sparkSaveTimers[timerKey] = setTimeout(function() { sparkPatchLabor(entryId, phaseKey, value); }, 500);
+}
+
+function sparkDebouncedPatchOop(entryId, field, value) {
+  var timerKey = 'oop-' + entryId + '-' + field;
+  if (sparkSaveTimers[timerKey]) clearTimeout(sparkSaveTimers[timerKey]);
+  if (sparkCurrentData && sparkCurrentData.oop) {
+    for (var i = 0; i < sparkCurrentData.oop.length; i++) {
+      if (sparkCurrentData.oop[i].id === entryId) {
+        sparkCurrentData.oop[i][field] = parseFloat(value) || 0;
+        break;
+      }
+    }
+  }
+  sparkRenderOopContent();
+  sparkRenderSummary();
+  sparkSaveTimers[timerKey] = setTimeout(function() { sparkPatchOop(entryId, field, value); }, 500);
+}
+
+function sparkRenderSummary() {
+  var el = document.getElementById('sparkSummaryBar');
+  if (!el || !sparkCurrentData) return;
+  var data = sparkCurrentData;
+  var totalLaborHrs = 0, totalLaborCost = 0;
+  for (var i = 0; i < data.labor.length; i++) {
+    var e = data.labor[i];
+    var hrs = sparkEntryHours(e, 'all');
+    totalLaborHrs += hrs;
+    totalLaborCost += hrs * sparkGetRate(e);
+  }
+  var totalOop = 0;
+  for (var i = 0; i < data.oop.length; i++) {
+    if (data.oop[i].is_active !== false) totalOop += sparkOopItemTotal(data.oop[i]);
+  }
+  var markupPct = sparkSettingVal(data.settings, 'markup', 'oop_markup_percentage', 20);
+  var totalOopWithMarkup = totalOop * (1 + markupPct / 100);
+  var totalAmount = totalLaborCost + totalOopWithMarkup;
+  var budget = data.budget;
+  var clientPrice = budget.client_price || 0;
+  var profit = clientPrice - totalAmount;
+  var margin = clientPrice > 0 ? (profit / clientPrice * 100) : 0;
+
+  var h = '';
+  h += '<div class="spark-summary-item"><div class="ss-label">Total Labor</div><div class="ss-value">' + sparkFmt(totalLaborCost) + '</div><div class="ss-sub">' + totalLaborHrs.toFixed(1) + ' hrs</div></div>';
+  h += '<div class="spark-summary-item"><div class="ss-label">Total OOP</div><div class="ss-value">' + sparkFmt(totalOopWithMarkup) + '</div><div class="ss-sub">incl. ' + markupPct + '% markup</div></div>';
+  h += '<div class="spark-summary-item"><div class="ss-label">Total Amount</div><div class="ss-value">' + sparkFmt(totalAmount) + '</div></div>';
+  h += '<div class="spark-summary-item"><div class="ss-label">Client Price</div><div class="ss-value" style="color:var(--sand)">' + sparkFmt(clientPrice) + '</div></div>';
+  h += '<div class="spark-summary-item"><div class="ss-label">Profit</div><div class="ss-value" style="color:' + (profit >= 0 ? '#81C784' : 'var(--ember)') + '">' + sparkFmt(profit) + '</div><div class="ss-sub">' + margin.toFixed(1) + '% margin</div></div>';
+  el.innerHTML = h;
+}
+
+function sparkRenderLaborContent() {
+  var el = document.getElementById('sparkLaborContent');
+  if (!el || !sparkCurrentData) return;
+  var data = sparkCurrentData;
+  var labor = data.labor;
+  var phaseKey = sparkPhaseTab;
+
+  /* Group by department */
+  var deptGroups = {};
+  for (var i = 0; i < SPARK_DEPT_ORDER.length; i++) deptGroups[SPARK_DEPT_ORDER[i]] = [];
+  var otherDept = [];
+  for (var i = 0; i < labor.length; i++) {
+    var dept = labor[i].department || (labor[i].team_member && labor[i].team_member.department) || 'Other';
+    if (deptGroups[dept]) deptGroups[dept].push(labor[i]);
+    else otherDept.push(labor[i]);
+  }
+
+  var h = '<table class="spark-labor-table">';
+  h += '<thead><tr><th>Name</th><th class="num">Rate</th>';
+  if (phaseKey === 'all') {
+    for (var p = 0; p < SPARK_PHASES.length; p++) {
+      h += '<th class="num">' + SPARK_PHASES[p].label + '</th>';
+    }
+  } else {
+    h += '<th class="num">Hours</th>';
+  }
+  h += '<th class="num">Total Hrs</th><th class="num">Total $</th></tr></thead><tbody>';
+
+  var allDepts = SPARK_DEPT_ORDER.slice();
+  if (otherDept.length) allDepts.push('Other');
+
+  for (var d = 0; d < allDepts.length; d++) {
+    var deptName = allDepts[d];
+    var members = deptName === 'Other' ? otherDept : deptGroups[deptName];
+    if (!members || !members.length) continue;
+    var deptColor = SPARK_DEPT_COLORS[deptName] || 'var(--mid-gray)';
+
+    /* Department subtotals */
+    var deptHrs = 0, deptCost = 0;
+    for (var m = 0; m < members.length; m++) {
+      deptHrs += sparkEntryHours(members[m], 'all');
+      deptCost += sparkEntryTotal(members[m]);
+    }
+
+    var colCount = phaseKey === 'all' ? SPARK_PHASES.length + 4 : 5;
+    h += '<tr class="spark-dept-row"><td colspan="' + colCount + '"><div class="spark-dept-label"><div class="spark-dept-bar" style="background:' + deptColor + '"></div>' + deptName + '<span style="font-weight:400;font-size:11px;color:var(--mid-gray);margin-left:8px">' + deptHrs.toFixed(1) + ' hrs / ' + sparkFmt(deptCost) + '</span></div></td></tr>';
+
+    for (var m = 0; m < members.length; m++) {
+      var entry = members[m];
+      var name = (entry.team_member && entry.team_member.name) || 'Unknown';
+      var rate = sparkGetRate(entry);
+      var totalHrs = sparkEntryHours(entry, 'all');
+      var totalCost = totalHrs * rate;
+      var empType = entry.employment_type || (entry.team_member && entry.team_member.employment_type) || '';
+      var isFreelancer = empType === 'Freelancer';
+
+      h += '<tr class="spark-person-row">';
+      h += '<td>' + name + (isFreelancer ? ' <span style="font-size:9px;color:var(--mid-gray)">(FL)</span>' : '') + '</td>';
+      h += '<td class="num">' + sparkFmtDec(rate) + '</td>';
+
+      if (phaseKey === 'all') {
+        for (var p = 0; p < SPARK_PHASES.length; p++) {
+          var pk = SPARK_PHASES[p].key;
+          var phVal = entry[pk] || 0;
+          h += '<td class="num"><input type="number" class="spark-input" value="' + phVal + '" min="0" step="0.5" onchange="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + pk + '\',this.value)" oninput="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + pk + '\',this.value)"></td>';
+        }
+      } else {
+        var phVal = entry[phaseKey] || 0;
+        h += '<td class="num"><input type="number" class="spark-input" value="' + phVal + '" min="0" step="0.5" onchange="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + phaseKey + '\',this.value)" oninput="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + phaseKey + '\',this.value)"></td>';
+      }
+
+      h += '<td class="num" style="font-weight:600">' + totalHrs.toFixed(1) + '</td>';
+      h += '<td class="num" style="font-weight:600">' + sparkFmt(totalCost) + '</td>';
+      h += '</tr>';
+    }
+  }
+
+  h += '</tbody></table>';
+  el.innerHTML = h;
+}
+
+function sparkRenderOopContent() {
+  var el = document.getElementById('sparkOopContent');
+  if (!el || !sparkCurrentData) return;
+  var data = sparkCurrentData;
+  var sections = data.oopSections;
+  var entries = data.oop;
+  var settings = data.settings;
+  var markupPct = sparkSettingVal(settings, 'markup', 'oop_markup_percentage', 20);
+
+  /* Find active section by tab */
+  var activeSection = null;
+  for (var i = 0; i < sections.length; i++) {
+    if (sections[i].slug === sparkOopTab) { activeSection = sections[i]; break; }
+  }
+  if (!activeSection && sections.length) activeSection = sections[0];
+  if (!activeSection) { el.innerHTML = '<p style="color:var(--mid-gray)">No OOP sections found.</p>'; return; }
+
+  /* Filter entries for this section */
+  var sectionEntries = [];
+  for (var i = 0; i < entries.length; i++) {
+    if (entries[i].section && entries[i].section.id === activeSection.id && entries[i].is_active !== false) {
+      sectionEntries.push(entries[i]);
+    }
+  }
+
+  var h = '<div class="spark-oop-section">';
+  h += '<div class="spark-oop-item spark-oop-hdr"><div>Name</div><div>Vendor</div><div class="num">Count</div><div class="num">Rate</div><div class="num">Total</div><div>Notes</div></div>';
+
+  var sectionTotal = 0;
+  for (var i = 0; i < sectionEntries.length; i++) {
+    var item = sectionEntries[i];
+    var itemRate = item.rate_override != null && item.rate_override > 0 ? item.rate_override : (item.vendor_rate || 0);
+    var itemTotal = sparkOopItemTotal(item);
+    sectionTotal += itemTotal;
+
+    h += '<div class="spark-oop-item">';
+    h += '<div>' + (item.name || 'Unnamed') + '</div>';
+    h += '<div style="font-size:12px;color:var(--mid-gray)">' + (item.vendor_id ? 'Vendor' : '-') + '</div>';
+    h += '<div class="num"><input type="number" class="spark-input" value="' + (item.count || 0) + '" min="0" step="1" onchange="sparkDebouncedPatchOop(\'' + item.id + '\',\'count\',this.value)" oninput="sparkDebouncedPatchOop(\'' + item.id + '\',\'count\',this.value)"></div>';
+    h += '<div class="num"><input type="number" class="spark-input" value="' + (itemRate || 0) + '" min="0" step="0.01" onchange="sparkDebouncedPatchOop(\'' + item.id + '\',\'rate_override\',this.value)" oninput="sparkDebouncedPatchOop(\'' + item.id + '\',\'rate_override\',this.value)"></div>';
+    h += '<div class="num" style="font-weight:600">' + sparkFmt(itemTotal) + '</div>';
+    h += '<div style="font-size:11px;color:var(--mid-gray)">' + (item.notes || '') + '</div>';
+    h += '</div>';
+  }
+
+  if (!sectionEntries.length) {
+    h += '<div style="padding:16px;color:var(--mid-gray);font-size:13px;text-align:center">No line items in this section.</div>';
+  }
+
+  /* Markup + subtotal */
+  var markupAmt = sectionTotal * (markupPct / 100);
+  h += '<div class="spark-oop-markup"><span>Subtotal</span><span>' + sparkFmt(sectionTotal) + '</span></div>';
+  h += '<div class="spark-oop-markup" style="border-top:1px solid var(--canvas);font-size:12px;color:var(--mid-gray)"><span>Markup (' + markupPct + '%)</span><span>' + sparkFmt(markupAmt) + '</span></div>';
+  h += '<div class="spark-oop-markup"><span>Section Total</span><span style="font-size:16px">' + sparkFmt(sectionTotal + markupAmt) + '</span></div>';
+  h += '</div>';
+  el.innerHTML = h;
+}
+
+function sparkSetPhaseTab(tab) {
+  sparkPhaseTab = tab;
+  /* Update tab UI */
+  var tabs = document.querySelectorAll('.spark-phase-tab[data-group="labor"]');
+  for (var i = 0; i < tabs.length; i++) {
+    tabs[i].className = 'spark-phase-tab' + (tabs[i].getAttribute('data-tab') === tab ? ' active' : '');
+  }
+  sparkRenderLaborContent();
+}
+
+function sparkSetOopTab(tab) {
+  sparkOopTab = tab;
+  var tabs = document.querySelectorAll('.spark-phase-tab[data-group="oop"]');
+  for (var i = 0; i < tabs.length; i++) {
+    tabs[i].className = 'spark-phase-tab' + (tabs[i].getAttribute('data-tab') === tab ? ' active' : '');
+  }
+  sparkRenderOopContent();
+}
+
+async function sparkLoadBudget(budgetId) {
+  sparkSelectedBudget = budgetId;
+  if (!budgetId) { sparkCurrentData = null; sparkRenderBudgetContent(); return; }
+
+  var loadingEl = document.getElementById('sparkBudgetContent');
+  if (loadingEl) loadingEl.innerHTML = '<div style="padding:40px;text-align:center;color:var(--mid-gray)">Loading budget data...</div>';
+
+  var results = await Promise.all([
+    sparkFetch('budgets', 'id=eq.' + budgetId + '&select=*,clients(id,name,client_number),projects(id,name,code)'),
+    sparkFetch('labor_budget_entries', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,billable_rate,fully_burdened_rate,department,employment_type)&order=department.asc,display_order.asc'),
+    sparkFetch('oop_budget_entries', 'budget_id=eq.' + budgetId + '&select=*,section:oop_sections(id,name,slug)&order=display_order.asc'),
+    sparkFetch('oop_sections', 'select=*&order=display_order.asc'),
+    sparkFetch('labor_actuals', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,department,employment_type)&order=work_date.desc'),
+    sparkFetch('agency_settings', 'select=*&order=category.asc,sort_order.asc')
+  ]);
+
+  sparkCurrentData = {
+    budget: results[0] && results[0][0] ? results[0][0] : null,
+    labor: results[1] || [],
+    oop: results[2] || [],
+    oopSections: results[3] || [],
+    actuals: results[4] || [],
+    settings: results[5] || []
+  };
+
+  sparkPhaseTab = 'all';
+  sparkOopTab = (sparkCurrentData.oopSections.length && sparkCurrentData.oopSections[0].slug) || 'creative';
+  sparkRenderBudgetContent();
+}
+
+function sparkRenderBudgetContent() {
+  var el = document.getElementById('sparkBudgetContent');
+  if (!el) return;
+  if (!sparkCurrentData || !sparkCurrentData.budget) {
+    el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--mid-gray)">Select a budget above to begin editing.</div>';
+    return;
+  }
+
+  var data = sparkCurrentData;
+  var budget = data.budget;
+  var settings = data.settings;
+  var reservePct = sparkSettingVal(settings, 'reserve', 'reserve_percentage', 5);
+  var discountPct = budget.has_discount ? (budget.discount_percentage || sparkSettingVal(settings, 'discount', 'discount_percentage', 0)) : 0;
+  var clientPrice = budget.client_price || 0;
+  var discountAmt = clientPrice * (discountPct / 100);
+  var tcv = clientPrice - discountAmt;
+  var reserveAmt = tcv * (reservePct / 100);
+
+  /* Compute labor total */
+  var totalLaborCost = 0;
+  for (var i = 0; i < data.labor.length; i++) totalLaborCost += sparkEntryTotal(data.labor[i]);
+  /* Compute OOP total */
+  var totalOop = 0;
+  for (var i = 0; i < data.oop.length; i++) {
+    if (data.oop[i].is_active !== false) totalOop += sparkOopItemTotal(data.oop[i]);
+  }
+  var markupPct = sparkSettingVal(settings, 'markup', 'oop_markup_percentage', 20);
+  var totalOopWithMarkup = totalOop * (1 + markupPct / 100);
+
+  var h = '';
+
+  /* ── Project Overview Card ── */
+  h += '<div class="snapshot-banner">';
+  h += '<div class="snap-header"><div>';
+  h += '<div style="font-size:16px;font-weight:700">' + (budget.name || 'Untitled') + '</div>';
+  h += '<div style="font-size:12px;opacity:.55;margin-top:2px">#' + (budget.estimate_number || '—') + '</div>';
+  h += '</div><div style="display:flex;gap:8px;align-items:center">';
+  h += '<span class="spark-status-badge ' + (budget.status || '') + '">' + (budget.status || '—') + '</span>';
+  h += '<span id="sparkSavingIndicator" class="spark-saving">Saving...</span>';
+  h += '</div></div>';
+
+  /* Client info */
+  var clientName = budget.clients ? (budget.clients.client_number || '') + ' - ' + (budget.clients.name || '') : '—';
+  h += '<div style="font-size:12px;opacity:.55;margin-bottom:14px">Client: ' + clientName + '</div>';
+
+  /* Financial overview grid */
+  h += '<div class="spark-overview-grid">';
+  h += '<div class="spark-overview-item"><div class="so-label">Client Price</div><div class="so-value" style="color:var(--sand)">' + sparkFmt(clientPrice) + '</div></div>';
+  if (discountPct > 0) {
+    h += '<div class="spark-overview-item"><div class="so-label">Discount (' + discountPct + '%)</div><div class="so-value">-' + sparkFmt(discountAmt) + '</div></div>';
+  }
+  h += '<div class="spark-overview-item"><div class="so-label">TCV</div><div class="so-value">' + sparkFmt(tcv) + '</div></div>';
+  h += '<div class="spark-overview-item"><div class="so-label">Fee (Labor)</div><div class="so-value" style="color:var(--ocean)">' + sparkFmt(totalLaborCost) + '</div></div>';
+  h += '<div class="spark-overview-item"><div class="so-label">Pass-Through (OOP)</div><div class="so-value">' + sparkFmt(totalOopWithMarkup) + '</div></div>';
+  h += '<div class="spark-overview-item"><div class="so-label">Reserve (' + reservePct + '%)</div><div class="so-value">' + sparkFmt(reserveAmt) + '</div></div>';
+  h += '</div></div>';
+
+  /* ── Labor Fee Section ── */
+  h += '<div class="section-title" style="margin-top:28px">Labor Fee</div>';
+  h += '<div class="spark-phase-tabs">';
+  h += '<div class="spark-phase-tab' + (sparkPhaseTab === 'all' ? ' active' : '') + '" data-group="labor" data-tab="all" onclick="sparkSetPhaseTab(\'all\')">ALL</div>';
+  for (var p = 0; p < SPARK_PHASES.length; p++) {
+    var pk = SPARK_PHASES[p].key;
+    h += '<div class="spark-phase-tab' + (sparkPhaseTab === pk ? ' active' : '') + '" data-group="labor" data-tab="' + pk + '" onclick="sparkSetPhaseTab(\'' + pk + '\')">' + SPARK_PHASES[p].label + '</div>';
+  }
+  h += '</div>';
+  h += '<div class="rt-card"><div id="sparkLaborContent"></div></div>';
+
+  /* ── OOP Section ── */
+  h += '<div class="section-title" style="margin-top:28px">Out-of-Pocket (OOP)</div>';
+  h += '<div class="spark-phase-tabs">';
+  for (var s = 0; s < data.oopSections.length; s++) {
+    var sec = data.oopSections[s];
+    h += '<div class="spark-phase-tab' + (sparkOopTab === sec.slug ? ' active' : '') + '" data-group="oop" data-tab="' + sec.slug + '" onclick="sparkSetOopTab(\'' + sec.slug + '\')">' + sec.name + '</div>';
+  }
+  h += '</div>';
+  h += '<div id="sparkOopContent"></div>';
+
+  /* ── Summary Bar ── */
+  h += '<div class="spark-summary" id="sparkSummaryBar"></div>';
+
+  el.innerHTML = h;
+
+  /* Render sub-sections */
+  sparkRenderLaborContent();
+  sparkRenderOopContent();
+  sparkRenderSummary();
+}
+
+async function renderSpark() {
+  if (!sparkAuth.connected) {
+    var h = '<h1 class="page-title">&#9889; Spark Budget Editor</h1>';
+    h += '<p class="page-subtitle">Connect to Spark in Settings to use the budget editor.</p>';
+    h += '<div class="snapshot-banner" style="max-width:500px;margin-top:24px">';
+    h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><div style="width:10px;height:10px;border-radius:50%;background:var(--ember)"></div><div style="font-size:14px;font-weight:600">Not Connected</div></div>';
+    h += '<div style="font-size:12px;opacity:.6;margin-bottom:14px">Go to Settings and sign in with Google to connect Spark.</div>';
+    h += '<button onclick="navigate(\'settings\')" style="padding:8px 20px;border-radius:6px;border:none;background:var(--ocean);color:var(--white);cursor:pointer;font-size:13px;font-weight:600">Go to Settings</button>';
+    h += '</div>';
+    document.getElementById('mainContent').innerHTML = h;
+    return;
+  }
+
+  var h = '<h1 class="page-title">&#9889; Spark Budget Editor</h1>';
+  h += '<p class="page-subtitle">Edit live project budgets from Spark</p>';
+
+  /* Budget selector */
+  h += '<div style="margin-bottom:24px">';
+  h += '<select class="spark-select" id="sparkBudgetSelect" onchange="sparkLoadBudget(this.value)">';
+  h += '<option value="">Loading budgets...</option>';
+  h += '</select></div>';
+
+  /* Content area */
+  h += '<div id="sparkBudgetContent"><div style="padding:40px;text-align:center;color:var(--mid-gray)">Select a budget to begin editing.</div></div>';
+
+  document.getElementById('mainContent').innerHTML = h;
+
+  /* Fetch budget list */
+  sparkBudgets = await sparkFetch('budgets', 'status=in.(active,closeout,proposed)&visibility=eq.visible&select=id,name,estimate_number,status,client_price,clients(name,client_number)&order=updated_at.desc') || [];
+
+  var sel = document.getElementById('sparkBudgetSelect');
+  if (sel) {
+    var opts = '<option value="">-- Select a budget --</option>';
+    for (var i = 0; i < sparkBudgets.length; i++) {
+      var b = sparkBudgets[i];
+      var clientLabel = b.clients ? (b.clients.client_number || '') + ' ' + (b.clients.name || '') : '';
+      var statusTag = b.status ? ' [' + b.status.toUpperCase() + ']' : '';
+      opts += '<option value="' + b.id + '"' + (sparkSelectedBudget === b.id ? ' selected' : '') + '>#' + (b.estimate_number || '—') + ' — ' + (b.name || 'Untitled') + ' — ' + clientLabel + statusTag + '</option>';
+    }
+    sel.innerHTML = opts;
+  }
+
+  /* If a budget was already selected, reload it */
+  if (sparkSelectedBudget) {
+    sparkLoadBudget(sparkSelectedBudget);
+  }
+}
+
 /* ── RESOURCE TRACKER STATE ── */
 var RT_WEEKS = [];
 var RT_LEADERSHIP = [];
@@ -3008,6 +3557,7 @@ function navigate(view) {
   else if (view === 'completed') renderCompleted();
   else if (view === 'resource') renderResource();
   else if (view === 'allocations') renderAllocations();
+  else if (view === 'spark') renderSpark();
   else if (view === 'settings') renderSettings();
   else if (view.indexOf('client:') === 0) renderClient(view.split(':')[1]);
   else if (view.indexOf('project:') === 0) renderProject(view.split(':')[1]);
