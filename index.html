@@ -1863,15 +1863,13 @@ async function sparkCheckStatus() {
 }
 
 async function sparkLogin() {
-  var email = document.getElementById('spark-email').value.trim();
-  var pw = document.getElementById('spark-password').value;
-  if (!email || !pw) return;
   var btn = document.getElementById('spark-connect-btn');
   var msg = document.getElementById('spark-msg');
   btn.disabled = true;
-  btn.textContent = 'Connecting…';
-  msg.textContent = '';
-  var result = await window.furnaceAPI.sparkLogin(email, pw);
+  btn.textContent = 'Signing in…';
+  msg.textContent = 'A Google sign-in window will open…';
+  msg.style.color = 'var(--sand)';
+  var result = await window.furnaceAPI.sparkLogin();
   if (result.ok) {
     sparkAuth.connected = true;
     sparkAuth.email = result.email;
@@ -1880,7 +1878,7 @@ async function sparkLogin() {
     msg.textContent = result.error || 'Login failed';
     msg.style.color = 'var(--ember)';
     btn.disabled = false;
-    btn.textContent = 'Connect';
+    btn.textContent = 'Sign in with Google';
   }
 }
 
@@ -1937,12 +1935,8 @@ function renderSettings() {
     h += '<div style="width:10px;height:10px;border-radius:50%;background:var(--ember)"></div>';
     h += '<div style="font-size:14px;font-weight:600">Not Connected</div>';
     h += '</div>';
-    h += '<div style="font-size:12px;opacity:.6;margin-bottom:14px">Sign in with your Spark email and password to pull live budget data.</div>';
-    h += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
-    h += '<input type="email" id="spark-email" placeholder="Email" style="padding:7px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:var(--white);font-size:13px;width:200px">';
-    h += '<input type="password" id="spark-password" placeholder="Password" style="padding:7px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:var(--white);font-size:13px;width:180px" onkeydown="if(event.key===\'Enter\')sparkLogin()">';
-    h += '<button id="spark-connect-btn" onclick="sparkLogin()" style="padding:7px 18px;border-radius:6px;border:none;background:var(--ocean);color:var(--white);cursor:pointer;font-size:13px;font-weight:600">Connect</button>';
-    h += '</div>';
+    h += '<div style="font-size:12px;opacity:.6;margin-bottom:14px">Sign in with your Google account to pull live budget data from Spark.</div>';
+    h += '<button id="spark-connect-btn" onclick="sparkLogin()" style="padding:9px 22px;border-radius:6px;border:none;background:var(--ocean);color:var(--white);cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Sign in with Google</button>';
     h += '<div id="spark-msg" style="font-size:12px;margin-top:8px;min-height:16px"></div>';
   }
   h += '</div>';

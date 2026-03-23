@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld('furnaceAPI', {
   readCsv: (filePath) => ipcRenderer.invoke('read-csv', filePath),
 
   // Spark auth
-  sparkLogin: (email, password) => ipcRenderer.invoke('spark-login', email, password),
+  sparkLogin: () => ipcRenderer.invoke('spark-login'),
   sparkGetToken: () => ipcRenderer.invoke('spark-get-token'),
   sparkGetStatus: () => ipcRenderer.invoke('spark-get-status'),
   sparkLogout: () => ipcRenderer.invoke('spark-logout'),
