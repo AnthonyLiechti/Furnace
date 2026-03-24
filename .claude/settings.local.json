@@ -52,7 +52,8 @@
       "Bash(ls /Users/anthonyliechti/Downloads/*.csv)",
       "Bash(sleep 30 ls /Users/anthonyliechti/Downloads/*.csv)",
       "Bash(sleep 45 ls /Users/anthonyliechti/Downloads/*.csv)",
-      "Bash(pkill -f \"python3 -m http.server\")"
+      "Bash(pkill -f \"python3 -m http.server\")",
+      "Bash(git tag:*)"
     ]
   }
 }
