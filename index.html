@@ -146,7 +146,7 @@ body { font-family: Arial, 'TT Hoves Pro', sans-serif; background: var(--light-g
 .proj-callout .pc-main { font-size:16px; font-weight:500; line-height:1.5; }
 .proj-callout .pc-hl { color:var(--sand); font-weight:700; }
 .proj-callout .pc-detail { font-size:12px; opacity:.55; margin-top:6px; line-height:1.5; }
-/* Resource Tracker */
+/* Resource Analytics */
 .rt-card { background:var(--white); border:1px solid var(--canvas); border-radius:10px; padding:20px 24px; margin-bottom:16px; }
 .rt-card h3 { font-size:14px; color:var(--abyss); margin-bottom:14px; }
 .rt-row { display:grid; grid-template-columns:150px 80px 80px 80px 1fr 60px; gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid var(--light-gray); font-size:13px; }
@@ -285,6 +285,31 @@ body { font-family: Arial, 'TT Hoves Pro', sans-serif; background: var(--light-g
 .spark-oop-grid-std { grid-template-columns:1.5fr 1fr 70px 90px 90px 1.5fr; }
 .spark-oop-grid-talent { grid-template-columns:1.5fr 1fr 70px 90px 60px 90px 1.2fr; }
 .spark-oop-grid-travel { grid-template-columns:1.5fr 1fr 70px 90px 60px 60px 90px 1fr; }
+/* 3-tier OOP grid — all columns in ONE horizontal row */
+.spark-oop-tier-hdr { display:flex; gap:0; padding:0 4px 0 24px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; align-items:stretch; }
+.spark-oop-tier-hdr > div:first-child { flex:1.4; }
+.oop-tier-group { text-align:center; padding:5px 8px; border-radius:4px 4px 0 0; flex:1; }
+.oop-tier-group.planned { background:rgba(48,109,124,.12); color:var(--ocean); }
+.oop-tier-group.adjusted { background:rgba(255,183,77,.12); color:#F57F17; }
+.oop-tier-group.actual { background:rgba(129,199,132,.12); color:#2E7D32; }
+.spark-oop-col-hdr-3tier { display:flex; gap:2px; align-items:center; padding:4px 4px 6px 24px; border-bottom:2px solid var(--canvas); font-size:9px; text-transform:uppercase; letter-spacing:.5px; color:var(--mid-gray); font-weight:600; }
+.spark-oop-col-hdr-3tier > div { flex:0 0 56px; text-align:center; }
+.spark-oop-col-hdr-3tier > div:first-child { flex:1.4; text-align:left; }
+.spark-oop-col-hdr-3tier > div:last-child { flex:1; text-align:left; }
+.spark-oop-col-hdr-3tier .adj { color:#F57F17; }
+.spark-oop-col-hdr-3tier .act { color:#2E7D32; }
+.spark-oop-line-item-3tier { display:flex; gap:2px; align-items:center; padding:4px 4px 4px 24px; border-bottom:1px solid var(--light-gray); font-size:12px; }
+.spark-oop-line-item-3tier > div { flex:0 0 56px; text-align:center; }
+.spark-oop-line-item-3tier > div:first-child { flex:1.4; text-align:left; }
+.spark-oop-line-item-3tier > div:last-child { flex:1; text-align:left; }
+.spark-oop-line-item-3tier:hover { background:rgba(0,0,0,.02); }
+.spark-oop-line-item-3tier .spark-input { width:48px; padding:3px 4px; font-size:11px; }
+.spark-oop-line-item-3tier .tier-planned .spark-input { background:rgba(48,109,124,.06); border-color:rgba(48,109,124,.2); }
+.spark-oop-line-item-3tier .tier-planned .spark-input:focus { border-color:var(--ocean); }
+.spark-oop-line-item-3tier .adj-input { background:rgba(255,183,77,.08); border-color:rgba(255,183,77,.25); }
+.spark-oop-line-item-3tier .adj-input:focus { border-color:#F57F17; }
+.spark-oop-line-item-3tier .act-input { background:rgba(129,199,132,.08); border-color:rgba(129,199,132,.25); }
+.spark-oop-line-item-3tier .act-input:focus { border-color:#2E7D32; }
 .spark-summary { background:var(--abyss); color:var(--white); border-radius:10px; padding:18px 24px; margin-top:24px; display:grid; grid-template-columns:repeat(auto-fit, minmax(140px,1fr)); gap:16px; }
 .spark-summary-item { text-align:center; }
 .spark-summary-item .ss-label { font-size:9px; text-transform:uppercase; letter-spacing:.8px; opacity:.5; margin-bottom:4px; }
@@ -429,7 +454,7 @@ html.dark td { color:var(--dm-text); }
 html.dark hr { border-color:var(--dm-border); }
 html.dark .lob-legend-item { color:var(--dm-text-muted); }
 
-/* ── DARK MODE: Resource Tracker ── */
+/* ── DARK MODE: Resource Analytics ── */
 html.dark .rt-card { background:var(--dm-surface); border-color:var(--dm-border); box-shadow:0 1px 4px rgba(0,0,0,.3); }
 html.dark .rt-card h3 { color:var(--dm-text); }
 html.dark .rt-scard { background:var(--dm-surface); border-color:var(--dm-border); }
@@ -692,6 +717,25 @@ function getFilteredProjectHours(projectName) {
 function filteredProjectSpent(proj) {
   /* Returns spent hours: filtered from RT if date filter active, otherwise from phases */
   if (globalDateFilter === 'all') return projectSpent(proj);
+
+  /* If Supabase data loaded, filter actuals by date range */
+  if (SUPA_LOADED && SUPA_ACTUALS_ALL.length > 0) {
+    var range = getDateRange(globalDateFilter);
+    if (!range) return projectSpent(proj);
+    var start = range.start.toISOString().slice(0, 10);
+    var end = range.end.toISOString().slice(0, 10);
+    var code = proj.code;
+    var total = 0;
+    for (var i = 0; i < SUPA_ACTUALS_ALL.length; i++) {
+      var a = SUPA_ACTUALS_ALL[i];
+      if (a.project_code === code && a.work_date >= start && a.work_date <= end) {
+        total += a.hours || 0;
+      }
+    }
+    return total;
+  }
+
+  /* Fallback to RT data */
   var rtHours = getFilteredProjectHours(proj.name);
   return rtHours !== null ? rtHours : 0;
 }
@@ -753,6 +797,12 @@ var PC = {};
 var RES = {};
 var METADATA = {};
 
+/* ── SUPABASE DATA (3 sources of truth) ── */
+var SUPA_BUDGETS = {};   // project_code -> {budget object with labor entries, oop entries}
+var SUPA_ACTUALS = {};   // project_code -> {totalHours, phases: {phase_key: hours}, people: {name: hours}, byDate: {date: hours}}
+var SUPA_ACTUALS_ALL = []; // raw labor_actuals array
+var SUPA_LOADED = false;
+
 /* ── NATIVE ALLOCATION DATA ── */
 var ALLOCATIONS = { version: 1, allocations: [], team: [], weeklyCapacity: 40 };
 var ACTUALS = { version: 1, weeks: [], lastImport: null };
@@ -782,11 +832,54 @@ function expandAlloc(a) {
   return days;
 }
 
+function findProjectName(projId) {
+  for (var i = 0; i < CLIENTS.length; i++) {
+    for (var j = 0; j < CLIENTS[i].projects.length; j++) {
+      if (CLIENTS[i].projects[j].id === projId) return CLIENTS[i].projects[j];
+    }
+  }
+  return null;
+}
+
+function getAllocationsForProject(projId) {
+  if (!ALLOCATIONS || !ALLOCATIONS.allocations || !ALLOCATIONS.allocations.length) return [];
+  var proj = findProjectName(projId);
+  if (!proj) return [];
+  var projName = proj.name || '';
+  var forecastName = proj.forecastName || '';
+  var supaName = (proj._supabudget && proj._supabudget.name) ? proj._supabudget.name : '';
+  var allAllocs = ALLOCATIONS.allocations;
+  var matched = [];
+  for (var i = 0; i < allAllocs.length; i++) {
+    var a = allAllocs[i];
+    var ap = a.project || '';
+    if (!ap) continue;
+    /* Exact match on project name, forecastName, or supabudget name */
+    if (ap === projName || (forecastName && ap === forecastName) || (supaName && ap === supaName)) {
+      matched.push(a);
+    } else if (projName && (ap.indexOf(projName) >= 0 || projName.indexOf(ap) >= 0)) {
+      /* Partial / contains match */
+      matched.push(a);
+    }
+  }
+  return matched;
+}
+
 function buildWeeks(projId) {
   var allocs = RES[projId] || [];
-  if (!allocs.length) return [];
   var daily = [];
   for (var i = 0; i < allocs.length; i++) { daily = daily.concat(expandAlloc(allocs[i])); }
+
+  /* Also merge from ALLOCATIONS (per-day format) */
+  var nativeAllocs = getAllocationsForProject(projId);
+  for (var i = 0; i < nativeAllocs.length; i++) {
+    var a = nativeAllocs[i];
+    if (a.date && a.hoursPerDay) {
+      daily.push({person: a.person || 'Unknown', date: a.date, hours: a.hoursPerDay});
+    }
+  }
+
+  if (!daily.length) return [];
   var wm = {};
   for (var i = 0; i < daily.length; i++) {
     var wk = getWeekMon(daily[i].date);
@@ -813,6 +906,18 @@ function buildTeam(projId) {
     t[a.p].total += tot;
     var sd = new Date(a.s+'T00:00:00');
     if (sd >= fourAgo) t[a.p].recent += tot;
+  }
+  /* Also merge from ALLOCATIONS (per-day format) */
+  var nativeAllocs = getAllocationsForProject(projId);
+  for (var i = 0; i < nativeAllocs.length; i++) {
+    var a = nativeAllocs[i];
+    if (a.date && a.hoursPerDay) {
+      var person = a.person || 'Unknown';
+      if (!t[person]) t[person] = {total:0, recent:0};
+      t[person].total += a.hoursPerDay;
+      var ad = new Date(a.date+'T00:00:00');
+      if (ad >= fourAgo) t[person].recent += a.hoursPerDay;
+    }
   }
   var arr = [];
   for (var k in t) { if (k !== 'Unknown') arr.push({name:k, total:t[k].total, recent:t[k].recent}); }
@@ -880,6 +985,11 @@ function computeCascade(project) {
 
 /* ── AGGREGATE HELPERS ── */
 function projectSpent(proj) {
+  /* Prefer Supabase actuals if loaded */
+  if (SUPA_LOADED && SUPA_ACTUALS[proj.code]) {
+    return SUPA_ACTUALS[proj.code].totalHours || 0;
+  }
+  /* Fallback to phases */
   var s = 0;
   for (var i = 0; i < proj.phases.length; i++) {
     if (proj.phases[i].status !== 'na') s += proj.phases[i].spent;
@@ -887,7 +997,9 @@ function projectSpent(proj) {
   return s;
 }
 function isProjectCompleted(p) {
-  if (p.status === 'finished') return true;
+  if (p.status === 'finished' || p.status === 'complete') return true;
+  /* Check if Supabase budget is marked complete */
+  if (p._supabudget && p._supabudget.status === 'complete') return true;
   var nonNa = [];
   for (var i = 0; i < p.phases.length; i++) { if (p.phases[i].status !== 'na') nonNa.push(p.phases[i]); }
   if (nonNa.length === 0) return false;
@@ -911,6 +1023,8 @@ function activeProjects() {
   var out = [];
   for (var i = 0; i < all.length; i++) {
     if (isProjectCompleted(all[i])) continue;
+    /* Include if it has a Supabase budget */
+    if (all[i]._supabudget) { out.push(all[i]); continue; }
     if (forecast.length > 0 && forecast.indexOf(all[i].name) < 0) continue;
     out.push(all[i]);
   }
@@ -941,10 +1055,9 @@ function renderSidebar() {
   var html = '';
   html += '<div class="nav-item ' + (currentView === 'master' ? 'active' : '') + '" onclick="navigate(\'master\')"><span class="icon">&#9673;</span> Master Dashboard</div>';
   html += '<div class="nav-item ' + (currentView === 'flagged' ? 'active' : '') + '" onclick="navigate(\'flagged\')"><span class="icon">&#9888;</span> Needs Attention</div>';
+  html += '<div class="nav-item ' + (currentView === 'allocations' ? 'active' : '') + '" onclick="navigate(\'allocations\')"><span class="icon">&#9881;</span> Manage Resources</div>';
+  html += '<div class="nav-item ' + (currentView === 'resource' ? 'active' : '') + '" onclick="navigate(\'resource\')"><span class="icon">&#9202;</span> Resource Analytics</div>';
   html += '<div class="nav-item ' + (currentView === 'completed' ? 'active' : '') + '" onclick="navigate(\'completed\')"><span class="icon">&#10003;</span> Completed Projects</div>';
-  html += '<div class="nav-item ' + (currentView === 'resource' ? 'active' : '') + '" onclick="navigate(\'resource\')"><span class="icon">&#9202;</span> Resource Tracker</div>';
-  html += '<div class="nav-item ' + (currentView === 'allocations' ? 'active' : '') + '" onclick="navigate(\'allocations\')"><span class="icon">&#9997;</span> Manage Allocations</div>';
-  html += '<div class="nav-item ' + (currentView === 'spark' ? 'active' : '') + '" onclick="navigate(\'spark\')"><span class="icon">&#9889;</span> Spark</div>';
   html += '<div class="nav-item ' + (currentView === 'settings' ? 'active' : '') + '" onclick="navigate(\'settings\')"><span class="icon">&#9881;</span> Settings</div>';
   html += '<div class="nav-divider"></div>';
 
@@ -1057,10 +1170,10 @@ function renderHourTypeSection(ht, clientId) {
 function renderMaster() {
   var all = showFinalized ? allProjects() : activeProjects();
   var doneCount = completedProjects().length;
-  var noSnapshotCount = 0;
-  for (var i = 0; i < all.length; i++) { if (all[i].dataSource === 'no_snapshot') noSnapshotCount++; }
+  var needsReviewCount = 0;
+  for (var i = 0; i < all.length; i++) { if (all[i].dataSource === 'no_snapshot' || all[i].dataSource === 'needs_review') needsReviewCount++; }
 
-  /* Aggregate financials from all visible projects with snapshots */
+  /* Aggregate financials from all visible projects with snapshots or Supabase budgets */
   var totalBudgetHrs = 0, totalSpentHrs = 0;
   var totalDollarBudget = 0, totalLaborMU = 0, totalLaborCost = 0, totalOOP = 0;
   var totalProfit = 0, snapshotCount = 0, billableCount = 0, bizdevCount = 0;
@@ -1069,10 +1182,15 @@ function renderMaster() {
     var sp = filteredProjectSpent(p);
     totalBudgetHrs += p.totalBudget || 0;
     totalSpentHrs += sp;
-    if (p.dataSource === 'snapshot') {
+    if (p.dataSource === 'supabase' || p.dataSource === 'snapshot') {
       totalDollarBudget += p.dollarBudget || 0;
       totalLaborMU += p.laborCost || 0;
-      totalLaborCost += (p.laborCost || 0) * 0.833;
+      /* Use actual labor cost from Supabase, or 0.833 fallback for old snapshots */
+      if (p._supabudget) {
+        totalLaborCost += p._supabudget.laborCostInternal || 0;
+      } else {
+        totalLaborCost += (p.laborCost || 0) * 0.833;
+      }
       totalOOP += p.oopCost || 0;
       totalProfit += p.profit || 0;
       snapshotCount++;
@@ -1107,10 +1225,10 @@ function renderMaster() {
   }
 
   /* Needs Attention alert */
-  if (noSnapshotCount > 0) {
+  if (needsReviewCount > 0) {
     h += '<div style="background:#FFF8E1;border-left:4px solid var(--honey);border-radius:8px;padding:14px 16px;margin-bottom:20px">';
-    h += '<div style="font-weight:600;color:#F57F17;margin-bottom:6px">&#9888; Needs Attention: ' + noSnapshotCount + ' project' + (noSnapshotCount !== 1 ? 's' : '') + ' missing snapshots</div>';
-    h += '<div style="font-size:12px;color:#F57F17">Cannot verify budget data without snapshots. <a href="#" onclick="navigate(\'flagged\');return false" style="color:#F57F17;text-decoration:underline;font-weight:600;cursor:pointer">View flagged projects &rarr;</a></div>';
+    h += '<div style="font-weight:600;color:#F57F17;margin-bottom:6px">&#9888; Needs Review: ' + needsReviewCount + ' project' + (needsReviewCount !== 1 ? 's' : '') + ' missing budget data</div>';
+    h += '<div style="font-size:12px;color:#F57F17">Projects need a Supabase budget or snapshot for accurate financials. <a href="#" onclick="navigate(\'flagged\');return false" style="color:#F57F17;text-decoration:underline;font-weight:600;cursor:pointer">View flagged projects &rarr;</a></div>';
     h += '</div>';
   }
 
@@ -1251,7 +1369,7 @@ function renderClient(clientId) {
   var visibleList = showFinalized ? c.projects : activeList;
   var rate = getRate(c.id);
 
-  /* Aggregate financials from snapshots */
+  /* Aggregate financials from snapshots and Supabase budgets */
   var totalBudget = 0, totalSpent = 0;
   var totalDollarBudget = 0, totalLaborMU = 0, totalLaborCost = 0, totalOOP = 0;
   var totalEstProfit = 0, totalActiveProfit = 0, snapshotCount = 0;
@@ -1259,10 +1377,15 @@ function renderClient(clientId) {
     var p = visibleList[i];
     totalBudget += p.totalBudget || 0;
     totalSpent += filteredProjectSpent(p);
-    if (p.dataSource === 'snapshot') {
+    if (p.dataSource === 'supabase' || p.dataSource === 'snapshot') {
       totalDollarBudget += p.dollarBudget || 0;
       totalLaborMU += p.laborCost || 0;
-      totalLaborCost += (p.laborCost || 0) * 0.833;
+      /* Use actual labor cost from Supabase, or 0.833 fallback for old snapshots */
+      if (p._supabudget) {
+        totalLaborCost += p._supabudget.laborCostInternal || 0;
+      } else {
+        totalLaborCost += (p.laborCost || 0) * 0.833;
+      }
       totalOOP += p.oopCost || 0;
       totalEstProfit += p.profit || 0;
       totalActiveProfit += p.profit || 0;
@@ -1457,20 +1580,117 @@ function renderProject(projectId) {
   h += '<h1 class="page-title">' + p.name + '</h1>';
   h += '<p class="page-subtitle">' + p.clientCode + ' ' + p.clientName + ' &middot; Rate: ' + (rate > 0 ? '$' + rate + '/hr' : 'Not set') + '</p>';
 
-  if (!p.hasBudgetData && p.dataSource !== 'snapshot') {
+  if (!p.hasBudgetData && p.dataSource !== 'snapshot' && p.dataSource !== 'supabase') {
     h += '<div class="flagged-card" style="margin-bottom:16px"><div class="flag-title">&#9888; No Budget Data</div><div class="flag-reason">This project has no planned effort or snapshot. Time tracked against it will still appear below.</div></div>';
   }
+  if (p.dataSource === 'needs_review') {
+    h += '<div style="background:#FFF8E1;border-left:4px solid var(--honey);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#F57F17;font-weight:600">&#9888; Needs Review &mdash; No Supabase budget found for this project</div>';
+  }
 
-  /* Spark budget placeholder — inserted before snapshot section */
-  if (sparkAuth.connected) {
-    h += '<div id="sparkProjectBudget"><div style="padding:20px;color:var(--mid-gray)">Loading Spark budget data...</div></div>';
+  /* ── SUPABASE SUMMARY CARD (always visible at top) ── */
+  if (p._supabudget) {
+    var sb = p._supabudget;
+    var saHrs = SUPA_ACTUALS[p.code] ? SUPA_ACTUALS[p.code].totalHours : 0;
+
+    /* Hours Predicted from Furnace allocations (Manage Resources) */
+    var allocHrs = 0;
+    var nativeAllocs = getAllocationsForProject(p.id);
+    for (var ai = 0; ai < nativeAllocs.length; ai++) {
+      allocHrs += nativeAllocs[ai].hoursPerDay || 0;
+    }
+
+    var hrsRemaining = (sb.laborHours || 0) - saHrs;
+
+    /* Apply discount to client price */
+    var rawPrice = sb.client_price || 0;
+    var hasDisc = sb.has_discount || false;
+    var discAmt = hasDisc ? rawPrice * 0.035 : 0;
+    var tcvPrice = rawPrice - discAmt;
+    var profitVal = tcvPrice - (sb.total_amount || 0);
+    var profitPctVal = tcvPrice > 0 ? ((profitVal / tcvPrice) * 100).toFixed(1) : 0;
+
+    /* OOP metrics */
+    var oopBudget = sb.oopEffective || sb.oopTotal || 0;
+    var oopSpent = sb.oopSpent || 0;
+    var oopPredicted = 0; /* TODO: from OOP resource manager */
+    var oopRemaining = oopBudget - oopSpent;
+
+    /* Convert hours to dollars for the progress bar (at $200/hr agency rate) */
+    var agencyRate = 200;
+    var laborSpent$ = saHrs * agencyRate;
+    var laborRemaining$ = Math.max(0, hrsRemaining) * agencyRate;
+    var barTotal = tcvPrice > 0 ? tcvPrice : 1;
+    var profitBar$ = Math.max(0, tcvPrice - laborSpent$ - laborRemaining$ - oopSpent - Math.max(0, oopRemaining));
+
+    h += '<div class="snapshot-banner" style="margin-bottom:16px">';
+    h += '<div class="snap-header"><div class="snap-title">Project Financials</div><div class="snap-version">Live from Supabase &#9889;</div></div>';
+    h += '<div class="snap-financials">';
+    h += '<div class="snap-fin-item"><div class="sf-label">Client Price</div><div class="sf-value sf-gold">$' + Math.round(tcvPrice).toLocaleString() + '</div>';
+    if (hasDisc) h += '<div class="sf-sub">Before discount: $' + Math.round(rawPrice).toLocaleString() + '</div>';
+    h += '</div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Labor Cost</div><div class="sf-value">$' + Math.round(sb.laborCostInternal || 0).toLocaleString() + '</div><div class="sf-sub">Client: $' + Math.round(sb.laborTotal || 0).toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">OOP Cost</div><div class="sf-value">$' + Math.round(sb.oopTotal || 0).toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Profit</div><div class="sf-value ' + (profitVal >= 0 ? 'sf-green' : '') + '">$' + Math.round(profitVal).toLocaleString() + '</div><div class="sf-sub">' + profitPctVal + '%</div></div>';
+    h += '</div>';
+
+    /* ── Progress Bar ── */
+    var pLaborSpent = Math.min(100, laborSpent$ / barTotal * 100);
+    var pLaborRem = Math.min(100 - pLaborSpent, laborRemaining$ / barTotal * 100);
+    var pOopSpent = Math.min(100 - pLaborSpent - pLaborRem, oopSpent / barTotal * 100);
+    var pOopRem = Math.min(100 - pLaborSpent - pLaborRem - pOopSpent, Math.max(0, oopRemaining) / barTotal * 100);
+    var pProfit = Math.max(0, 100 - pLaborSpent - pLaborRem - pOopSpent - pOopRem);
+    h += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1)">';
+    h += '<div class="lob-bar">';
+    if (pLaborSpent > 0) h += '<div class="lob-seg" style="width:' + pLaborSpent.toFixed(1) + '%;background:var(--ember)">' + (pLaborSpent >= 8 ? '$' + Math.round(laborSpent$).toLocaleString() : '') + '</div>';
+    if (pLaborRem > 0.5) h += '<div class="lob-seg" style="width:' + pLaborRem.toFixed(1) + '%;background:var(--ocean)">' + (pLaborRem >= 8 ? '$' + Math.round(laborRemaining$).toLocaleString() : '') + '</div>';
+    if (pOopSpent > 0) h += '<div class="lob-seg" style="width:' + pOopSpent.toFixed(1) + '%;background:#F57F17">' + (pOopSpent >= 8 ? '$' + Math.round(oopSpent).toLocaleString() : '') + '</div>';
+    if (pOopRem > 0.5) h += '<div class="lob-seg" style="width:' + pOopRem.toFixed(1) + '%;background:#FFE0B2;color:var(--abyss)">' + (pOopRem >= 8 ? '$' + Math.round(Math.max(0, oopRemaining)).toLocaleString() : '') + '</div>';
+    if (pProfit > 0.5) h += '<div class="lob-seg" style="width:' + pProfit.toFixed(1) + '%;background:#81C784">' + (pProfit >= 8 ? '$' + Math.round(profitBar$).toLocaleString() : '') + '</div>';
+    h += '</div>';
+    h += '<div class="lob-legend">';
+    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ember)"></div>Labor Spent</div>';
+    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ocean)"></div>Labor Remaining</div>';
+    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#F57F17"></div>OOP Spent</div>';
+    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#FFE0B2"></div>OOP Remaining</div>';
+    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Profit</div>';
+    h += '</div></div>';
+
+    /* ── Hours Row ── */
+    h += '<div class="snap-financials" style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1)">';
+    h += '<div class="snap-fin-item"><div class="sf-label">Hours Budget</div><div class="sf-value">' + (sb.laborHours || 0).toFixed(1) + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Hours Spent</div><div class="sf-value" style="color:var(--ember)">' + saHrs.toFixed(1) + '</div><div class="sf-sub">' + pct(saHrs, sb.laborHours || 0) + '% of budget</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Hours Predicted</div><div class="sf-value">' + allocHrs.toFixed(1) + '</div><div class="sf-sub">From allocations</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Hours Remaining</div><div class="sf-value" style="color:' + (hrsRemaining < 0 ? 'var(--ember)' : 'var(--white)') + '">' + hrsRemaining.toFixed(1) + '</div></div>';
+    h += '</div>';
+
+    /* ── OOP Row ── */
+    h += '<div class="snap-financials" style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1)">';
+    h += '<div class="snap-fin-item"><div class="sf-label">OOP Budget</div><div class="sf-value">$' + Math.round(oopBudget).toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">OOP Spent</div><div class="sf-value" style="color:#F57F17">$' + Math.round(oopSpent).toLocaleString() + '</div><div class="sf-sub">' + pct(oopSpent, oopBudget) + '% of budget</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">OOP Predicted</div><div class="sf-value">' + (oopPredicted > 0 ? '$' + Math.round(oopPredicted).toLocaleString() : '\u2014') + '</div><div class="sf-sub">From OOP planner</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">OOP Remaining</div><div class="sf-value" style="color:' + (oopRemaining < 0 ? 'var(--ember)' : 'var(--white)') + '">$' + Math.round(oopRemaining).toLocaleString() + '</div></div>';
+    h += '</div></div>';
   }
 
   var isBizDev = p.projectType === 'bizdev';
   var isSmallProj = p.projectType === 'small_projects';
 
-  /* Wrap snapshot/financial section in a div so Spark can hide it */
-  h += '<div id="snapshotSection">';
+  /* Project Overview (always visible) — rendered by Spark async */
+  if (sparkAuth.connected) {
+    h += '<div id="sparkProjectOverview"></div>';
+  }
+
+  /* Budget Snapshot toggle — COLLAPSED by default, click to expand */
+  if (p._supabudget || (sparkAuth.connected && p.dataSource !== 'no_snapshot')) {
+    h += '<button id="snapshotToggleBtn" onclick="toggleSnapshotSection()" style="background:none;border:1px solid var(--canvas);border-radius:6px;padding:10px 16px;cursor:pointer;font-size:13px;font-weight:600;color:var(--mid-gray);margin-bottom:16px;display:flex;align-items:center;gap:8px;width:100%;justify-content:flex-start">&#128202; Budget Snapshot <span class="arrow" id="snapshotArrow">&#9656;</span></button>';
+    h += '<div id="snapshotSection" style="display:none">';
+    /* Spark budget editor will render inside here */
+    if (sparkAuth.connected) {
+      h += '<div id="sparkProjectBudget"><div style="padding:20px;color:var(--mid-gray)">Loading budget data...</div></div>';
+    }
+  } else {
+    h += '<div id="snapshotSection">';
+  }
 
   if (isSmallProj && p.subSnapshots && p.subSnapshots.length > 0) {
     /* ── SMALL PROJECTS: Aggregated header + individual sub-snapshots ── */
@@ -1788,12 +2008,35 @@ function renderProject(projectId) {
     h += '</div>';
   }
 
-  /* Resource Allocation Section — upcoming weeks only */
-  var weeks = buildWeeks(projectId);
+  /* Resource Allocation Section — from Manage Resources allocations.json only */
   var todayStr = new Date().toISOString().slice(0,10);
   var curMon = getWeekMon(todayStr);
+
+  /* Build weekly allocation data from ALLOCATIONS (not Monday RES) */
+  var allocWeeks = {};
+  if (ALLOCATIONS && ALLOCATIONS.allocations) {
+    var pName = p.name;
+    var pForecast = p.forecastName || '';
+    var sbName = (p._supabudget && p._supabudget.name) || '';
+    for (var ai = 0; ai < ALLOCATIONS.allocations.length; ai++) {
+      var a = ALLOCATIONS.allocations[ai];
+      var aProj = a.project || '';
+      /* Match allocation to this project by name */
+      if (aProj !== pName && aProj !== pForecast && aProj !== sbName) {
+        if (pName.indexOf(aProj) < 0 && aProj.indexOf(pName) < 0) continue;
+      }
+      var wk = a.weekOf || getWeekMon(a.date);
+      if (wk < curMon) continue;
+      if (!allocWeeks[wk]) allocWeeks[wk] = { sunday: wk, total: 0, people: {} };
+      var person = a.person || 'Unknown';
+      if (!allocWeeks[wk].people[person]) allocWeeks[wk].people[person] = 0;
+      allocWeeks[wk].people[person] += a.hoursPerDay || 0;
+      allocWeeks[wk].total += a.hoursPerDay || 0;
+    }
+  }
   var upcoming = [];
-  for (var i = 0; i < weeks.length; i++) { if (weeks[i].sunday >= curMon) upcoming.push(weeks[i]); }
+  for (var wk in allocWeeks) upcoming.push(allocWeeks[wk]);
+  upcoming.sort(function(a,b) { return a.sunday < b.sunday ? -1 : 1; });
 
   h += '<div class="section-title" style="margin-top:32px">Upcoming Resource Allocation</div>';
 
@@ -1803,9 +2046,8 @@ function renderProject(projectId) {
     var maxWkHrs = 1;
     for (var i = 0; i < upcoming.length; i++) { if (upcoming[i].total > maxWkHrs) maxWkHrs = upcoming[i].total; }
 
-    h += '<div style="font-size:12px;color:var(--mid-gray);margin-bottom:14px">' + upcoming.length + ' week' + (upcoming.length !== 1 ? 's' : '') + ' &middot; ' + upcomingTotal.toFixed(1) + ' hrs allocated</div>';
+    h += '<div style="font-size:12px;color:var(--mid-gray);margin-bottom:14px">' + upcoming.length + ' week' + (upcoming.length !== 1 ? 's' : '') + ' &middot; ' + upcomingTotal.toFixed(1) + ' hrs allocated &middot; From Manage Resources</div>';
 
-    /* Weekly timeline */
     h += '<div class="week-timeline">';
     for (var wi = 0; wi < upcoming.length; wi++) {
       var w = upcoming[wi];
@@ -1833,10 +2075,8 @@ function renderProject(projectId) {
     }
     h += '</div>';
   } else {
-    /* No upcoming allocations — show current week date range */
-    var curSunStr = curMon;
-    var curSatDate = getSaturday(curSunStr);
-    h += '<div style="font-size:13px;color:var(--mid-gray);margin-top:8px;padding:16px;background:var(--cloud);border-radius:8px">No allocations for upcoming week <span style="font-weight:600">(' + fmtDateShort(curSunStr) + ' – ' + fmtDateShort(curSatDate) + ')</span></div>';
+    var curSatDate = getSaturday(curMon);
+    h += '<div style="font-size:13px;color:var(--mid-gray);margin-top:8px;padding:16px;background:var(--cloud);border-radius:8px">No allocations from Manage Resources for this project <span style="font-weight:600">(' + fmtDateShort(curMon) + ' – ' + fmtDateShort(curSatDate) + ')</span></div>';
   }
 
   document.getElementById('mainContent').innerHTML = h;
@@ -1854,17 +2094,18 @@ function renderFlagged() {
 
   var all = allProjects();
 
-  /* Missing Snapshots section at TOP */
-  var noSnapshot = [];
+  /* Needs Review — projects without a Furnace budget */
+  var needsReview = [];
   for (var i = 0; i < all.length; i++) {
-    if (all[i].dataSource === 'no_snapshot') noSnapshot.push(all[i]);
+    if (all[i].dataSource === 'no_snapshot' || all[i].dataSource === 'needs_review') needsReview.push(all[i]);
   }
 
-  if (noSnapshot.length) {
-    h += '<div class="section-title" style="color:var(--honey)">Missing Snapshots</div>';
+  if (needsReview.length) {
+    h += '<div class="section-title" style="color:var(--honey)">Needs Furnace Budget (' + needsReview.length + ')</div>';
+    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">These projects don\'t have a budget snapshot in Furnace yet. Click into any project and use "Create Budget" to start one.</p>';
     var byClient = {};
-    for (var i = 0; i < noSnapshot.length; i++) {
-      var p = noSnapshot[i];
+    for (var i = 0; i < needsReview.length; i++) {
+      var p = needsReview[i];
       if (!byClient[p.clientId]) byClient[p.clientId] = {name:p.clientName, code:p.clientCode, projects:[]};
       byClient[p.clientId].projects.push(p);
     }
@@ -1873,7 +2114,11 @@ function renderFlagged() {
       h += '<div style="margin-bottom:12px"><div style="font-size:12px;font-weight:600;color:var(--mid-gray);margin-bottom:6px">' + g.code + ' ' + g.name + ' (' + g.projects.length + ')</div>';
       for (var j = 0; j < g.projects.length; j++) {
         var p = g.projects[j];
-        h += '<div class="flagged-card" style="border-left-color:var(--honey);margin-bottom:8px"><div class="flag-title">' + p.name + '</div><div class="flag-reason" style="color:var(--honey)">No snapshot found on Monday.com board — cannot verify budget data</div><div class="flag-client">' + p.code + '</div></div>';
+        h += '<div class="flagged-card" style="border-left-color:var(--honey);margin-bottom:8px;cursor:pointer" onclick="navigate(\'project:' + p.id + '\')">';
+        h += '<div class="flag-title">' + p.name + '</div>';
+        h += '<div class="flag-reason" style="color:var(--honey)">No Furnace budget — click to create one</div>';
+        h += '<div class="flag-client">' + p.code + '</div>';
+        h += '</div>';
       }
       h += '</div>';
     }
@@ -1908,7 +2153,7 @@ function renderFlagged() {
     }
   }
 
-  if (!noSnapshot.length && !FLAGGED_NO_STRUCTURE.length && !possiblyDone.length) {
+  if (!needsReview.length && !FLAGGED_NO_STRUCTURE.length && !possiblyDone.length) {
     h += '<div style="text-align:center;color:var(--mid-gray);padding:60px 0"><p style="font-size:40px;margin-bottom:12px">&#10003;</p><p>All projects have complete data</p></div>';
   }
   document.getElementById('mainContent').innerHTML = h;
@@ -2086,50 +2331,29 @@ async function sparkFindBudgetForProject(projectCode) {
   if (!sparkAuth.connected) return null;
   if (!projectCode) return null;
 
-  /* Return cached result if available */
-  if (sparkBudgetMapFetched && sparkBudgetMap[projectCode] !== undefined) {
-    return sparkBudgetMap[projectCode];
-  }
-
-  /* Fetch all visible budgets with full code fields */
-  if (!sparkBudgetMapFetched) {
-    var rows = await sparkFetch('budgets', 'select=id,name,estimate_number,status,project_code,client_code,campaign_code,clients(client_number)&visibility=eq.visible&status=in.(active,closeout,proposed)&order=updated_at.desc');
-    if (rows && rows.length) {
-      for (var i = 0; i < rows.length; i++) {
-        var b = rows[i];
-        /* Reconstruct the full Forge project code: clientNumber_campaignCode_projectCode */
-        var cn = (b.clients && b.clients.client_number) ? b.clients.client_number : b.client_code;
-        var cmp = b.campaign_code || '';
-        var pc = b.project_code || '';
-        if (cn && cmp && pc) {
-          var fullCode = cn + '_' + cmp + '_' + pc;
-          if (!sparkBudgetMap[fullCode]) {
-            sparkBudgetMap[fullCode] = b.id;
-          }
-        }
-        /* Also index by client_code based reconstruction as fallback */
-        if (b.client_code && cmp && pc) {
-          var altCode = b.client_code + '_' + cmp + '_' + pc;
-          if (!sparkBudgetMap[altCode]) {
-            sparkBudgetMap[altCode] = b.id;
-          }
-        }
+  /* Always fetch the full budget map (it's fast and avoids stale cache issues) */
+  var rows = await sparkFetch('budgets', 'select=id,name,status,projects(project_code)&visibility=eq.visible&order=updated_at.desc');
+  if (rows && rows.length) {
+    sparkBudgetMap = {}; /* clear and rebuild */
+    for (var i = 0; i < rows.length; i++) {
+      var b = rows[i];
+      var code = b.projects && b.projects.project_code ? b.projects.project_code : null;
+      if (code) {
+        sparkBudgetMap[code] = b.id;
       }
     }
-    sparkBudgetMapFetched = true;
   }
+  sparkBudgetMapFetched = true;
 
   /* Direct match on full code */
   if (sparkBudgetMap[projectCode]) return sparkBudgetMap[projectCode];
 
-  /* Try matching without trailing segments for codes like 320_10_XXX */
+  /* Try prefix matching for codes like 320_10_XXX */
   var codeParts = projectCode.split('_');
   if (codeParts.length >= 3) {
-    /* Try with just first two segments + wildcard */
     var prefix = codeParts[0] + '_' + codeParts[1];
     for (var key in sparkBudgetMap) {
       if (key && key.indexOf(prefix) === 0) {
-        /* Check if close enough */
         if (key.split('_')[2] === codeParts[2]) return sparkBudgetMap[key];
       }
     }
@@ -2138,13 +2362,144 @@ async function sparkFindBudgetForProject(projectCode) {
   return null;
 }
 
+var sparkSnapshotExpanded = false; /* collapsed by default */
+
+function toggleSnapshotSection() {
+  var el = document.getElementById('snapshotSection');
+  var arrow = document.getElementById('snapshotArrow');
+  if (!el) return;
+  var isHidden = el.style.display === 'none';
+  el.style.display = isHidden ? 'block' : 'none';
+  if (arrow) arrow.innerHTML = isHidden ? '&#9662;' : '&#9656;';
+}
+
+async function sparkCreateBudgetForProject(projectCode) {
+  var container = document.getElementById('sparkProjectBudget');
+  if (!container) return;
+  container.innerHTML = '<div style="padding:20px;color:var(--mid-gray)">Creating budget...</div>';
+
+  /* Find the project in portfolio */
+  var proj = null;
+  for (var i = 0; i < CLIENTS.length; i++) {
+    for (var j = 0; j < CLIENTS[i].projects.length; j++) {
+      if (CLIENTS[i].projects[j].code === projectCode) {
+        proj = CLIENTS[i].projects[j];
+        proj._clientName = CLIENTS[i].name;
+        proj._clientCode = CLIENTS[i].code;
+        break;
+      }
+    }
+    if (proj) break;
+  }
+  if (!proj) {
+    container.innerHTML = '<div style="padding:16px 20px;color:var(--ember);font-size:13px;background:var(--white);border-radius:10px;margin-bottom:20px">Could not find project in portfolio.</div>';
+    return;
+  }
+
+  try {
+    /* 1. Check if a Supabase project record already exists */
+    var existingProj = await sparkFetch('projects', 'project_code=eq.' + encodeURIComponent(projectCode) + '&select=id');
+    var supaProjectId;
+    if (existingProj && existingProj.length > 0) {
+      supaProjectId = existingProj[0].id;
+    } else {
+      /* Check if client exists */
+      var existingClient = await sparkFetch('clients', 'client_number=eq.' + encodeURIComponent(proj._clientCode) + '&select=id');
+      var clientId;
+      if (existingClient && existingClient.length > 0) {
+        clientId = existingClient[0].id;
+      } else {
+        var newClient = await sparkFetch('clients', '', 'POST', {
+          name: proj._clientName,
+          client_number: proj._clientCode
+        });
+        if (!newClient || !newClient[0]) throw new Error('Failed to create client');
+        clientId = newClient[0].id;
+      }
+      /* Create project */
+      var newProj = await sparkFetch('projects', '', 'POST', {
+        name: proj.name,
+        project_code: projectCode,
+        client_id: clientId
+      });
+      if (!newProj || !newProj[0]) throw new Error('Failed to create project');
+      supaProjectId = newProj[0].id;
+    }
+
+    /* 2. Create budget record */
+    var newBudget = await sparkFetch('budgets', '', 'POST', {
+      name: proj.name,
+      project_id: supaProjectId,
+      status: 'proposed',
+      visibility: 'visible',
+      client_price: 0,
+      total_amount: 0,
+      has_discount: false,
+      discount_percentage: 0,
+      reserve_percentage: 5,
+      oop_markup_percentage: 20
+    });
+    if (!newBudget || !newBudget[0]) throw new Error('Failed to create budget');
+    var budgetId = newBudget[0].id;
+
+    /* 3. Create default OOP entries from categories template */
+    var oopSections = await sparkFetch('oop_sections', 'select=id,slug');
+    var oopCats = await sparkFetch('oop_categories', 'select=id,name,section_id&order=display_order.asc');
+    if (oopCats && oopCats.length) {
+      for (var i = 0; i < oopCats.length; i++) {
+        await sparkFetch('oop_budget_entries', '', 'POST', {
+          budget_id: budgetId,
+          category_id: oopCats[i].id,
+          section_id: oopCats[i].section_id,
+          line_item_name: oopCats[i].name,
+          count: 0,
+          rate: 0,
+          days: 1,
+          head_count: 1,
+          is_active: true,
+          display_order: i
+        });
+      }
+    }
+
+    /* 4. Update local state so project no longer shows as needs_review */
+    sparkBudgetMap[projectCode] = budgetId;
+    SUPA_BUDGETS[projectCode] = newBudget[0];
+    for (var ci = 0; ci < CLIENTS.length; ci++) {
+      for (var pi = 0; pi < CLIENTS[ci].projects.length; pi++) {
+        var lp = CLIENTS[ci].projects[pi];
+        if (lp.code === projectCode) {
+          lp._supabudget = newBudget[0];
+          lp.dataSource = 'supabase';
+          lp.dollarBudget = 0;
+          lp.laborCost = 0;
+          lp.oopCost = 0;
+          lp.profit = 0;
+          lp.totalBudget = 0;
+        }
+      }
+    }
+    renderSidebar();
+
+    /* 5. Reload the budget view */
+    await sparkLoadBudgetForProject(projectCode);
+  } catch (err) {
+    console.error('Failed to create budget:', err);
+    container.innerHTML = '<div style="padding:16px 20px;color:var(--ember);font-size:13px;background:var(--white);border-radius:10px;margin-bottom:20px">Failed to create budget: ' + err.message + '</div>';
+  }
+}
+
 async function sparkLoadBudgetForProject(projectCode) {
   var container = document.getElementById('sparkProjectBudget');
   if (!container) return;
 
   var budgetId = await sparkFindBudgetForProject(projectCode);
   if (!budgetId) {
-    container.innerHTML = '<div style="padding:16px 20px;color:var(--mid-gray);font-size:13px;background:var(--white);border-radius:10px;margin-bottom:20px">No Spark budget found for project code <span style="font-family:monospace">' + projectCode + '</span>. Showing snapshot data below.</div>';
+    /* Issue 4: Show "Create Budget" button for unbudgeted projects */
+    container.innerHTML = '<div style="background:var(--white);border-radius:10px;padding:20px;margin-bottom:20px;text-align:center">'
+      + '<div style="font-size:13px;color:var(--mid-gray);margin-bottom:12px">No Spark budget found for <span style="font-family:monospace">' + projectCode + '</span></div>'
+      + '<button onclick="sparkCreateBudgetForProject(\'' + projectCode + '\')" style="padding:8px 20px;border-radius:6px;border:none;background:var(--ocean);color:var(--white);cursor:pointer;font-size:13px;font-weight:600">Create Budget</button>'
+      + '</div>';
     return;
   }
 
@@ -2154,9 +2509,9 @@ async function sparkLoadBudgetForProject(projectCode) {
   loadingEl.innerHTML = '<div style="padding:20px;color:var(--mid-gray)">Loading Spark budget data...</div>';
 
   var results = await Promise.all([
-    sparkFetch('budgets', 'id=eq.' + budgetId + '&select=*,clients(id,name,client_number),projects(id,name,code)'),
+    sparkFetch('budgets', 'id=eq.' + budgetId + '&select=*,projects(id,name,project_code,clients(id,name,client_number))'),
     sparkFetch('labor_budget_entries', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,billable_rate,fully_burdened_rate,department,employment_type)&order=department.asc,display_order.asc'),
-    sparkFetch('oop_budget_entries', 'budget_id=eq.' + budgetId + '&select=*,section:oop_sections(id,name,slug),category:oop_categories(id,name),vendor:team_members(id,name,billable_rate)&order=display_order.asc'),
+    sparkFetch('oop_budget_entries', 'budget_id=eq.' + budgetId + '&select=*,section:oop_sections(id,name,slug),category:oop_categories(id,name)&order=display_order.asc'),
     sparkFetch('oop_sections', 'select=*&order=display_order.asc'),
     sparkFetch('oop_categories', 'select=*&order=display_order.asc'),
     sparkFetch('labor_actuals', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,department,employment_type)&order=work_date.desc'),
@@ -2181,11 +2536,7 @@ async function sparkLoadBudgetForProject(projectCode) {
     return;
   }
 
-  /* Hide the snapshot section since Spark data replaces it */
-  var snapshotBanner = document.getElementById('snapshotSection');
-  if (snapshotBanner) snapshotBanner.style.display = 'none';
-
-  /* Render the budget content into the project page */
+  /* Render the budget content into the project page (snapshotSection stays collapsed by default) */
   sparkRenderBudgetContent(true);
 }
 
@@ -2253,8 +2604,25 @@ function sparkSettingVal(settings, category, key, fallback) {
 }
 
 function sparkOopItemTotal(item) {
-  var rate = item.rate_override != null && item.rate_override > 0 ? item.rate_override : (item.vendor_rate || 0);
+  /* Planned total (always from planned fields) */
+  var rate = item.rate || item.rate_override || item.vendor_rate || 0;
   return (item.count || 0) * rate * (item.days || 1) * (item.head_count || 1);
+}
+
+function sparkOopItemEffective(item) {
+  /* Cascade: Actual → Adjusted → Planned */
+  if (item.actual_amount != null) return item.actual_amount;
+  var adjCount = item.adjusted_count, adjRate = item.adjusted_rate, adjDays = item.adjusted_days, adjHead = item.adjusted_head_count;
+  if (adjCount != null || adjRate != null) {
+    return (adjCount != null ? adjCount : (item.count||0)) * (adjRate != null ? adjRate : (item.rate||0)) * (adjDays != null ? adjDays : (item.days||1)) * (adjHead != null ? adjHead : (item.head_count||1));
+  }
+  return sparkOopItemTotal(item);
+}
+
+function sparkOopItemSpent(item) {
+  /* Only counts if Paid is checked */
+  if (!item.paid) return 0;
+  return sparkOopItemEffective(item);
 }
 
 function sparkShowSaving() {
@@ -2278,7 +2646,7 @@ async function sparkPatchLabor(entryId, phaseKey, value) {
 async function sparkPatchOop(entryId, field, value) {
   sparkShowSaving();
   var body = {};
-  body[field] = (field === 'notes') ? (value || '') : (parseFloat(value) || 0);
+  body[field] = (field === 'notes' || field === 'line_item_name') ? (value || '') : (parseFloat(value) || 0);
   await sparkFetch('oop_budget_entries', 'id=eq.' + entryId, 'PATCH', body);
   sparkHideSaving();
 }
@@ -2305,7 +2673,7 @@ function sparkDebouncedPatchOop(entryId, field, value) {
   if (sparkCurrentData && sparkCurrentData.oop) {
     for (var i = 0; i < sparkCurrentData.oop.length; i++) {
       if (sparkCurrentData.oop[i].id === entryId) {
-        sparkCurrentData.oop[i][field] = (field === 'notes') ? (value || '') : (parseFloat(value) || 0);
+        sparkCurrentData.oop[i][field] = (field === 'notes' || field === 'line_item_name') ? (value || '') : (parseFloat(value) || 0);
         break;
       }
     }
@@ -2313,6 +2681,108 @@ function sparkDebouncedPatchOop(entryId, field, value) {
   sparkRenderOopContent();
   sparkRenderSummary();
   sparkSaveTimers[timerKey] = setTimeout(function() { sparkPatchOop(entryId, field, value); }, 500);
+}
+
+async function sparkAddOopEntry(categoryId, budgetId) {
+  if (!budgetId || !categoryId) return;
+  sparkShowSaving();
+  var maxOrder = 0;
+  if (sparkCurrentData && sparkCurrentData.oop) {
+    for (var i = 0; i < sparkCurrentData.oop.length; i++) {
+      if ((sparkCurrentData.oop[i].display_order || 0) > maxOrder) maxOrder = sparkCurrentData.oop[i].display_order;
+    }
+  }
+  var newEntry = await sparkFetch('oop_budget_entries', '', 'POST', {
+    budget_id: budgetId,
+    category_id: categoryId,
+    line_item_name: 'New Item',
+    count: 1,
+    rate: 0,
+    days: 1,
+    head_count: 1,
+    is_active: true,
+    display_order: maxOrder + 1
+  });
+  sparkHideSaving();
+  if (newEntry && newEntry[0]) {
+    /* Add to local data and re-render */
+    if (sparkCurrentData && sparkCurrentData.oop) {
+      sparkCurrentData.oop.push(newEntry[0]);
+    }
+    sparkOopCategoryExpanded[categoryId] = true;
+    sparkRenderOopContent();
+    sparkRenderSummary();
+  }
+}
+
+async function sparkSetProjectStatus(status) {
+  if (!sparkCurrentData || !sparkCurrentData.budget) return;
+  var budgetId = sparkCurrentData.budget.id;
+  sparkShowSaving();
+  /* Map our UI statuses to Supabase values */
+  var dbStatus = status; /* nonbillable, bizdev, active, complete all stored as-is */
+  await sparkFetch('budgets?id=eq.' + budgetId, '', 'PATCH', { status: dbStatus });
+  sparkCurrentData.budget.status = dbStatus;
+  sparkHideSaving();
+
+  /* Also update the local portfolio project data so sidebar/completed reflects change */
+  for (var ci = 0; ci < CLIENTS.length; ci++) {
+    for (var pi = 0; pi < CLIENTS[ci].projects.length; pi++) {
+      var p = CLIENTS[ci].projects[pi];
+      if (p._supabudget && p._supabudget.id === budgetId) {
+        if (status === 'complete') {
+          p.status = 'complete';
+          p.projectType = 'billable';
+        } else if (status === 'nonbillable') {
+          p.status = 'active';
+          p.projectType = 'internal';
+        } else if (status === 'bizdev') {
+          p.status = 'active';
+          p.projectType = 'bizdev';
+        } else {
+          p.status = 'active';
+          p.projectType = 'billable';
+        }
+      }
+    }
+  }
+  renderSidebar();
+  sparkRenderBudgetContent(true);
+}
+
+function sparkBudgetAmtFocus(el) {
+  el.value = el.value.replace(/[^0-9.]/g, '');
+}
+function sparkBudgetAmtBlur(el) {
+  var v = parseFloat(el.value.replace(/,/g, '')) || 0;
+  sparkPatchBudgetField('client_price', v);
+  el.value = Math.round(v).toLocaleString();
+}
+
+async function sparkPatchBudgetField(field, value) {
+  if (!sparkCurrentData || !sparkCurrentData.budget) return;
+  var budgetId = sparkCurrentData.budget.id;
+  sparkShowSaving();
+  var patch = {};
+  patch[field] = value;
+  await sparkFetch('budgets?id=eq.' + budgetId, '', 'PATCH', patch);
+  sparkCurrentData.budget[field] = value;
+  sparkHideSaving();
+  /* Re-render to reflect changes */
+  sparkRenderBudgetContent(true);
+}
+
+async function sparkDeleteOopEntry(entryId) {
+  if (!entryId) return;
+  sparkShowSaving();
+  await sparkFetch('oop_budget_entries?id=eq.' + entryId, '', 'DELETE');
+  sparkHideSaving();
+  /* Remove from local data and re-render */
+  if (sparkCurrentData && sparkCurrentData.oop) {
+    sparkCurrentData.oop = sparkCurrentData.oop.filter(function(e) { return e.id !== entryId; });
+  }
+  sparkRenderOopContent();
+  sparkRenderSummary();
 }
 
 function sparkRenderSummary() {
@@ -2445,12 +2915,32 @@ function sparkOopGridClass(slug) {
 }
 
 function sparkOopColHeaders(slug) {
-  var gc = sparkOopGridClass(slug);
-  var h = '<div class="spark-oop-col-hdr ' + gc + '">';
-  h += '<div>Line Item</div><div>Vendor</div><div class="num">Count</div><div class="num">Rate</div>';
+  var h = '<div class="spark-oop-tier-hdr">';
+  h += '<div class="oop-tier-label" style="grid-column:1"></div>';
+  h += '<div class="oop-tier-group planned">PLANNED</div>';
+  h += '<div class="oop-tier-group adjusted">ADJUSTED</div>';
+  h += '<div class="oop-tier-group actual">ACTUAL</div>';
+  h += '<div></div><div></div><div></div>';
+  h += '</div>';
+  h += '<div class="spark-oop-col-hdr-3tier">';
+  h += '<div>Line Item</div>';
+  /* Planned */
+  h += '<div class="num">Count</div><div class="num">Rate</div>';
   if (slug === 'talent' || slug === 'travel-meals') h += '<div class="num">Days</div>';
   if (slug === 'travel-meals') h += '<div class="num">Head</div>';
-  h += '<div class="num">Total</div><div>Notes</div>';
+  h += '<div class="num">Total</div>';
+  /* Adjusted */
+  h += '<div class="num adj">Count</div><div class="num adj">Rate</div>';
+  if (slug === 'talent' || slug === 'travel-meals') h += '<div class="num adj">Days</div>';
+  if (slug === 'travel-meals') h += '<div class="num adj">Head</div>';
+  h += '<div class="num adj">Total</div>';
+  /* Actual */
+  h += '<div class="num act">Count</div><div class="num act">Rate</div>';
+  if (slug === 'talent' || slug === 'travel-meals') h += '<div class="num act">Days</div>';
+  if (slug === 'travel-meals') h += '<div class="num act">Head</div>';
+  h += '<div class="num act">Total</div>';
+  h += '<div class="num act">Paid</div>';
+  h += '<div>Notes</div>';
   h += '</div>';
   return h;
 }
@@ -2562,26 +3052,69 @@ function sparkRenderOopContent() {
           }
           for (var e = 0; e < activeCatEntries.length; e++) {
             var item = activeCatEntries[e];
-            var itemRate = item.rate_override != null && item.rate_override > 0 ? item.rate_override : (item.vendor_rate || 0);
+            var itemRate = item.rate || item.rate_override || item.vendor_rate || 0;
             var itemTotal = sparkOopItemTotal(item);
             var itemName = item.line_item_name || (item.category ? item.category.name : null) || 'Unnamed';
-            var vendorName = item.vendor ? item.vendor.name : (item.vendor_id ? 'Vendor' : '-');
 
-            h += '<div class="spark-oop-line-item ' + gc + '">';
-            h += '<div>' + itemName + '</div>';
-            h += '<div style="font-size:12px;color:var(--mid-gray)">' + vendorName + '</div>';
-            h += '<div class="num"><input type="number" class="spark-input" value="' + (item.count || 0) + '" min="0" step="1" onchange="sparkDebouncedPatchOop(\'' + item.id + '\',\'count\',this.value)" oninput="sparkDebouncedPatchOop(\'' + item.id + '\',\'count\',this.value)"></div>';
-            h += '<div class="num"><input type="number" class="spark-input" value="' + (itemRate || 0) + '" min="0" step="0.01" onchange="sparkDebouncedPatchOop(\'' + item.id + '\',\'rate_override\',this.value)" oninput="sparkDebouncedPatchOop(\'' + item.id + '\',\'rate_override\',this.value)"></div>';
+            /* Adjusted values — override planned if set */
+            var adjCount = item.adjusted_count;
+            var adjRate = item.adjusted_rate;
+            var adjDays = item.adjusted_days;
+            var adjHead = item.adjusted_head_count;
+            var adjTotal = (adjCount != null || adjRate != null) ? (adjCount != null ? adjCount : (item.count||0)) * (adjRate != null ? adjRate : itemRate) * (adjDays != null ? adjDays : (item.days||1)) * (adjHead != null ? adjHead : (item.head_count||1)) : null;
+
+            /* Actual values */
+            var actCount = item.actual_count;
+            var actRate = item.actual_rate;
+            var actDays = item.actual_days;
+            var actHead = item.actual_head_count;
+            var actAmount = item.actual_amount;
+            var actTotal = actAmount != null ? actAmount : ((actCount != null || actRate != null) ? (actCount != null ? actCount : 0) * (actRate != null ? actRate : 0) * (actDays != null ? actDays : 1) * (actHead != null ? actHead : 1) : null);
+
+            var iid = item.id;
+            h += '<div class="spark-oop-line-item-3tier">';
+            /* Name */
+            h += '<div><input type="text" class="spark-input" style="width:100%;text-align:left;font-weight:500" value="' + itemName.replace(/"/g, '&quot;') + '" onchange="sparkDebouncedPatchOop(\'' + iid + '\',\'line_item_name\',this.value)" onblur="sparkDebouncedPatchOop(\'' + iid + '\',\'line_item_name\',this.value)"></div>';
+            /* ── PLANNED ── */
+            h += '<div class="num tier-planned"><input type="number" class="spark-input" value="' + (item.count||0) + '" min="0" step="1" onchange="sparkDebouncedPatchOop(\'' + iid + '\',\'count\',this.value)"></div>';
+            h += '<div class="num tier-planned"><input type="number" class="spark-input" value="' + (itemRate||0) + '" min="0" step="0.01" onchange="sparkDebouncedPatchOop(\'' + iid + '\',\'rate\',this.value)"></div>';
             if (slug === 'talent' || slug === 'travel-meals') {
-              h += '<div class="num"><input type="number" class="spark-input" value="' + (item.days || 1) + '" min="0" step="1" onchange="sparkDebouncedPatchOop(\'' + item.id + '\',\'days\',this.value)" oninput="sparkDebouncedPatchOop(\'' + item.id + '\',\'days\',this.value)"></div>';
+              h += '<div class="num tier-planned"><input type="number" class="spark-input" value="' + (item.days||1) + '" min="0" step="1" onchange="sparkDebouncedPatchOop(\'' + iid + '\',\'days\',this.value)"></div>';
             }
             if (slug === 'travel-meals') {
-              h += '<div class="num"><input type="number" class="spark-input" value="' + (item.head_count || 1) + '" min="0" step="1" onchange="sparkDebouncedPatchOop(\'' + item.id + '\',\'head_count\',this.value)" oninput="sparkDebouncedPatchOop(\'' + item.id + '\',\'head_count\',this.value)"></div>';
+              h += '<div class="num tier-planned"><input type="number" class="spark-input" value="' + (item.head_count||1) + '" min="0" step="1" onchange="sparkDebouncedPatchOop(\'' + iid + '\',\'head_count\',this.value)"></div>';
             }
-            h += '<div class="num" style="font-weight:600">' + sparkFmt(itemTotal) + '</div>';
-            h += '<div><input type="text" class="spark-input" style="width:100%;text-align:left" value="' + (item.notes || '').replace(/"/g, '&quot;') + '" placeholder="Notes" onchange="sparkDebouncedPatchOop(\'' + item.id + '\',\'notes\',this.value)"></div>';
+            h += '<div class="num tier-planned" style="font-weight:600">' + sparkFmt(itemTotal) + '</div>';
+            /* ── ADJUSTED ── */
+            h += '<div class="num tier-adjusted"><input type="number" class="spark-input adj-input" value="' + (adjCount != null ? adjCount : '') + '" placeholder="—" min="0" step="1" onchange="sparkDebouncedPatchOop(\'' + iid + '\',\'adjusted_count\',this.value)"></div>';
+            h += '<div class="num tier-adjusted"><input type="number" class="spark-input adj-input" value="' + (adjRate != null ? adjRate : '') + '" placeholder="—" min="0" step="0.01" onchange="sparkDebouncedPatchOop(\'' + iid + '\',\'adjusted_rate\',this.value)"></div>';
+            if (slug === 'talent' || slug === 'travel-meals') {
+              h += '<div class="num tier-adjusted"><input type="number" class="spark-input adj-input" value="' + (adjDays != null ? adjDays : '') + '" placeholder="—" min="0" step="1" onchange="sparkDebouncedPatchOop(\'' + iid + '\',\'adjusted_days\',this.value)"></div>';
+            }
+            if (slug === 'travel-meals') {
+              h += '<div class="num tier-adjusted"><input type="number" class="spark-input adj-input" value="' + (adjHead != null ? adjHead : '') + '" placeholder="—" min="0" step="1" onchange="sparkDebouncedPatchOop(\'' + iid + '\',\'adjusted_head_count\',this.value)"></div>';
+            }
+            h += '<div class="num tier-adjusted" style="font-weight:600">' + (adjTotal != null ? sparkFmt(adjTotal) : '<span style="opacity:.3">—</span>') + '</div>';
+            /* ── ACTUAL ── */
+            h += '<div class="num tier-actual"><input type="number" class="spark-input act-input" value="' + (actCount != null ? actCount : '') + '" placeholder="—" min="0" step="1" onchange="sparkDebouncedPatchOop(\'' + iid + '\',\'actual_count\',this.value)"></div>';
+            h += '<div class="num tier-actual"><input type="number" class="spark-input act-input" value="' + (actRate != null ? actRate : '') + '" placeholder="—" min="0" step="0.01" onchange="sparkDebouncedPatchOop(\'' + iid + '\',\'actual_rate\',this.value)"></div>';
+            if (slug === 'talent' || slug === 'travel-meals') {
+              h += '<div class="num tier-actual"><input type="number" class="spark-input act-input" value="' + (actDays != null ? actDays : '') + '" placeholder="—" min="0" step="1" onchange="sparkDebouncedPatchOop(\'' + iid + '\',\'actual_days\',this.value)"></div>';
+            }
+            if (slug === 'travel-meals') {
+              h += '<div class="num tier-actual"><input type="number" class="spark-input act-input" value="' + (actHead != null ? actHead : '') + '" placeholder="—" min="0" step="1" onchange="sparkDebouncedPatchOop(\'' + iid + '\',\'actual_head_count\',this.value)"></div>';
+            }
+            h += '<div class="num tier-actual" style="font-weight:600">' + (actTotal != null ? sparkFmt(actTotal) : '<span style="opacity:.3">—</span>') + '</div>';
+            /* Paid checkbox */
+            var isPaid = item.paid || false;
+            h += '<div style="text-align:center"><input type="checkbox" ' + (isPaid ? 'checked' : '') + ' onchange="sparkDebouncedPatchOop(\'' + iid + '\',\'paid\',this.checked)" title="Mark as paid" style="cursor:pointer;width:15px;height:15px;accent-color:#81C784"></div>';
+            /* Notes + Delete */
+            h += '<div style="display:flex;align-items:center;gap:4px"><input type="text" class="spark-input" style="flex:1;text-align:left" value="' + (item.notes || '').replace(/"/g, '&quot;') + '" placeholder="Notes" onchange="sparkDebouncedPatchOop(\'' + iid + '\',\'notes\',this.value)">';
+            h += '<button onclick="sparkDeleteOopEntry(\'' + iid + '\')" title="Delete line item" style="background:none;border:none;color:var(--mid-gray);cursor:pointer;font-size:14px;padding:2px 4px;opacity:.5;transition:opacity .2s" onmouseenter="this.style.opacity=1;this.style.color=\'var(--ember)\'" onmouseleave="this.style.opacity=.5;this.style.color=\'var(--mid-gray)\'">&times;</button></div>';
             h += '</div>';
           }
+          /* Add line item button */
+          h += '<div style="padding:6px 24px"><button onclick="sparkAddOopEntry(\'' + catId + '\',\'' + (data.budget.id || '') + '\')" style="padding:4px 12px;border-radius:4px;border:1px dashed var(--mid-gray);background:transparent;color:var(--mid-gray);cursor:pointer;font-size:11px">+ Add Line Item</button></div>';
         }
       }
 
@@ -2620,9 +3153,9 @@ async function sparkLoadBudget(budgetId) {
   if (loadingEl) loadingEl.innerHTML = '<div style="padding:40px;text-align:center;color:var(--mid-gray)">Loading budget data...</div>';
 
   var results = await Promise.all([
-    sparkFetch('budgets', 'id=eq.' + budgetId + '&select=*,clients(id,name,client_number),projects(id,name,code)'),
+    sparkFetch('budgets', 'id=eq.' + budgetId + '&select=*,projects(id,name,project_code,clients(id,name,client_number))'),
     sparkFetch('labor_budget_entries', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,billable_rate,fully_burdened_rate,department,employment_type)&order=department.asc,display_order.asc'),
-    sparkFetch('oop_budget_entries', 'budget_id=eq.' + budgetId + '&select=*,section:oop_sections(id,name,slug),category:oop_categories(id,name),vendor:team_members(id,name,billable_rate)&order=display_order.asc'),
+    sparkFetch('oop_budget_entries', 'budget_id=eq.' + budgetId + '&select=*,section:oop_sections(id,name,slug),category:oop_categories(id,name)&order=display_order.asc'),
     sparkFetch('oop_sections', 'select=*&order=display_order.asc'),
     sparkFetch('oop_categories', 'select=*&order=display_order.asc'),
     sparkFetch('labor_actuals', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,department,employment_type)&order=work_date.desc'),
@@ -2658,15 +3191,19 @@ function sparkRenderBudgetContent(embedded) {
   var budget = data.budget;
   var settings = data.settings;
   var reservePct = sparkSettingVal(settings, 'reserve', 'reserve_percentage', 5);
-  var discountPct = budget.has_discount ? (budget.discount_percentage || sparkSettingVal(settings, 'discount', 'discount_percentage', 0)) : 0;
+  var discountPct = budget.has_discount ? 3.5 : 0;
   var clientPrice = budget.client_price || 0;
   var discountAmt = clientPrice * (discountPct / 100);
   var tcv = clientPrice - discountAmt;
   var reserveAmt = tcv * (reservePct / 100);
 
-  /* Compute labor total */
+  /* Compute labor total + hours */
   var totalLaborCost = 0;
-  for (var i = 0; i < data.labor.length; i++) totalLaborCost += sparkEntryTotal(data.labor[i]);
+  var totalLaborHrs = 0;
+  for (var i = 0; i < data.labor.length; i++) {
+    totalLaborCost += sparkEntryTotal(data.labor[i]);
+    totalLaborHrs += sparkEntryHours(data.labor[i], 'all');
+  }
   /* Compute OOP total */
   var totalOop = 0;
   for (var i = 0; i < data.oop.length; i++) {
@@ -2674,49 +3211,91 @@ function sparkRenderBudgetContent(embedded) {
   }
   var markupPct = sparkSettingVal(settings, 'markup', 'oop_markup_percentage', 20);
   var totalOopWithMarkup = totalOop * (1 + markupPct / 100);
+  var totalAmount = totalLaborCost + totalOopWithMarkup;
+  var profit = clientPrice - totalAmount;
+  var profitMargin = clientPrice > 0 ? (profit / clientPrice * 100) : 0;
 
   var h = '';
 
-  /* ── Project Overview Card ── */
-  h += '<div class="snapshot-banner">';
-
   if (embedded) {
-    /* Embedded mode: "Live from Spark" header with timestamp */
-    var fetchTime = new Date();
-    var fetchStr = fetchTime.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-    h += '<div class="snap-header"><div>';
-    h += '<div class="snap-title">Project Financials</div>';
-    h += '<div style="font-size:12px;opacity:.55;margin-top:2px">' + (budget.name || 'Untitled') + ' &middot; #' + (budget.estimate_number || '—') + '</div>';
-    h += '</div><div style="display:flex;gap:8px;align-items:center">';
-    h += '<div class="snap-version">Live from Spark &#9889;</div>';
-    h += '<span class="spark-status-badge ' + (budget.status || '') + '">' + (budget.status || '—') + '</span>';
-    h += '</div></div>';
-    h += '<div style="font-size:11px;opacity:.4;margin-bottom:14px">Last fetched at ' + fetchStr + '</div>';
+    /* ── PROJECT OVERVIEW → renders into sparkProjectOverview (always visible) ── */
+    var overviewEl = document.getElementById('sparkProjectOverview');
+    if (overviewEl) {
+      var oh = '';
+      var curStatus = budget.status || 'active';
+      oh += '<div class="snapshot-banner" style="margin-bottom:16px">';
+      oh += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">';
+      oh += '<div style="font-size:16px;font-weight:700">PROJECT OVERVIEW <span style="font-size:13px;font-weight:400;opacity:.5">#' + (budget.estimate_number || '\u2014') + '</span></div>';
+      oh += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
+      var statusOpts = [
+        {label:'Non-Billable', val:'nonbillable', color:'var(--mid-gray)'},
+        {label:'Business Development', val:'bizdev', color:'#F57F17'},
+        {label:'Active Billable', val:'active', color:'var(--ocean)'},
+        {label:'Finished', val:'complete', color:'#81C784'}
+      ];
+      for (var si = 0; si < statusOpts.length; si++) {
+        var so = statusOpts[si];
+        var isSel = (curStatus === so.val);
+        oh += '<span style="padding:5px 12px;border-radius:12px;font-size:10px;font-weight:600;cursor:pointer;transition:all .2s;' + (isSel ? 'background:' + so.color + ';color:var(--white)' : 'background:rgba(255,255,255,.08);color:var(--mid-gray)') + '" onclick="sparkSetProjectStatus(\'' + so.val + '\')">' + (isSel ? '\u2714 ' : '') + so.label + '</span>';
+      }
+      oh += '</div></div>';
+      oh += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">';
+      oh += '<div>';
+      oh += '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;opacity:.5;margin-bottom:8px">PRICE</div>';
+      oh += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">';
+      oh += '<span style="font-size:12px;opacity:.6">Budget Amount</span>';
+      oh += '<div style="position:relative;display:inline-flex;align-items:center"><span style="position:absolute;left:10px;font-size:14px;font-weight:600;color:rgba(255,255,255,.5);pointer-events:none">$</span>';
+      oh += '<input type="text" id="sparkBudgetAmount" class="spark-input" style="width:160px;font-size:16px;font-weight:600;padding:6px 10px 6px 22px;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);color:var(--white)" value="' + Math.round(clientPrice || 0).toLocaleString() + '" onfocus="sparkBudgetAmtFocus(this)" onblur="sparkBudgetAmtBlur(this)">';
+      oh += '</div>';
+      oh += '</div>';
+      oh += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
+      oh += '<span style="font-size:12px;opacity:.6">Discount 3.5%</span>';
+      oh += '<label style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer"><input type="checkbox" ' + (budget.has_discount ? 'checked' : '') + ' onchange="sparkPatchBudgetField(\'has_discount\',this.checked)" style="opacity:0;width:0;height:0"><span style="position:absolute;top:0;left:0;right:0;bottom:0;background:' + (budget.has_discount ? 'var(--ocean)' : 'rgba(255,255,255,.2)') + ';border-radius:10px;transition:.3s"></span><span style="position:absolute;left:' + (budget.has_discount ? '18px' : '2px') + ';top:2px;width:16px;height:16px;background:white;border-radius:50%;transition:.3s"></span></label>';
+      if (budget.has_discount) {
+        oh += '<span style="font-size:11px;opacity:.5;margin-left:4px">(-$' + Math.round(discountAmt).toLocaleString() + ')</span>';
+      }
+      oh += '</div>';
+      oh += '<div style="font-size:12px;opacity:.6">TCV <span style="font-size:16px;font-weight:700;color:var(--white);margin-left:8px">$' + Math.round(tcv).toLocaleString() + '</span></div>';
+      oh += '</div>';
+      oh += '<div>';
+      oh += '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;opacity:.5;margin-bottom:8px">ALLOCATION</div>';
+      oh += '<div style="font-size:12px;margin-bottom:6px">Fee (Labor) <span style="float:right;font-weight:600">$' + Math.round(totalLaborCost).toLocaleString() + '</span></div>';
+      oh += '<div style="font-size:12px;margin-bottom:6px">Pass-Through (OOP) <span style="float:right;font-weight:600">$' + Math.round(totalOopWithMarkup).toLocaleString() + '</span></div>';
+      oh += '</div>';
+      oh += '</div>';
+      oh += '</div>';
+      overviewEl.innerHTML = oh;
+    }
+
+    /* Labor + OOP go inside sparkProjectBudget (inside the collapsible) */
   } else {
+    /* Full Spark editor mode (non-embedded) */
+    h += '<div class="snapshot-banner">';
     h += '<div class="snap-header"><div>';
     h += '<div style="font-size:16px;font-weight:700">' + (budget.name || 'Untitled') + '</div>';
-    h += '<div style="font-size:12px;opacity:.55;margin-top:2px">#' + (budget.estimate_number || '—') + '</div>';
+    h += '<div style="font-size:12px;opacity:.55;margin-top:2px">#' + (budget.estimate_number || '\u2014') + '</div>';
     h += '</div><div style="display:flex;gap:8px;align-items:center">';
-    h += '<span class="spark-status-badge ' + (budget.status || '') + '">' + (budget.status || '—') + '</span>';
+    h += '<span class="spark-status-badge ' + (budget.status || '') + '">' + (budget.status || '\u2014') + '</span>';
     h += '<span id="sparkSavingIndicator" class="spark-saving">Saving...</span>';
     h += '</div></div>';
 
     /* Client info */
-    var clientName = budget.clients ? (budget.clients.client_number || '') + ' - ' + (budget.clients.name || '') : '—';
+    var cl = budget.projects && budget.projects.clients ? budget.projects.clients : budget.clients;
+    var clientName = cl ? (cl.client_number || '') + ' - ' + (cl.name || '') : '\u2014';
     h += '<div style="font-size:12px;opacity:.55;margin-bottom:14px">Client: ' + clientName + '</div>';
-  }
 
-  /* Financial overview grid */
-  h += '<div class="spark-overview-grid">';
-  h += '<div class="spark-overview-item"><div class="so-label">Client Price</div><div class="so-value" style="color:var(--sand)">' + sparkFmt(clientPrice) + '</div></div>';
-  if (discountPct > 0) {
-    h += '<div class="spark-overview-item"><div class="so-label">Discount (' + discountPct + '%)</div><div class="so-value">-' + sparkFmt(discountAmt) + '</div></div>';
+    /* Financial overview grid */
+    h += '<div class="spark-overview-grid">';
+    h += '<div class="spark-overview-item"><div class="so-label">Client Price</div><div class="so-value" style="color:var(--sand)">' + sparkFmt(clientPrice) + '</div></div>';
+    if (discountPct > 0) {
+      h += '<div class="spark-overview-item"><div class="so-label">Discount (' + discountPct + '%)</div><div class="so-value">-' + sparkFmt(discountAmt) + '</div></div>';
+    }
+    h += '<div class="spark-overview-item"><div class="so-label">TCV</div><div class="so-value">' + sparkFmt(tcv) + '</div></div>';
+    h += '<div class="spark-overview-item"><div class="so-label">Fee (Labor)</div><div class="so-value" style="color:var(--ocean)">' + sparkFmt(totalLaborCost) + '</div></div>';
+    h += '<div class="spark-overview-item"><div class="so-label">Pass-Through (OOP)</div><div class="so-value">' + sparkFmt(totalOopWithMarkup) + '</div></div>';
+    h += '<div class="spark-overview-item"><div class="so-label">Reserve (' + reservePct + '%)</div><div class="so-value">' + sparkFmt(reserveAmt) + '</div></div>';
+    h += '</div></div>';
   }
-  h += '<div class="spark-overview-item"><div class="so-label">TCV</div><div class="so-value">' + sparkFmt(tcv) + '</div></div>';
-  h += '<div class="spark-overview-item"><div class="so-label">Fee (Labor)</div><div class="so-value" style="color:var(--ocean)">' + sparkFmt(totalLaborCost) + '</div></div>';
-  h += '<div class="spark-overview-item"><div class="so-label">Pass-Through (OOP)</div><div class="so-value">' + sparkFmt(totalOopWithMarkup) + '</div></div>';
-  h += '<div class="spark-overview-item"><div class="so-label">Reserve (' + reservePct + '%)</div><div class="so-value">' + sparkFmt(reserveAmt) + '</div></div>';
-  h += '</div></div>';
 
   /* ── Labor Fee Section ── */
   h += '<div class="section-title" style="margin-top:28px">Labor Fee</div>';
@@ -2900,7 +3479,7 @@ function rtFilterNames(allNames) {
 
 function renderResource() {
   if (!RT_WEEKS || RT_WEEKS.length === 0) {
-    document.getElementById('mainContent').innerHTML = '<h1 class="page-title">Resource Tracker</h1><p style="color:var(--mid-gray);margin-top:12px">No resource tracker data available yet.</p>';
+    document.getElementById('mainContent').innerHTML = '<h1 class="page-title">Resource Analytics</h1><p style="color:var(--mid-gray);margin-top:12px">No resource tracker data available yet.</p>';
     return;
   }
 
@@ -2933,7 +3512,7 @@ function renderResource() {
     if (rtCalcAcc(p, a) >= 80) onTarget++;
   }
 
-  var h = '<h1 class="page-title">Resource Tracker</h1>';
+  var h = '<h1 class="page-title">Resource Analytics</h1>';
   h += '<p class="page-subtitle">Comparing resource planner predictions vs actual hours logged</p>';
 
   if (useGlobalFilter) {
@@ -3305,23 +3884,54 @@ function computeResourceWeeks() {
     wk.people[a.person].projects[a.project].p += hrs;
   }
 
-  /* 2. Process actual hours from ACTUALS */
-  var weeks = ACTUALS.weeks || [];
-  for (var i = 0; i < weeks.length; i++) {
-    var aw = weeks[i];
-    var mon = new Date(aw.weekOf + 'T00:00:00');
-    var sun = new Date(mon); sun.setDate(sun.getDate() - 1);
-    var sunKey = sun.toISOString().slice(0, 10);
+  /* 2. Process actual hours from Supabase (preferred) or ACTUALS.weeks (fallback) */
+  if (SUPA_LOADED && SUPA_ACTUALS_ALL.length > 0) {
+    /* Group by week (Sunday boundary) and person */
+    for (var i = 0; i < SUPA_ACTUALS_ALL.length; i++) {
+      var a = SUPA_ACTUALS_ALL[i];
+      if (!a.work_date || !a.person_name || !a.hours) continue;
+      var d = new Date(a.work_date + 'T00:00:00');
+      var day = d.getDay();
+      var sun = new Date(d); sun.setDate(sun.getDate() - day);
+      var sunKey = sun.toISOString().slice(0, 10);
 
-    if (!weekMap[sunKey]) weekMap[sunKey] = { people: {} };
-    var wk = weekMap[sunKey];
-    for (var pn in aw.people) {
+      if (!weekMap[sunKey]) weekMap[sunKey] = { people: {} };
+      var wk = weekMap[sunKey];
+      var pn = a.person_name;
       if (!wk.people[pn]) wk.people[pn] = { predicted: 0, actual: 0, projects: {} };
-      var projs = aw.people[pn].projects || {};
-      for (var proj in projs) {
-        wk.people[pn].actual += projs[proj];
-        if (!wk.people[pn].projects[proj]) wk.people[pn].projects[proj] = { p: 0, a: 0 };
-        wk.people[pn].projects[proj].a += projs[proj];
+
+      /* Map board_name to project name using RT_BUDGET_ALIASES */
+      var projName = a.board_name || a.project_code || 'Unknown';
+      /* Clean up board name: remove project code prefix (e.g. "320_30_10 - CES4 Post" -> "CES4 Post") */
+      if (projName.match(/^\d+_\d+.*? - /)) {
+        projName = projName.replace(/^\d+[\d_A-Za-z]*\s*-\s*/, '');
+      }
+      /* Apply aliases */
+      if (RT_BUDGET_ALIASES[projName]) projName = RT_BUDGET_ALIASES[projName];
+
+      wk.people[pn].actual += a.hours;
+      if (!wk.people[pn].projects[projName]) wk.people[pn].projects[projName] = { p: 0, a: 0 };
+      wk.people[pn].projects[projName].a += a.hours;
+    }
+  } else {
+    /* Fallback to ACTUALS.weeks (old format) */
+    var weeks = ACTUALS.weeks || [];
+    for (var i = 0; i < weeks.length; i++) {
+      var aw = weeks[i];
+      var mon = new Date(aw.weekOf + 'T00:00:00');
+      var sun = new Date(mon); sun.setDate(sun.getDate() - 1);
+      var sunKey = sun.toISOString().slice(0, 10);
+
+      if (!weekMap[sunKey]) weekMap[sunKey] = { people: {} };
+      var wk = weekMap[sunKey];
+      for (var pn in aw.people) {
+        if (!wk.people[pn]) wk.people[pn] = { predicted: 0, actual: 0, projects: {} };
+        var projs = aw.people[pn].projects || {};
+        for (var proj in projs) {
+          wk.people[pn].actual += projs[proj];
+          if (!wk.people[pn].projects[proj]) wk.people[pn].projects[proj] = { p: 0, a: 0 };
+          wk.people[pn].projects[proj].a += projs[proj];
+        }
       }
     }
   }
@@ -3968,6 +4578,158 @@ function buildProjectBudgetLookup() {
   }
 }
 
+/* ── SUPABASE PAGINATION HELPER ── */
+async function sparkFetchAll(table, query) {
+  var all = [], offset = 0, pageSize = 1000;
+  while (true) {
+    var page = await sparkFetch(table, query + '&limit=' + pageSize + '&offset=' + offset);
+    if (!page || !page.length) break;
+    all = all.concat(page);
+    if (page.length < pageSize) break;
+    offset += pageSize;
+  }
+  return all;
+}
+
+/* ── SUPABASE DATA LOADER ── */
+async function loadSupabaseData() {
+  if (!sparkAuth.connected) return;
+  try {
+    /* 1. Fetch all visible budgets with project info */
+    var budgets = await sparkFetchAll('budgets', 'select=id,name,status,client_price,total_amount,has_discount,discount_percentage,reserve_percentage,oop_markup_percentage,project_id,projects(id,project_code,name)&visibility=eq.visible');
+    if (!budgets || !budgets.length) { console.warn('No Supabase budgets found'); return; }
+
+    /* 2. Fetch labor_budget_entries and oop_budget_entries for all budgets */
+    var budgetIds = budgets.map(function(b) { return b.id; });
+    var laborEntries = await sparkFetchAll('labor_budget_entries', 'select=id,budget_id,department,employment_type,phase1,phase2,phase3_1,phase3_2,phase4,phase5,rate_override,team_member_id,team_member:team_members(id,name,fully_burdened_rate)&budget_id=in.(' + budgetIds.join(',') + ')');
+    var oopEntries = await sparkFetchAll('oop_budget_entries', 'select=id,budget_id,line_item_name,count,rate,days,head_count,adjusted_count,adjusted_rate,adjusted_days,adjusted_head_count,actual_amount,paid,is_active&budget_id=in.(' + budgetIds.join(',') + ')');
+
+    /* 3. Group entries by budget_id */
+    var laborByBudget = {}, oopByBudget = {};
+    for (var i = 0; i < (laborEntries || []).length; i++) {
+      var le = laborEntries[i];
+      if (!laborByBudget[le.budget_id]) laborByBudget[le.budget_id] = [];
+      laborByBudget[le.budget_id].push(le);
+    }
+    for (var i = 0; i < (oopEntries || []).length; i++) {
+      var oe = oopEntries[i];
+      if (!oopByBudget[oe.budget_id]) oopByBudget[oe.budget_id] = [];
+      oopByBudget[oe.budget_id].push(oe);
+    }
+
+    /* 4. Build SUPA_BUDGETS keyed by project_code */
+    SUPA_BUDGETS = {};
+    for (var i = 0; i < budgets.length; i++) {
+      var b = budgets[i];
+      var projCode = b.projects ? b.projects.project_code : null;
+      if (!projCode) continue;
+
+      b.labor = laborByBudget[b.id] || [];
+      b.oop = oopByBudget[b.id] || [];
+
+      /* Compute labor totals */
+      var laborHours = 0, laborCost = 0;
+      for (var k = 0; k < b.labor.length; k++) {
+        var le = b.labor[k];
+        var hrs = (le.phase1 || 0) + (le.phase2 || 0) + (le.phase3_1 || 0) + (le.phase3_2 || 0) + (le.phase4 || 0) + (le.phase5 || 0);
+        laborHours += hrs;
+        var rate = le.rate_override || (le.team_member ? le.team_member.fully_burdened_rate : 185) || 185;
+        laborCost += hrs * rate;
+      }
+      var laborCostMU = laborCost * (1 / 0.833); // markup to client-facing
+
+      /* Compute OOP totals: planned, effective (cascade), and spent (paid only) */
+      var oopPlanned = 0, oopEffective = 0, oopSpent = 0;
+      for (var k = 0; k < b.oop.length; k++) {
+        var oe = b.oop[k];
+        if (oe.is_active === false) continue;
+        /* Planned: always from planned fields */
+        oopPlanned += (oe.count || 0) * (oe.rate || 0) * (oe.days || 1) * (oe.head_count || 1);
+        /* Effective: cascade Actual → Adjusted → Planned */
+        var effVal;
+        if (oe.actual_amount != null) {
+          effVal = oe.actual_amount;
+        } else if (oe.adjusted_count != null || oe.adjusted_rate != null) {
+          effVal = (oe.adjusted_count != null ? oe.adjusted_count : (oe.count||0)) * (oe.adjusted_rate != null ? oe.adjusted_rate : (oe.rate||0)) * (oe.adjusted_days != null ? oe.adjusted_days : (oe.days||1)) * (oe.adjusted_head_count != null ? oe.adjusted_head_count : (oe.head_count||1));
+        } else {
+          effVal = (oe.count || 0) * (oe.rate || 0) * (oe.days || 1) * (oe.head_count || 1);
+        }
+        oopEffective += effVal;
+        /* Spent: only if Paid is checked */
+        if (oe.paid) oopSpent += effVal;
+      }
+
+      b.laborHours = laborHours;
+      b.laborTotal = laborCostMU;
+      b.laborCostInternal = laborCost;
+      b.oopTotal = oopPlanned;
+      b.oopEffective = oopEffective;
+      b.oopSpent = oopSpent;
+
+      SUPA_BUDGETS[projCode] = b;
+    }
+
+    /* 5. Fetch ALL labor_actuals (paginated) */
+    SUPA_ACTUALS_ALL = await sparkFetchAll('labor_actuals', 'select=id,hours,work_date,person_name,project_code,phase_key,is_billable,is_bizdev,is_timeoff,board_name&source=eq.timetracker&order=work_date.desc');
+
+    /* 6. Build SUPA_ACTUALS keyed by project_code */
+    SUPA_ACTUALS = {};
+    for (var i = 0; i < SUPA_ACTUALS_ALL.length; i++) {
+      var a = SUPA_ACTUALS_ALL[i];
+      var code = a.project_code;
+      if (!code) continue;
+      if (!SUPA_ACTUALS[code]) SUPA_ACTUALS[code] = { totalHours: 0, phases: {}, people: {}, byDate: {} };
+      var sa = SUPA_ACTUALS[code];
+      sa.totalHours += a.hours || 0;
+      if (a.phase_key) {
+        if (!sa.phases[a.phase_key]) sa.phases[a.phase_key] = 0;
+        sa.phases[a.phase_key] += a.hours || 0;
+      }
+      if (a.person_name) {
+        if (!sa.people[a.person_name]) sa.people[a.person_name] = 0;
+        sa.people[a.person_name] += a.hours || 0;
+      }
+      if (a.work_date) {
+        if (!sa.byDate[a.work_date]) sa.byDate[a.work_date] = 0;
+        sa.byDate[a.work_date] += a.hours || 0;
+      }
+    }
+
+    SUPA_LOADED = true;
+    console.log('Supabase data loaded:', Object.keys(SUPA_BUDGETS).length, 'budgets,', SUPA_ACTUALS_ALL.length, 'actuals');
+  } catch (err) {
+    console.error('Failed to load Supabase data:', err);
+  }
+}
+
+/* ── ENRICH PROJECTS WITH SUPABASE DATA ── */
+function enrichProjectsWithSupabase() {
+  if (!SUPA_LOADED) return;
+  for (var i = 0; i < CLIENTS.length; i++) {
+    for (var j = 0; j < CLIENTS[i].projects.length; j++) {
+      var p = CLIENTS[i].projects[j];
+      var sb = SUPA_BUDGETS[p.code];
+      if (sb) {
+        p._supabudget = sb;
+        p.dataSource = 'supabase';
+        p.dollarBudget = sb.client_price || 0;
+        p.laborCost = sb.laborTotal || 0;
+        p.oopCost = sb.oopTotal || 0;
+        p.profit = (sb.client_price || 0) - (sb.total_amount || 0);
+        p.profitMargin = sb.client_price > 0 ? ((p.profit / sb.client_price) * 100) : 0;
+        p.totalBudget = sb.laborHours || 0;
+      } else {
+        p._supabudget = null;
+        p.dataSource = 'needs_review';
+      }
+      var sa = SUPA_ACTUALS[p.code];
+      if (sa) {
+        p._supaactuals = sa;
+      }
+    }
+  }
+}
+
 /* ── DATA LOADER ── */
 async function loadData() {
   try {
@@ -4002,6 +4764,12 @@ async function loadData() {
 
     /* Check Spark connection status */
     await sparkCheckStatus();
+
+    /* Load Supabase data if connected */
+    if (sparkAuth.connected) {
+      await loadSupabaseData();
+      enrichProjectsWithSupabase();
+    }
 
     navigate('master');
   } catch(e) {
