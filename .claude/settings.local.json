@@ -44,7 +44,15 @@
       "Bash(git push:*)",
       "Bash(SUPABASE_URL=\"https://rhtwnbfyspdnotrvvbtx.supabase.co\" ANON_KEY=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJodHduYmZ5c3Bkbm90cnZ2YnR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYxMTk0MzAsImV4cCI6MjA4MTY5NTQzMH0.SdXQyOgDhUJbPYHGkt4X7WNvxLtCGZ_HG1mPHtoJeCg\" __NEW_LINE_3d55e14dff0b11c1__ curl -s \"$SUPABASE_URL/rest/v1/budgets?select=id,name,estimate_number,status,project_code,client_code,campaign_code,clients\\(name,client_number\\)&visibility=eq.visible&order=status.asc,updated_at.desc&limit=100\" -H \"apikey: $ANON_KEY\" -H \"Authorization: Bearer $ANON_KEY\")",
       "Bash(SUPABASE_URL=\"https://rhtwnbfyspdnotrvvbtx.supabase.co\" ANON_KEY=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJodHduYmZ5c3Bkbm90cnZ2YnR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYxMTk0MzAsImV4cCI6MjA4MTY5NTQzMH0.SdXQyOgDhUJbPYHGkt4X7WNvxLtCGZ_HG1mPHtoJeCg\" __NEW_LINE_43bb364eeef58644__ curl -s \"$SUPABASE_URL/rest/v1/oop_budget_entries?budget_id=eq.e686230d-710b-4bc7-89db-80853d039ae9&select=id,name,category_id,section_id,vendor_rate,rate_override,count,is_active,notes,category:oop_categories\\(id,name\\),section:oop_sections\\(id,name,slug\\)&order=display_order.asc&limit=20\" -H \"apikey: $ANON_KEY\" -H \"Authorization: Bearer $ANON_KEY\")",
-      "Bash(SUPABASE_URL=\"https://rhtwnbfyspdnotrvvbtx.supabase.co\" ANON_KEY=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJodHduYmZ5c3Bkbm90cnZ2YnR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYxMTk0MzAsImV4cCI6MjA4MTY5NTQzMH0.SdXQyOgDhUJbPYHGkt4X7WNvxLtCGZ_HG1mPHtoJeCg\" __NEW_LINE_05c7207443ecbeb5__ curl -s \"$SUPABASE_URL/rest/v1/oop_budget_entries?budget_id=eq.e686230d-710b-4bc7-89db-80853d039ae9&select=line_item_name,category:oop_categories\\(name\\),section:oop_sections\\(slug\\),vendor_rate,rate_override,count,is_active&order=section_id.asc,category_id.asc,display_order.asc\" -H \"apikey: $ANON_KEY\" -H \"Authorization: Bearer $ANON_KEY\")"
+      "Bash(SUPABASE_URL=\"https://rhtwnbfyspdnotrvvbtx.supabase.co\" ANON_KEY=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJodHduYmZ5c3Bkbm90cnZ2YnR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYxMTk0MzAsImV4cCI6MjA4MTY5NTQzMH0.SdXQyOgDhUJbPYHGkt4X7WNvxLtCGZ_HG1mPHtoJeCg\" __NEW_LINE_05c7207443ecbeb5__ curl -s \"$SUPABASE_URL/rest/v1/oop_budget_entries?budget_id=eq.e686230d-710b-4bc7-89db-80853d039ae9&select=line_item_name,category:oop_categories\\(name\\),section:oop_sections\\(slug\\),vendor_rate,rate_override,count,is_active&order=section_id.asc,category_id.asc,display_order.asc\" -H \"apikey: $ANON_KEY\" -H \"Authorization: Bearer $ANON_KEY\")",
+      "Bash(ls -la ~/Downloads/snapshot_*.xlsx ~/Downloads/*Snapshot*.xlsx)",
+      "Bash(ls -lt ~/Downloads/*.xlsx)",
+      "Bash(sleep 3 ls -lt /Users/anthonyliechti/Downloads/*.csv)",
+      "Bash(sleep 5 ls -lt /Users/anthonyliechti/Downloads/*.csv)",
+      "Bash(ls /Users/anthonyliechti/Downloads/*.csv)",
+      "Bash(sleep 30 ls /Users/anthonyliechti/Downloads/*.csv)",
+      "Bash(sleep 45 ls /Users/anthonyliechti/Downloads/*.csv)",
+      "Bash(pkill -f \"python3 -m http.server\")"
     ]
   }
 }
