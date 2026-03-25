@@ -2436,24 +2436,26 @@ async function importHandleFile(file) {
 
   prog.textContent = 'Parsed ' + entries.length + ' valid entries (skipped ' + skipped + ' empty). Checking for duplicates in Supabase...';
 
-  /* Build set of existing hashes from SUPA_ACTUALS_ALL for dedup */
-  var existingHashes = {};
-  if (SUPA_ACTUALS_ALL) {
-    for (var i = 0; i < SUPA_ACTUALS_ALL.length; i++) {
-      var a = SUPA_ACTUALS_ALL[i];
-      var eh = (a.person_name || '') + '|' + (a.board_name || '') + '|' + (a.work_date || '') + '|' + (a.item_name || '') + '|' + (a.hours || 0);
-      existingHashes[eh] = true;
-    }
-  }
+  /* Find date range in the file to query only relevant existing entries */
+  var fileDates = entries.map(function(e) { return e.work_date; }).filter(Boolean).sort();
+  var minDate = fileDates[0] || '2020-01-01';
+  var maxDate = fileDates[fileDates.length - 1] || '2030-12-31';
 
-  /* Also check by person + date + board + hours as a simpler dedup */
+  /* Fetch existing entries from Supabase for this date range — direct query, not cache */
+  prog.textContent = 'Fetching existing entries for ' + minDate + ' to ' + maxDate + '...';
+  var existing = await sparkFetchAll('labor_actuals',
+    'select=person_name,board_name,work_date,hours&source=eq.timetracker' +
+    '&work_date=gte.' + minDate + '&work_date=lte.' + maxDate +
+    '&order=work_date.asc');
+
+  prog.textContent = 'Found ' + existing.length + ' existing entries in date range. Deduplicating...';
+
+  /* Build hash set from Supabase data */
   var simpleHashes = {};
-  if (SUPA_ACTUALS_ALL) {
-    for (var i = 0; i < SUPA_ACTUALS_ALL.length; i++) {
-      var a = SUPA_ACTUALS_ALL[i];
-      var sh = (a.person_name || '') + '|' + (a.board_name || '') + '|' + (a.work_date || '') + '|' + (a.hours || 0);
-      simpleHashes[sh] = true;
-    }
+  for (var i = 0; i < existing.length; i++) {
+    var a = existing[i];
+    var sh = (a.person_name || '') + '|' + (a.board_name || '') + '|' + (a.work_date || '') + '|' + (a.hours || 0);
+    simpleHashes[sh] = true;
   }
 
   /* Filter out duplicates */
