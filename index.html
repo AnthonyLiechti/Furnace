@@ -2595,24 +2595,47 @@ async function importHandleFile(file) {
   }
   preview += '</div>';
 
-  preview += '<div style="margin-top:12px;display:flex;gap:8px">';
-  preview += '<button onclick="importExecute()" style="padding:8px 24px;border-radius:6px;border:none;background:var(--ocean);color:white;cursor:pointer;font-size:13px;font-weight:600">Import ' + newEntries.length + ' Entries</button>';
+  preview += '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">';
+  preview += '<button onclick="importExecute(false)" style="padding:8px 24px;border-radius:6px;border:none;background:var(--ocean);color:white;cursor:pointer;font-size:13px;font-weight:600">Import ' + newEntries.length + ' New Entries</button>';
+  preview += '<button onclick="importExecute(true)" style="padding:8px 24px;border-radius:6px;border:none;background:#F57F17;color:white;cursor:pointer;font-size:13px;font-weight:600" title="Deletes ALL existing timetracker data and replaces with this file">&#x1F504; Replace All Data</button>';
   preview += '<button onclick="importTimeState.status=\'idle\';renderImportTime()" style="padding:8px 16px;border-radius:6px;border:1px solid var(--canvas);background:transparent;color:var(--mid-gray);cursor:pointer;font-size:13px">Cancel</button>';
-  preview += '</div></div>';
+  preview += '</div>';
+  preview += '<div style="font-size:10px;color:var(--mid-gray);margin-top:6px">&#x1F504; <b>Replace All</b> wipes all existing timetracker entries and imports this file as the single source of truth.</div>';
+  preview += '</div>';
 
   statusEl.innerHTML = preview;
 
   /* Store parsed entries for the import button */
   importTimeState.parsed = newEntries;
+  importTimeState.allParsed = entries; /* Full set (pre-dedup) for Replace All */
   importTimeState.status = 'preview';
 }
 
-async function importExecute() {
+async function importExecute(replaceAll) {
   var entries = importTimeState.parsed;
   if (!entries || entries.length === 0) return;
 
+  if (replaceAll) {
+    if (!confirm('This will DELETE ALL existing timetracker entries and replace with the ' + entries.length + ' entries from this file.\n\nThis cannot be undone. Continue?')) return;
+    /* Use the full parsed file (not just new entries) — reimport everything */
+    entries = importTimeState.allParsed || entries;
+  }
+
   var statusEl = document.getElementById('importStatus');
-  statusEl.innerHTML = '<div style="background:#E3F2FD;border-radius:8px;padding:16px;margin-bottom:12px"><div style="font-weight:600;color:#1565C0;margin-bottom:4px">&#9203; Importing...</div><div style="font-size:12px;color:#1565C0" id="importProgress">0 / ' + entries.length + '</div><div style="background:var(--canvas);border-radius:4px;height:6px;margin-top:8px"><div id="importBar" style="background:var(--ocean);height:100%;border-radius:4px;width:0%;transition:width .3s"></div></div></div>';
+  var actionLabel = replaceAll ? 'Replacing all data' : 'Importing';
+  statusEl.innerHTML = '<div style="background:#E3F2FD;border-radius:8px;padding:16px;margin-bottom:12px"><div style="font-weight:600;color:#1565C0;margin-bottom:4px">&#9203; ' + actionLabel + '...</div><div style="font-size:12px;color:#1565C0" id="importProgress">0 / ' + entries.length + '</div><div style="background:var(--canvas);border-radius:4px;height:6px;margin-top:8px"><div id="importBar" style="background:' + (replaceAll ? '#F57F17' : 'var(--ocean)') + ';height:100%;border-radius:4px;width:0%;transition:width .3s"></div></div></div>';
+
+  /* If replaceAll, delete all existing timetracker entries first */
+  if (replaceAll) {
+    var prog = document.getElementById('importProgress');
+    if (prog) prog.textContent = 'Deleting old entries...';
+    try {
+      await sparkFetch('labor_actuals?source=eq.timetracker', '', 'DELETE');
+    } catch(e) { console.warn('Delete error (may be fine):', e); }
+    /* Clear local cache */
+    SUPA_ACTUALS_ALL = [];
+    SUPA_ACTUALS = {};
+  }
 
   var prog = document.getElementById('importProgress');
   var bar = document.getElementById('importBar');
@@ -3064,6 +3087,24 @@ async function sparkCreateBudgetForProject(projectCode) {
     });
     if (!newBudget || !newBudget[0]) throw new Error('Failed to create budget');
     var budgetId = newBudget[0].id;
+
+    /* 2b. Pre-fill all active team members with 0 hours */
+    var allTeam = await sparkFetch('team_members', 'select=id,name,department,employment_type&is_active=eq.true&order=name.asc');
+    if (allTeam && allTeam.length) {
+      var laborBatch = [];
+      for (var ti = 0; ti < allTeam.length; ti++) {
+        var tm = allTeam[ti];
+        var dept = tm.department;
+        if (dept && dept !== 'Executive/Admin' && dept !== 'Account' && dept !== 'Creative' && dept !== 'Post') dept = null;
+        laborBatch.push({
+          budget_id: budgetId, team_member_id: tm.id, department: dept,
+          employment_type: tm.employment_type || 'Employee',
+          phase1: 0, phase2: 0, phase3_1: 0, phase3_2: 0, phase4: 0, phase5: 0,
+          display_order: ti
+        });
+      }
+      await sparkFetch('labor_budget_entries', '', 'POST', laborBatch);
+    }
 
     /* 3. Create default OOP entries from categories template */
     var oopSections = await sparkFetch('oop_sections', 'select=id,slug');
