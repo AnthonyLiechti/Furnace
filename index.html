@@ -6542,8 +6542,10 @@ function enrichProjectsWithSupabase() {
         p.dataSource = 'supabase';
         p.dollarBudget = sb.client_price || 0;
         p.laborCost = sb.laborTotal || 0;
-        p.oopCost = sb.oopTotal || 0;
-        p.profit = (sb.client_price || 0) - (sb.total_amount || 0);
+        p.oopCost = sb.oopEffective || sb.oopTotal || 0;
+        /* Compute profit from live labor + OOP data, not stale total_amount */
+        var computedTotal = (sb.laborTotal || 0) + (sb.oopEffective || sb.oopTotal || 0);
+        p.profit = (sb.client_price || 0) - computedTotal;
         p.profitMargin = sb.client_price > 0 ? ((p.profit / sb.client_price) * 100) : 0;
         p.totalBudget = sb.laborHours || 0;
       } else {
