@@ -1061,6 +1061,28 @@ function computeCascade(project) {
 }
 
 /* ── AGGREGATE HELPERS ── */
+/* Lazy-load actuals for a specific project if not in cache (covers pre-2025 data) */
+var _lazyLoadedProjects = {};
+async function ensureProjectActuals(projCode) {
+  if (!SUPA_LOADED || !sparkAuth.connected) return;
+  if (SUPA_ACTUALS[projCode] || _lazyLoadedProjects[projCode]) return;
+  _lazyLoadedProjects[projCode] = true;
+  /* Fetch ALL actuals for this project (no date filter) */
+  var entries = await sparkFetchAll('labor_actuals',
+    'select=id,hours,work_date,person_name,project_code,phase_key,is_billable,is_bizdev,is_timeoff,board_name&source=eq.timetracker&project_code=eq.' + projCode + '&order=work_date.desc');
+  if (entries && entries.length > 0) {
+    if (!SUPA_ACTUALS[projCode]) SUPA_ACTUALS[projCode] = { totalHours: 0, phases: {}, people: {}, byDate: {} };
+    var sa = SUPA_ACTUALS[projCode];
+    for (var i = 0; i < entries.length; i++) {
+      var a = entries[i];
+      sa.totalHours += a.hours || 0;
+      if (a.phase_key) sa.phases[a.phase_key] = (sa.phases[a.phase_key] || 0) + (a.hours || 0);
+      if (a.person_name) sa.people[a.person_name] = (sa.people[a.person_name] || 0) + (a.hours || 0);
+    }
+    SUPA_ACTUALS_ALL = (SUPA_ACTUALS_ALL || []).concat(entries);
+  }
+}
+
 function projectSpent(proj) {
   /* Prefer Supabase actuals if loaded */
   if (SUPA_LOADED && SUPA_ACTUALS[proj.code]) {
@@ -1649,6 +1671,8 @@ function renderClient(clientId) {
 function renderProject(projectId) {
   var p = projectById(projectId);
   if (!p) return;
+  /* Lazy-load actuals for this project if not already in cache */
+  ensureProjectActuals(p.code);
   var cascaded = computeCascade(p);
   var spent = filteredProjectSpent(p);
   var prog = pct(spent, p.totalBudget);
@@ -6009,12 +6033,9 @@ async function loadSupabaseData() {
       SUPA_BUDGETS[projCode] = b;
     }
 
-    /* 5. Fetch ALL labor_actuals (paginated) */
-    /* Only fetch current fiscal year actuals for performance (last 12 months) */
-    var cutoffDate = new Date();
-    cutoffDate.setFullYear(cutoffDate.getFullYear() - 1);
-    var cutoff = cutoffDate.toISOString().slice(0, 10);
-    SUPA_ACTUALS_ALL = await sparkFetchAll('labor_actuals', 'select=id,hours,work_date,person_name,project_code,phase_key,is_billable,is_bizdev,is_timeoff,board_name&source=eq.timetracker&work_date=gte.' + cutoff + '&order=work_date.desc');
+    /* 5. Fetch labor_actuals — only 2025+ for fast initial load */
+    /* Older data and finished project data loaded on-demand when needed */
+    SUPA_ACTUALS_ALL = await sparkFetchAll('labor_actuals', 'select=id,hours,work_date,person_name,project_code,phase_key,is_billable,is_bizdev,is_timeoff,board_name&source=eq.timetracker&work_date=gte.2025-01-01&order=work_date.desc');
 
     /* 6. Build SUPA_ACTUALS keyed by project_code */
     SUPA_ACTUALS = {};
