@@ -1863,7 +1863,8 @@ function renderProject(projectId) {
     var hasDisc = sb.has_discount || false;
     var discAmt = hasDisc ? rawPrice * 0.035 : 0;
     var tcvPrice = rawPrice - discAmt;
-    var profitVal = tcvPrice - (sb.total_amount || 0);
+    var computedCosts = (sb.laborTotal || 0) + (sb.oopEffective || sb.oopTotal || 0);
+    var profitVal = tcvPrice - computedCosts;
     var profitPctVal = tcvPrice > 0 ? ((profitVal / tcvPrice) * 100).toFixed(1) : 0;
 
     /* OOP metrics */
