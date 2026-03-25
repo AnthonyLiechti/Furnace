@@ -2569,18 +2569,22 @@ async function importExecute() {
   var icon = errors === 0 ? '&#10003;' : '&#9888;';
   var bg = errors === 0 ? '#E8F5E9' : '#FFF8E1';
   var color = errors === 0 ? '#2E7D32' : '#F57F17';
-  statusEl.innerHTML = '<div style="background:' + bg + ';border-radius:8px;padding:16px;margin-bottom:12px"><div style="font-weight:600;color:' + color + ';margin-bottom:4px">' + icon + ' Import Complete</div><div style="font-size:12px;color:' + color + '">' + imported + ' entries imported' + (errors > 0 ? ', ' + errors + ' errors' : '') + '. Refreshing data...</div></div>';
+  statusEl.innerHTML = '<div style="background:' + bg + ';border-radius:8px;padding:16px;margin-bottom:12px"><div style="font-weight:600;color:' + color + ';margin-bottom:4px">' + icon + ' Import Complete</div><div style="font-size:12px;color:' + color + '">' + imported + ' entries imported' + (errors > 0 ? ', ' + errors + ' errors' : '') + '.</div></div>';
 
-  /* Reload actuals from Supabase */
   importTimeState.status = 'done';
   importTimeState.parsed = null;
 
-  /* Refresh SUPA_ACTUALS_ALL */
-  if (typeof loadSupabaseData === 'function') {
-    await loadSupabaseData();
-    enrichProjectsWithSupabase();
+  /* Add the imported entries to the local cache so dedup works on next upload without full reload */
+  if (SUPA_ACTUALS_ALL && entries) {
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      SUPA_ACTUALS_ALL.push({
+        person_name: e.person_name, board_name: e.board_name,
+        work_date: e.work_date, hours: e.hours,
+        project_code: e.project_code, is_billable: e.is_billable
+      });
+    }
   }
-  renderImportTime();
 }
 
 /* ── RENDER: COMPLETED ── */
@@ -6004,7 +6008,11 @@ async function loadSupabaseData() {
     }
 
     /* 5. Fetch ALL labor_actuals (paginated) */
-    SUPA_ACTUALS_ALL = await sparkFetchAll('labor_actuals', 'select=id,hours,work_date,person_name,project_code,phase_key,is_billable,is_bizdev,is_timeoff,board_name&source=eq.timetracker&order=work_date.desc');
+    /* Only fetch current fiscal year actuals for performance (last 12 months) */
+    var cutoffDate = new Date();
+    cutoffDate.setFullYear(cutoffDate.getFullYear() - 1);
+    var cutoff = cutoffDate.toISOString().slice(0, 10);
+    SUPA_ACTUALS_ALL = await sparkFetchAll('labor_actuals', 'select=id,hours,work_date,person_name,project_code,phase_key,is_billable,is_bizdev,is_timeoff,board_name&source=eq.timetracker&work_date=gte.' + cutoff + '&order=work_date.desc');
 
     /* 6. Build SUPA_ACTUALS keyed by project_code */
     SUPA_ACTUALS = {};
