@@ -295,6 +295,222 @@
       ]
     },
     {
+      "id": "small-accounts",
+      "name": "Small Accounts",
+      "code": "300",
+      "color": "#8D6E63",
+      "status": "active",
+      "projects": [
+        {
+          "id": "oc-sports-awards",
+          "name": "OC Sports Awards",
+          "code": "380_06_01",
+          "totalBudget": 0,
+          "hasBudgetData": true,
+          "dataSource": "snapshot",
+          "hourType": "ops",
+          "phases": [
+            {
+              "name": "Event",
+              "planned": 0,
+              "spent": 185.92,
+              "status": "completed"
+            }
+          ],
+          "dollarBudget": 0,
+          "laborCost": 0,
+          "oopCost": 0,
+          "projectType": "bizdev"
+        },
+        {
+          "id": "101-videos",
+          "name": "101 Videos (Stephens & CC)",
+          "code": "381_06_01",
+          "totalBudget": 198,
+          "hasBudgetData": true,
+          "dataSource": "snapshot",
+          "phases": [
+            {
+              "name": "P1 \u2014 Initiation",
+              "planned": 9,
+              "spent": 0,
+              "status": "complete"
+            },
+            {
+              "name": "P3.1 \u2014 Design",
+              "planned": 41,
+              "spent": 24,
+              "status": "complete"
+            },
+            {
+              "name": "P3.2 \u2014 Production",
+              "planned": 73,
+              "spent": 44,
+              "status": "complete"
+            },
+            {
+              "name": "P4 \u2014 Execution",
+              "planned": 70,
+              "spent": 70,
+              "status": "active"
+            },
+            {
+              "name": "P5 \u2014 Resolution",
+              "planned": 5,
+              "spent": 0,
+              "status": "future"
+            }
+          ],
+          "dollarBudget": 48250,
+          "laborCost": 24475,
+          "oopCost": 14780,
+          "totalPrice": 39255,
+          "profit": 8994,
+          "profitMargin": 18.64,
+          "status": "active",
+          "snapshotUrl": "https://docs.google.com/spreadsheets/d/1_zMAkfryfjSyJcxINCHTk3QKtobD0hiJyTKTjzzTqaE/edit"
+        },
+        {
+          "id": "ultrasound-queen",
+          "name": "Ultrasound Queen",
+          "code": "388_01_01",
+          "totalBudget": 0,
+          "hasBudgetData": true,
+          "dataSource": "snapshot",
+          "dollarBudget": 0,
+          "laborCost": 0,
+          "oopCost": 0,
+          "projectType": "bizdev",
+          "phases": [
+            {
+              "name": "Active",
+              "planned": 0,
+              "spent": 52.0,
+              "status": "complete"
+            }
+          ],
+          "status": "finished"
+        },
+        {
+          "id": "natural-high",
+          "name": "Natural High - Brian Welch Shoot",
+          "code": "387_01_01",
+          "totalBudget": 0,
+          "hasBudgetData": true,
+          "dataSource": "snapshot",
+          "dollarBudget": 0,
+          "laborCost": 0,
+          "oopCost": 0,
+          "projectType": "bizdev",
+          "phases": [
+            {
+              "name": "Active",
+              "planned": 0,
+              "spent": 46.2,
+              "status": "complete"
+            }
+          ],
+          "status": "finished"
+        },
+        {
+          "id": "occf-vision-2030",
+          "name": "OCCF Vision 2030 Explainer Video",
+          "code": "384_01_01",
+          "totalBudget": 14,
+          "hasBudgetData": true,
+          "dataSource": "snapshot",
+          "dollarBudget": 10000,
+          "laborCost": 9026,
+          "oopCost": 8023,
+          "totalPrice": 17049,
+          "profit": -7049,
+          "profitMargin": -70.49,
+          "phases": [
+            {
+              "name": "P1 \u2014 Initiation",
+              "planned": 2,
+              "spent": 3,
+              "status": "complete"
+            },
+            {
+              "name": "P2 \u2014 Concepting",
+              "planned": 2,
+              "spent": 7,
+              "status": "complete"
+            },
+            {
+              "name": "P3.1 \u2014 Design",
+              "planned": 5,
+              "spent": 0,
+              "status": "complete"
+            },
+            {
+              "name": "P3.2 \u2014 Production",
+              "planned": 5,
+              "spent": 0,
+              "status": "complete"
+            },
+            {
+              "name": "P4 \u2014 Execution",
+              "planned": 0,
+              "spent": 35,
+              "status": "complete"
+            },
+            {
+              "name": "P5 \u2014 Resolution",
+              "planned": 0,
+              "spent": 0,
+              "status": "complete"
+            }
+          ],
+          "status": "finished",
+          "snapshotUrl": "https://docs.google.com/spreadsheets/d/1Bfk_vTFreGtEja7oesxTxSgPL_Y1Uu_uB-4PGdie4Ck/edit"
+        },
+        {
+          "id": "abacus-life",
+          "name": "Abacus Life",
+          "code": "900_00_00_A033",
+          "totalBudget": 0,
+          "hasBudgetData": true,
+          "dataSource": "snapshot",
+          "dollarBudget": 0,
+          "laborCost": 0,
+          "oopCost": 0,
+          "projectType": "bizdev",
+          "phases": [
+            {
+              "name": "Active",
+              "planned": 0,
+              "spent": 7.2,
+              "status": "complete"
+            }
+          ],
+          "status": "finished"
+        },
+        {
+          "id": "cigna-shoot",
+          "name": "4MEDIA Cigna Shoot",
+          "code": "365_07_01",
+          "totalBudget": 0,
+          "hasBudgetData": true,
+          "dataSource": "snapshot",
+          "dollarBudget": 0,
+          "laborCost": 0,
+          "oopCost": 0,
+          "projectType": "bizdev",
+          "phases": [
+            {
+              "name": "Active",
+              "planned": 0,
+              "spent": 4.8,
+              "status": "complete"
+            }
+          ],
+          "status": "finished"
+        }
+      ]
+    },
+    {
       "id": "carecredit-dtc",
       "name": "CareCredit \u2014 DTC",
       "code": "320",
@@ -2708,7 +2924,7 @@
           "notes": "Small projects container for Peak Pro. Sub-project numbers: 334_20_01_XXX (Sean Ruehl), 334_20_02_XXX (Kevin Saia)"
         }
       ],
-      "status": "active"
+      "status": "inactive"
     },
     {
       "id": "irvine-co",
@@ -4728,6 +4944,42 @@
       "status": "active"
     },
     {
+      "id": "ehs",
+      "name": "EHS",
+      "code": "359",
+      "color": "#5B7065",
+      "status": "inactive",
+      "projects": [
+        {
+          "id": "ehs-bizdev",
+          "name": "Business Development",
+          "code": "359_00_00",
+          "totalBudget": 0,
+          "hasBudgetData": true,
+          "dataSource": "snapshot",
+          "projectType": "bizdev",
+          "dollarBudget": 0,
+          "laborCost": 18240.0,
+          "phases": [
+            {
+              "name": "Business Development",
+              "planned": 0,
+              "spent": 91.2,
+              "status": "active"
+            }
+          ],
+          "snapshot": {
+            "people": [
+              {
+                "name": "Matthew Givot",
+                "hours": 91.2
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": "allied",
       "name": "Allied Universal",
       "code": "367",
@@ -5370,6 +5622,82 @@
       "status": "active"
     },
     {
+      "id": "well-connected",
+      "name": "Well Connected",
+      "code": "385",
+      "color": "#df2f4a",
+      "projects": [
+        {
+          "id": "wc-website",
+          "name": "Well Connected Website",
+          "code": "385_01_01",
+          "boardId": 18394785496,
+          "totalBudget": 93.0,
+          "hasBudgetData": true,
+          "phases": [
+            {
+              "name": "P1 \u2014 Initiation",
+              "planned": 3.0,
+              "spent": 0,
+              "status": "na",
+              "plannedCost": 701
+            },
+            {
+              "name": "P3.1 \u2014 Design",
+              "planned": 0,
+              "spent": 1.0,
+              "status": "active"
+            },
+            {
+              "name": "P4 \u2014 Development",
+              "planned": 0,
+              "spent": 0,
+              "status": "active"
+            },
+            {
+              "name": "P5 \u2014 Resolution",
+              "planned": 0,
+              "spent": 1.5,
+              "status": "future"
+            }
+          ],
+          "hourType": "bizdev",
+          "projectNumber": "385_01_01",
+          "status": "active",
+          "snapshotUrl": "https://docs.google.com/spreadsheets/d/1HBb0UctLuNBWNhMt8-GWTbZfsXRkrn_HAMUPD5w1rmc/edit",
+          "laborCost": 24048.0,
+          "oopCost": 11000.0,
+          "totalPrice": 35048.0,
+          "snapshotTotalHours": 93.0,
+          "profit": -15048.0,
+          "profitMargin": -75.2,
+          "dataSource": "snapshot",
+          "dollarBudget": 20000.0
+        },
+        {
+          "id": "wc-pr",
+          "name": "Dr. Hoefer PR",
+          "code": "385_02_01",
+          "boardId": 9262861098,
+          "totalBudget": 0,
+          "hasBudgetData": false,
+          "phases": [
+            {
+              "name": "Active",
+              "planned": 0,
+              "spent": 209.08,
+              "status": "active"
+            }
+          ],
+          "projectNumber": "385_02_01",
+          "hourType": "bizdev",
+          "status": "finished",
+          "dataSource": "no_snapshot"
+        }
+      ],
+      "status": "active"
+    },
+    {
       "id": "synchrony",
       "name": "Synchrony",
       "code": "386",
@@ -5966,334 +6294,6 @@
         }
       ],
       "status": "active"
-    },
-    {
-      "id": "well-connected",
-      "name": "Well Connected",
-      "code": "385",
-      "color": "#df2f4a",
-      "projects": [
-        {
-          "id": "wc-website",
-          "name": "Well Connected Website",
-          "code": "385_01_01",
-          "boardId": 18394785496,
-          "totalBudget": 93.0,
-          "hasBudgetData": true,
-          "phases": [
-            {
-              "name": "P1 \u2014 Initiation",
-              "planned": 3.0,
-              "spent": 0,
-              "status": "na",
-              "plannedCost": 701
-            },
-            {
-              "name": "P3.1 \u2014 Design",
-              "planned": 0,
-              "spent": 1.0,
-              "status": "active"
-            },
-            {
-              "name": "P4 \u2014 Development",
-              "planned": 0,
-              "spent": 0,
-              "status": "active"
-            },
-            {
-              "name": "P5 \u2014 Resolution",
-              "planned": 0,
-              "spent": 1.5,
-              "status": "future"
-            }
-          ],
-          "hourType": "bizdev",
-          "projectNumber": "385_01_01",
-          "status": "active",
-          "snapshotUrl": "https://docs.google.com/spreadsheets/d/1HBb0UctLuNBWNhMt8-GWTbZfsXRkrn_HAMUPD5w1rmc/edit",
-          "laborCost": 24048.0,
-          "oopCost": 11000.0,
-          "totalPrice": 35048.0,
-          "snapshotTotalHours": 93.0,
-          "profit": -15048.0,
-          "profitMargin": -75.2,
-          "dataSource": "snapshot",
-          "dollarBudget": 20000.0
-        },
-        {
-          "id": "wc-pr",
-          "name": "Dr. Hoefer PR",
-          "code": "385_02_01",
-          "boardId": 9262861098,
-          "totalBudget": 0,
-          "hasBudgetData": false,
-          "phases": [
-            {
-              "name": "Active",
-              "planned": 0,
-              "spent": 209.08,
-              "status": "active"
-            }
-          ],
-          "projectNumber": "385_02_01",
-          "hourType": "bizdev",
-          "status": "finished",
-          "dataSource": "no_snapshot"
-        }
-      ],
-      "status": "active"
-    },
-    {
-      "id": "ehs",
-      "name": "EHS",
-      "code": "359",
-      "color": "#5B7065",
-      "status": "inactive",
-      "projects": [
-        {
-          "id": "ehs-bizdev",
-          "name": "Business Development",
-          "code": "359_00_00",
-          "totalBudget": 0,
-          "hasBudgetData": true,
-          "dataSource": "snapshot",
-          "projectType": "bizdev",
-          "dollarBudget": 0,
-          "laborCost": 18240.0,
-          "phases": [
-            {
-              "name": "Business Development",
-              "planned": 0,
-              "spent": 91.2,
-              "status": "active"
-            }
-          ],
-          "snapshot": {
-            "people": [
-              {
-                "name": "Matthew Givot",
-                "hours": 91.2
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "id": "small-accounts",
-      "name": "Small Accounts",
-      "code": "300",
-      "color": "#8D6E63",
-      "status": "active",
-      "projects": [
-        {
-          "id": "oc-sports-awards",
-          "name": "OC Sports Awards",
-          "code": "380_06_01",
-          "totalBudget": 0,
-          "hasBudgetData": true,
-          "dataSource": "snapshot",
-          "hourType": "ops",
-          "phases": [
-            {
-              "name": "Event",
-              "planned": 0,
-              "spent": 185.92,
-              "status": "completed"
-            }
-          ],
-          "dollarBudget": 0,
-          "laborCost": 0,
-          "oopCost": 0,
-          "projectType": "bizdev"
-        },
-        {
-          "id": "101-videos",
-          "name": "101 Videos (Stephens & CC)",
-          "code": "381_06_01",
-          "totalBudget": 198,
-          "hasBudgetData": true,
-          "dataSource": "snapshot",
-          "phases": [
-            {
-              "name": "P1 \u2014 Initiation",
-              "planned": 9,
-              "spent": 0,
-              "status": "complete"
-            },
-            {
-              "name": "P3.1 \u2014 Design",
-              "planned": 41,
-              "spent": 24,
-              "status": "complete"
-            },
-            {
-              "name": "P3.2 \u2014 Production",
-              "planned": 73,
-              "spent": 44,
-              "status": "complete"
-            },
-            {
-              "name": "P4 \u2014 Execution",
-              "planned": 70,
-              "spent": 70,
-              "status": "active"
-            },
-            {
-              "name": "P5 \u2014 Resolution",
-              "planned": 5,
-              "spent": 0,
-              "status": "future"
-            }
-          ],
-          "dollarBudget": 48250,
-          "laborCost": 24475,
-          "oopCost": 14780,
-          "totalPrice": 39255,
-          "profit": 8994,
-          "profitMargin": 18.64,
-          "status": "active",
-          "snapshotUrl": "https://docs.google.com/spreadsheets/d/1_zMAkfryfjSyJcxINCHTk3QKtobD0hiJyTKTjzzTqaE/edit"
-        },
-        {
-          "id": "ultrasound-queen",
-          "name": "Ultrasound Queen",
-          "code": "388_01_01",
-          "totalBudget": 0,
-          "hasBudgetData": true,
-          "dataSource": "snapshot",
-          "dollarBudget": 0,
-          "laborCost": 0,
-          "oopCost": 0,
-          "projectType": "bizdev",
-          "phases": [
-            {
-              "name": "Active",
-              "planned": 0,
-              "spent": 52.0,
-              "status": "complete"
-            }
-          ],
-          "status": "finished"
-        },
-        {
-          "id": "natural-high",
-          "name": "Natural High - Brian Welch Shoot",
-          "code": "387_01_01",
-          "totalBudget": 0,
-          "hasBudgetData": true,
-          "dataSource": "snapshot",
-          "dollarBudget": 0,
-          "laborCost": 0,
-          "oopCost": 0,
-          "projectType": "bizdev",
-          "phases": [
-            {
-              "name": "Active",
-              "planned": 0,
-              "spent": 46.2,
-              "status": "complete"
-            }
-          ],
-          "status": "finished"
-        },
-        {
-          "id": "occf-vision-2030",
-          "name": "OCCF Vision 2030 Explainer Video",
-          "code": "384_01_01",
-          "totalBudget": 14,
-          "hasBudgetData": true,
-          "dataSource": "snapshot",
-          "dollarBudget": 10000,
-          "laborCost": 9026,
-          "oopCost": 8023,
-          "totalPrice": 17049,
-          "profit": -7049,
-          "profitMargin": -70.49,
-          "phases": [
-            {
-              "name": "P1 \u2014 Initiation",
-              "planned": 2,
-              "spent": 3,
-              "status": "complete"
-            },
-            {
-              "name": "P2 \u2014 Concepting",
-              "planned": 2,
-              "spent": 7,
-              "status": "complete"
-            },
-            {
-              "name": "P3.1 \u2014 Design",
-              "planned": 5,
-              "spent": 0,
-              "status": "complete"
-            },
-            {
-              "name": "P3.2 \u2014 Production",
-              "planned": 5,
-              "spent": 0,
-              "status": "complete"
-            },
-            {
-              "name": "P4 \u2014 Execution",
-              "planned": 0,
-              "spent": 35,
-              "status": "complete"
-            },
-            {
-              "name": "P5 \u2014 Resolution",
-              "planned": 0,
-              "spent": 0,
-              "status": "complete"
-            }
-          ],
-          "status": "finished",
-          "snapshotUrl": "https://docs.google.com/spreadsheets/d/1Bfk_vTFreGtEja7oesxTxSgPL_Y1Uu_uB-4PGdie4Ck/edit"
-        },
-        {
-          "id": "abacus-life",
-          "name": "Abacus Life",
-          "code": "900_00_00_A033",
-          "totalBudget": 0,
-          "hasBudgetData": true,
-          "dataSource": "snapshot",
-          "dollarBudget": 0,
-          "laborCost": 0,
-          "oopCost": 0,
-          "projectType": "bizdev",
-          "phases": [
-            {
-              "name": "Active",
-              "planned": 0,
-              "spent": 7.2,
-              "status": "complete"
-            }
-          ],
-          "status": "finished"
-        },
-        {
-          "id": "cigna-shoot",
-          "name": "4MEDIA Cigna Shoot",
-          "code": "365_07_01",
-          "totalBudget": 0,
-          "hasBudgetData": true,
-          "dataSource": "snapshot",
-          "dollarBudget": 0,
-          "laborCost": 0,
-          "oopCost": 0,
-          "projectType": "bizdev",
-          "phases": [
-            {
-              "name": "Active",
-              "planned": 0,
-              "spent": 4.8,
-              "status": "complete"
-            }
-          ],
-          "status": "finished"
-        }
-      ]
     }
   ],
   "flaggedNoStructure": [
