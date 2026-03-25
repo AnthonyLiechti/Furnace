@@ -4939,6 +4939,20 @@
           "profitMargin": 0,
           "dataSource": "snapshot",
           "dollarBudget": 0.0
+        },
+        {
+          "id": "wq-campaign-2026",
+          "code": "358_17_03",
+          "name": "Water Quality Campaign 2026",
+          "status": "active",
+          "projectType": "billable",
+          "dataSource": "supabase",
+          "phases": [],
+          "dollarBudget": 0,
+          "totalBudget": 0,
+          "laborCost": 0,
+          "oopCost": 0,
+          "profit": 0
         }
       ],
       "status": "active"
