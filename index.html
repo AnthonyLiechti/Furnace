@@ -2626,10 +2626,15 @@ function renderCompleted() {
 var sparkAuth = { connected: false, email: null };
 
 async function sparkCheckStatus() {
-  if (!window.furnaceAPI || !window.furnaceAPI.sparkGetStatus) return;
-  var status = await window.furnaceAPI.sparkGetStatus();
-  sparkAuth.connected = status.connected;
-  sparkAuth.email = status.email || null;
+  if (window.furnaceAPI && window.furnaceAPI.sparkGetStatus) {
+    var status = await window.furnaceAPI.sparkGetStatus();
+    sparkAuth.connected = status.connected;
+    sparkAuth.email = status.email || null;
+  } else {
+    /* Browser fallback */
+    sparkAuth.connected = sparkBrowserIsConnected();
+    sparkAuth.email = sparkBrowserEmail();
+  }
 }
 
 async function sparkLogin() {
@@ -2641,11 +2646,21 @@ async function sparkLogin() {
   btn.disabled = true;
   btn.textContent = 'Connecting…';
   msg.textContent = '';
-  var result = await window.furnaceAPI.sparkLogin(email, pw);
+  var result;
+  if (window.furnaceAPI && window.furnaceAPI.sparkLogin) {
+    result = await window.furnaceAPI.sparkLogin(email, pw);
+  } else {
+    result = await sparkBrowserLogin(email, pw);
+  }
   if (result.ok) {
     sparkAuth.connected = true;
     sparkAuth.email = result.email;
     renderSettings();
+    /* Reload data now that we're connected */
+    if (typeof loadSupabaseData === 'function') {
+      await loadSupabaseData();
+      enrichProjectsWithSupabase();
+    }
   } else {
     msg.textContent = result.error || 'Login failed';
     msg.style.color = 'var(--ember)';
@@ -2655,19 +2670,110 @@ async function sparkLogin() {
 }
 
 async function sparkLogout() {
-  await window.furnaceAPI.sparkLogout();
+  if (window.furnaceAPI && window.furnaceAPI.sparkLogout) {
+    await window.furnaceAPI.sparkLogout();
+  } else {
+    sparkBrowserLogout();
+  }
   sparkAuth.connected = false;
   sparkAuth.email = null;
+  sparkConfig = null;
   renderSettings();
 }
 
 /* ── SPARK FETCH HELPER ── */
 var sparkConfig = null;
 
+/* ── BROWSER AUTH FALLBACK (for Vercel / non-Electron) ── */
+async function sparkBrowserGetToken() {
+  var stored = localStorage.getItem('furnace_auth');
+  if (!stored) return null;
+  try {
+    var auth = JSON.parse(stored);
+    /* Check expiry */
+    if (Date.now() >= auth.expires_at) {
+      /* Refresh */
+      var config = sparkConfig || { supabaseUrl: 'https://jnwdscddyqujjikesdpb.supabase.co', supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impud2RzY2RkeXF1amppa2VzZHBiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyODgxOTEsImV4cCI6MjA4OTg2NDE5MX0.EQueTlfX30ULmpLDF7ijSv0xR0_baAT2kPjYoK_RnpA' };
+      var resp = await fetch(config.supabaseUrl + '/auth/v1/token?grant_type=refresh_token', {
+        method: 'POST',
+        headers: { 'apikey': config.supabaseAnonKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: auth.refresh_token })
+      });
+      if (resp.ok) {
+        var data = await resp.json();
+        auth.access_token = data.access_token;
+        auth.refresh_token = data.refresh_token;
+        auth.expires_at = Date.now() + (data.expires_in * 1000) - 60000;
+        localStorage.setItem('furnace_auth', JSON.stringify(auth));
+        return auth.access_token;
+      } else {
+        localStorage.removeItem('furnace_auth');
+        return null;
+      }
+    }
+    return auth.access_token;
+  } catch (e) { return null; }
+}
+
+async function sparkBrowserLogin(email, password) {
+  var config = sparkConfig || { supabaseUrl: 'https://jnwdscddyqujjikesdpb.supabase.co', supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impud2RzY2RkeXF1amppa2VzZHBiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyODgxOTEsImV4cCI6MjA4OTg2NDE5MX0.EQueTlfX30ULmpLDF7ijSv0xR0_baAT2kPjYoK_RnpA' };
+  var resp = await fetch(config.supabaseUrl + '/auth/v1/token?grant_type=password', {
+    method: 'POST',
+    headers: { 'apikey': config.supabaseAnonKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email, password: password })
+  });
+  if (resp.ok) {
+    var data = await resp.json();
+    localStorage.setItem('furnace_auth', JSON.stringify({
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      expires_at: Date.now() + (data.expires_in * 1000) - 60000,
+      user_email: data.user ? data.user.email : email
+    }));
+    return { ok: true, email: data.user ? data.user.email : email };
+  } else {
+    var err = await resp.json();
+    return { ok: false, error: err.error_description || err.msg || 'Login failed' };
+  }
+}
+
+function sparkBrowserLogout() {
+  localStorage.removeItem('furnace_auth');
+}
+
+function sparkBrowserIsConnected() {
+  var stored = localStorage.getItem('furnace_auth');
+  if (!stored) return false;
+  try { return JSON.parse(stored).access_token ? true : false; } catch(e) { return false; }
+}
+
+function sparkBrowserEmail() {
+  var stored = localStorage.getItem('furnace_auth');
+  if (!stored) return '';
+  try { return JSON.parse(stored).user_email || ''; } catch(e) { return ''; }
+}
+
 async function sparkFetch(table, query, method, body) {
-  if (!sparkConfig) sparkConfig = await window.furnaceAPI.sparkReadConfig();
+  /* Load config — Electron IPC or browser localStorage fallback */
+  if (!sparkConfig) {
+    if (window.furnaceAPI && window.furnaceAPI.sparkReadConfig) {
+      sparkConfig = await window.furnaceAPI.sparkReadConfig();
+    } else {
+      /* Browser fallback — use hardcoded config + localStorage token */
+      sparkConfig = {
+        supabaseUrl: 'https://jnwdscddyqujjikesdpb.supabase.co',
+        supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impud2RzY2RkeXF1amppa2VzZHBiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyODgxOTEsImV4cCI6MjA4OTg2NDE5MX0.EQueTlfX30ULmpLDF7ijSv0xR0_baAT2kPjYoK_RnpA'
+      };
+    }
+  }
   if (!sparkConfig) return null;
-  var token = await window.furnaceAPI.sparkGetToken();
+  var token;
+  if (window.furnaceAPI && window.furnaceAPI.sparkGetToken) {
+    token = await window.furnaceAPI.sparkGetToken();
+  } else {
+    /* Browser fallback — get token from localStorage, refresh if expired */
+    token = await sparkBrowserGetToken();
+  }
   if (!token) return null;
   var url = sparkConfig.supabaseUrl + '/rest/v1/' + table + (query ? '?' + query : '');
   var opts = {
