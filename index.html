@@ -5880,13 +5880,46 @@ function buildProjectBudgetLookup() {
 
 /* ── SUPABASE PAGINATION HELPER ── */
 async function sparkFetchAll(table, query) {
-  var all = [], offset = 0, pageSize = 1000;
+  /* Use Range header for proper pagination past Supabase's 1000-row default */
+  if (!sparkConfig) {
+    if (window.furnaceAPI && window.furnaceAPI.sparkReadConfig) {
+      sparkConfig = await window.furnaceAPI.sparkReadConfig();
+    } else {
+      sparkConfig = {
+        supabaseUrl: 'https://jnwdscddyqujjikesdpb.supabase.co',
+        supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impud2RzY2RkeXF1amppa2VzZHBiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyODgxOTEsImV4cCI6MjA4OTg2NDE5MX0.EQueTlfX30ULmpLDF7ijSv0xR0_baAT2kPjYoK_RnpA'
+      };
+    }
+  }
+  var token;
+  if (window.furnaceAPI && window.furnaceAPI.sparkGetToken) {
+    token = await window.furnaceAPI.sparkGetToken();
+  } else {
+    token = await sparkBrowserGetToken();
+  }
+  if (!token || !sparkConfig) return [];
+
+  var all = [], page = 0, pageSize = 1000;
+  var url = sparkConfig.supabaseUrl + '/rest/v1/' + table + '?' + query;
   while (true) {
-    var page = await sparkFetch(table, query + '&limit=' + pageSize + '&offset=' + offset);
-    if (!page || !page.length) break;
-    all = all.concat(page);
-    if (page.length < pageSize) break;
-    offset += pageSize;
+    var start = page * pageSize;
+    var end = start + pageSize - 1;
+    try {
+      var resp = await fetch(url, {
+        headers: {
+          'apikey': sparkConfig.supabaseAnonKey,
+          'Authorization': 'Bearer ' + token,
+          'Range': start + '-' + end,
+          'Prefer': 'count=exact'
+        }
+      });
+      if (!resp.ok) break;
+      var batch = await resp.json();
+      if (!batch || !batch.length) break;
+      all = all.concat(batch);
+      if (batch.length < pageSize) break;
+      page++;
+    } catch (err) { console.error('sparkFetchAll page error', err); break; }
   }
   return all;
 }
