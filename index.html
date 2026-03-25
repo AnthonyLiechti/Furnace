@@ -6250,19 +6250,28 @@ async function loadData() {
     }
     buildProjectBudgetLookup();
 
-    /* Load native allocation data if running in Electron */
+    /* Load allocation data — Electron via IPC, Web via static file fetch */
     if (window.furnaceAPI) {
       try {
         var allocData = await window.furnaceAPI.readAllocations();
         if (allocData) ALLOCATIONS = allocData;
         var actualsData = await window.furnaceAPI.readActuals();
         if (actualsData) ACTUALS = actualsData;
-        computeResourceWeeks();
         var oopData = await window.furnaceAPI.readOopSchedule();
         if (oopData) OOP_SCHEDULE = oopData;
       } catch(ae) {
         console.warn('Could not load native allocations:', ae);
       }
+    } else {
+      /* Web/Vercel: fetch static JSON files */
+      try {
+        var resp = await fetch('data/allocations.json');
+        if (resp.ok) ALLOCATIONS = await resp.json();
+      } catch(e) {}
+      try {
+        var resp2 = await fetch('data/oop-schedule.json');
+        if (resp2.ok) OOP_SCHEDULE = await resp2.json();
+      } catch(e) {}
     }
 
     /* Check Spark connection status */
@@ -6272,6 +6281,11 @@ async function loadData() {
     if (sparkAuth.connected) {
       await loadSupabaseData();
       enrichProjectsWithSupabase();
+    }
+
+    /* Rebuild resource weeks AFTER both allocations AND Supabase actuals are loaded */
+    if (ALLOCATIONS.allocations.length > 0 || SUPA_LOADED) {
+      computeResourceWeeks();
     }
 
     navigate('master');
