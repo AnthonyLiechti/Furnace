@@ -1701,7 +1701,7 @@ function renderProject(projectId) {
     var profitBar$ = Math.max(0, tcvPrice - laborSpent$ - laborRemaining$ - oopSpent - Math.max(0, oopRemaining));
 
     h += '<div class="snapshot-banner" style="margin-bottom:16px">';
-    h += '<div class="snap-header"><div class="snap-title">Project Financials</div><div class="snap-version">Live from Supabase &#9889;</div></div>';
+    h += '<div class="snap-header"><div class="snap-title">Project Financials</div><div class="snap-version">Live from Furnace &#128293;</div></div>';
     h += '<div class="snap-financials">';
     h += '<div class="snap-fin-item"><div class="sf-label">Client Price</div><div class="sf-value sf-gold">$' + Math.round(tcvPrice).toLocaleString() + '</div>';
     if (hasDisc) h += '<div class="sf-sub">Before discount: $' + Math.round(rawPrice).toLocaleString() + '</div>';
@@ -2798,8 +2798,8 @@ function renderSettings() {
   var h = '<h1 class="page-title">Settings</h1>';
   h += '<p class="page-subtitle">Configure rates and integrations</p>';
 
-  /* ── Spark Connection Card ── */
-  h += '<div class="section-title" style="margin-top:4px">⚡ Spark Connection</div>';
+  /* ── Furnace Connection Card ── */
+  h += '<div class="section-title" style="margin-top:4px">🔥 Furnace Connection</div>';
   h += '<div class="snapshot-banner" style="margin-bottom:24px">';
   if (sparkAuth.connected) {
     h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">';
@@ -3027,7 +3027,7 @@ async function sparkLoadBudgetForProject(projectCode) {
   if (!budgetId) {
     /* Issue 4: Show "Create Budget" button for unbudgeted projects */
     container.innerHTML = '<div style="background:var(--white);border-radius:10px;padding:20px;margin-bottom:20px;text-align:center">'
-      + '<div style="font-size:13px;color:var(--mid-gray);margin-bottom:12px">No Spark budget found for <span style="font-family:monospace">' + projectCode + '</span></div>'
+      + '<div style="font-size:13px;color:var(--mid-gray);margin-bottom:12px">No Furnace budget found for <span style="font-family:monospace">' + projectCode + '</span></div>'
       + '<button onclick="sparkCreateBudgetForProject(\'' + projectCode + '\')" style="padding:8px 20px;border-radius:6px;border:none;background:var(--ocean);color:var(--white);cursor:pointer;font-size:13px;font-weight:600">Create Budget</button>'
       + '</div>';
     return;
@@ -3036,7 +3036,7 @@ async function sparkLoadBudgetForProject(projectCode) {
   /* Load full budget data */
   sparkSelectedBudget = budgetId;
   var loadingEl = container;
-  loadingEl.innerHTML = '<div style="padding:20px;color:var(--mid-gray)">Loading Spark budget data...</div>';
+  loadingEl.innerHTML = '<div style="padding:20px;color:var(--mid-gray)">Loading budget data...</div>';
 
   var results = await Promise.all([
     sparkFetch('budgets', 'id=eq.' + budgetId + '&select=*,projects(id,name,project_code,clients(id,name,client_number))'),
@@ -3062,7 +3062,7 @@ async function sparkLoadBudgetForProject(projectCode) {
   sparkOopTab = (sparkCurrentData.oopSections.length && sparkCurrentData.oopSections[0].slug) || 'creative';
 
   if (!sparkCurrentData.budget) {
-    container.innerHTML = '<div style="padding:16px 20px;color:var(--mid-gray);font-size:13px;background:var(--white);border-radius:10px;margin-bottom:20px">Could not load Spark budget data. Showing snapshot data below.</div>';
+    container.innerHTML = '<div style="padding:16px 20px;color:var(--mid-gray);font-size:13px;background:var(--white);border-radius:10px;margin-bottom:20px">Could not load budget data. Showing snapshot data below.</div>';
     return;
   }
 
@@ -3712,7 +3712,7 @@ function sparkRenderBudgetContent(embedded) {
   if (!el) return;
   if (!sparkCurrentData || !sparkCurrentData.budget) {
     el.innerHTML = embedded
-      ? '<div style="padding:16px 20px;color:var(--mid-gray);font-size:13px;background:var(--white);border-radius:10px;margin-bottom:20px">Could not load Spark budget data.</div>'
+      ? '<div style="padding:16px 20px;color:var(--mid-gray);font-size:13px;background:var(--white);border-radius:10px;margin-bottom:20px">Could not load budget data.</div>'
       : '<div style="padding:40px;text-align:center;color:var(--mid-gray)">Select a budget above to begin editing.</div>';
     return;
   }
