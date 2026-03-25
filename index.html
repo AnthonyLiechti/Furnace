@@ -3603,6 +3603,30 @@ async function sparkPatchBudgetField(field, value) {
   sparkRenderBudgetContent(true);
 }
 
+async function sparkTogglePaidWithDate(entryId, isChecked) {
+  sparkShowSaving();
+  var today = new Date().toISOString().slice(0, 10);
+  var patchData = { paid: isChecked };
+  if (isChecked) {
+    patchData.paid_date = today;
+  } else {
+    patchData.paid_date = null;
+  }
+  await sparkFetch('oop_budget_entries?id=eq.' + entryId, '', 'PATCH', patchData);
+  /* Update local data */
+  if (sparkCurrentData && sparkCurrentData.oop) {
+    for (var i = 0; i < sparkCurrentData.oop.length; i++) {
+      if (sparkCurrentData.oop[i].id === entryId) {
+        sparkCurrentData.oop[i].paid = isChecked;
+        sparkCurrentData.oop[i].paid_date = isChecked ? today : null;
+        break;
+      }
+    }
+  }
+  sparkHideSaving();
+  sparkRenderOopContent();
+}
+
 async function sparkDeleteOopEntry(entryId) {
   if (!entryId) return;
   sparkShowSaving();
@@ -4033,9 +4057,15 @@ function sparkRenderOopContent() {
               h += '<div class="num tier-actual"><input type="number" class="spark-input act-input" value="' + (actHead != null ? actHead : '') + '" placeholder="—" min="0" step="1" onchange="sparkDebouncedPatchOop(\'' + iid + '\',\'actual_head_count\',this.value)"></div>';
             }
             h += '<div class="num tier-actual" style="font-weight:600">' + (actTotal != null ? sparkFmt(actTotal) : '<span style="opacity:.3">—</span>') + '</div>';
-            /* Paid checkbox */
+            /* Paid checkbox + date */
             var isPaid = item.paid || false;
-            h += '<div style="text-align:center"><input type="checkbox" ' + (isPaid ? 'checked' : '') + ' onchange="sparkDebouncedPatchOop(\'' + iid + '\',\'paid\',this.checked)" title="Mark as paid" style="cursor:pointer;width:15px;height:15px;accent-color:#81C784"></div>';
+            var paidDate = item.paid_date || '';
+            h += '<div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:2px">';
+            h += '<input type="checkbox" ' + (isPaid ? 'checked' : '') + ' onchange="sparkTogglePaidWithDate(\'' + iid + '\',this.checked)" title="Mark as paid" style="cursor:pointer;width:15px;height:15px;accent-color:#81C784">';
+            if (isPaid) {
+              h += '<input type="date" class="spark-input" style="width:90px;font-size:9px;padding:1px 3px;text-align:center;color:#2E7D32;border-color:#C8E6C9" value="' + paidDate + '" onchange="sparkDebouncedPatchOop(\'' + iid + '\',\'paid_date\',this.value)" title="Date paid">';
+            }
+            h += '</div>';
             /* Notes + Delete */
             h += '<div style="display:flex;align-items:center;gap:4px"><input type="text" class="spark-input" style="flex:1;text-align:left" value="' + (item.notes || '').replace(/"/g, '&quot;') + '" placeholder="Notes" onchange="sparkDebouncedPatchOop(\'' + iid + '\',\'notes\',this.value)">';
             h += '<button onclick="sparkDeleteOopEntry(\'' + iid + '\')" title="Delete line item" style="background:none;border:none;color:var(--mid-gray);cursor:pointer;font-size:14px;padding:2px 4px;opacity:.5;transition:opacity .2s" onmouseenter="this.style.opacity=1;this.style.color=\'var(--ember)\'" onmouseleave="this.style.opacity=.5;this.style.color=\'var(--mid-gray)\'">&times;</button></div>';
@@ -5394,13 +5424,15 @@ function renderOopPlanner() {
 }
 
 async function oopToggleLineItemPaid(supaOopId, newPaid, projCode) {
-  /* Update Supabase oop_budget_entries paid field */
-  await sparkFetch('oop_budget_entries?id=eq.' + supaOopId, '', 'PATCH', { paid: newPaid });
+  /* Update Supabase oop_budget_entries paid + paid_date */
+  var today = new Date().toISOString().slice(0, 10);
+  var patchData = { paid: newPaid, paid_date: newPaid ? today : null };
+  await sparkFetch('oop_budget_entries?id=eq.' + supaOopId, '', 'PATCH', patchData);
   /* Update local cache */
   if (SUPA_BUDGETS && SUPA_BUDGETS[projCode] && SUPA_BUDGETS[projCode]._oopEntries) {
     var entries = SUPA_BUDGETS[projCode]._oopEntries;
     for (var i = 0; i < entries.length; i++) {
-      if (entries[i].id === supaOopId) { entries[i].paid = newPaid; break; }
+      if (entries[i].id === supaOopId) { entries[i].paid = newPaid; entries[i].paid_date = newPaid ? today : null; break; }
     }
     /* Recalc oopSpent */
     var spent = 0;
@@ -6364,7 +6396,7 @@ async function loadSupabaseData() {
     /* 2. Fetch labor_budget_entries and oop_budget_entries for all budgets */
     var budgetIds = budgets.map(function(b) { return b.id; });
     var laborEntries = await sparkFetchAll('labor_budget_entries', 'select=id,budget_id,department,employment_type,phase1,phase2,phase3_1,phase3_2,phase4,phase5,rate_override,team_member_id,team_member:team_members(id,name,fully_burdened_rate)&budget_id=in.(' + budgetIds.join(',') + ')');
-    var oopEntries = await sparkFetchAll('oop_budget_entries', 'select=id,budget_id,line_item_name,count,rate,days,head_count,adjusted_count,adjusted_rate,adjusted_days,adjusted_head_count,actual_amount,paid,is_active&budget_id=in.(' + budgetIds.join(',') + ')');
+    var oopEntries = await sparkFetchAll('oop_budget_entries', 'select=id,budget_id,line_item_name,count,rate,days,head_count,adjusted_count,adjusted_rate,adjusted_days,adjusted_head_count,actual_amount,paid,paid_date,is_active&budget_id=in.(' + budgetIds.join(',') + ')');
 
     /* 3. Group entries by budget_id */
     var laborByBudget = {}, oopByBudget = {};
