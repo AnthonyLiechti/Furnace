@@ -60,7 +60,8 @@
       "Bash(export PATH=/usr/bin:/usr/local/bin:/opt/homebrew/bin:$PATH echo 'New CSV downloads \\(last 2 minutes\\):' find /Users/anthonyliechti/Downloads -name *.csv -newer '/Users/anthonyliechti/Downloads/320_36_01 -YouTube Thumbnail Refresh P2 - Snapshot v03.22 - Snapshot.csv' -o -name *320_36* -newer /tmp)",
       "Bash(sort echo:*)",
       "Bash(/dev/null echo:*)",
-      "Bash(export PATH=\"/usr/bin:/usr/local/bin:/opt/homebrew/bin:$PATH\")"
+      "Bash(export PATH=\"/usr/bin:/usr/local/bin:/opt/homebrew/bin:$PATH\")",
+      "Bash(export PATH=/usr/bin:/usr/local/bin:/opt/homebrew/bin:$PATH ls -lt /Users/anthonyliechti/Downloads/*322_08* /Users/anthonyliechti/Downloads/*Sweeps*2025*Social*)"
     ]
   }
 }
