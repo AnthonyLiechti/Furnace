@@ -507,6 +507,49 @@
             }
           ],
           "status": "finished"
+        },
+        {
+          "id": "occf-flyer",
+          "name": "OCCF Flyer Template",
+          "code": "384_02_01",
+          "boardId": 18389525439,
+          "totalBudget": 16.0,
+          "hasBudgetData": true,
+          "phases": [
+            {
+              "name": "P1 \u2014 Initiation",
+              "planned": 4.0,
+              "spent": 2.2,
+              "status": "na",
+              "plannedCost": 598
+            },
+            {
+              "name": "P4 \u2014 Design Execution",
+              "planned": 0,
+              "spent": 9.8,
+              "status": "active"
+            },
+            {
+              "name": "P5 \u2014 Resolution",
+              "planned": 10.0,
+              "spent": 0,
+              "status": "future",
+              "plannedCost": 2021
+            }
+          ],
+          "budgetSource": "monday.com",
+          "projectNumber": "384_02_01",
+          "forgeClientNum": 384,
+          "hourType": "billable",
+          "snapshotUrl": "https://docs.google.com/spreadsheets/d/118fyeyZzqS6I7nWXnw3e7bkCdZdk-lnSKWfSBoyHav8/edit",
+          "laborCost": 3491.0,
+          "oopCost": 0.0,
+          "totalPrice": 3491.0,
+          "snapshotTotalHours": 16.0,
+          "profit": 9.0,
+          "profitMargin": 0.3,
+          "dataSource": "snapshot",
+          "dollarBudget": 3500.0
         }
       ]
     },
@@ -5588,51 +5631,7 @@
       "name": "OCCF",
       "code": "384",
       "color": "#cab641",
-      "projects": [
-        {
-          "id": "occf-flyer",
-          "name": "OCCF Flyer Template",
-          "code": "384_02_01",
-          "boardId": 18389525439,
-          "totalBudget": 16.0,
-          "hasBudgetData": true,
-          "phases": [
-            {
-              "name": "P1 \u2014 Initiation",
-              "planned": 4.0,
-              "spent": 2.2,
-              "status": "na",
-              "plannedCost": 598
-            },
-            {
-              "name": "P4 \u2014 Design Execution",
-              "planned": 0,
-              "spent": 9.8,
-              "status": "active"
-            },
-            {
-              "name": "P5 \u2014 Resolution",
-              "planned": 10.0,
-              "spent": 0,
-              "status": "future",
-              "plannedCost": 2021
-            }
-          ],
-          "budgetSource": "monday.com",
-          "projectNumber": "384_02_01",
-          "forgeClientNum": 384,
-          "hourType": "billable",
-          "snapshotUrl": "https://docs.google.com/spreadsheets/d/118fyeyZzqS6I7nWXnw3e7bkCdZdk-lnSKWfSBoyHav8/edit",
-          "laborCost": 3491.0,
-          "oopCost": 0.0,
-          "totalPrice": 3491.0,
-          "snapshotTotalHours": 16.0,
-          "profit": 9.0,
-          "profitMargin": 0.3,
-          "dataSource": "snapshot",
-          "dollarBudget": 3500.0
-        }
-      ],
+      "projects": [],
       "status": "active"
     },
     {
