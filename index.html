@@ -2457,8 +2457,8 @@ function renderFlagged() {
     }
   }
 
-  /* ── 3b. NEEDS OOP SCHEDULING ── */
-  /* Find projects with OOP line items that have costs but no scheduled payment date */
+  /* ── 3b. NEEDS OOP SCHEDULING — Finance Officer Checklist ── */
+  /* Find ALL OOP line items across ALL projects that have costs but aren't paid and aren't scheduled */
   var unscheduledOop = [];
   var oopScheduleEntries = (OOP_SCHEDULE && OOP_SCHEDULE.entries) ? OOP_SCHEDULE.entries : [];
   var scheduledItemIds = {};
@@ -2466,18 +2466,27 @@ function renderFlagged() {
     if (oopScheduleEntries[si].oopEntryId) scheduledItemIds[oopScheduleEntries[si].oopEntryId] = true;
   }
 
-  for (var i = 0; i < fullyLoaded.length; i++) {
-    var p = fullyLoaded[i];
-    if (!p._supabudget || !p._supabudget.oopEntries) continue;
-    var oopItems = p._supabudget.oopEntries || [];
+  /* Check ALL projects (not just fullyLoaded) for unscheduled OOP items */
+  var allForOop = all.filter(function(p) { return p._supabudget && !isProjectCompleted(p); });
+  var totalUnschedItems = 0;
+  var totalUnschedAmount = 0;
+  for (var i = 0; i < allForOop.length; i++) {
+    var p = allForOop[i];
+    var sb = p._supabudget;
+    var oopItems = sb._oopEntries || sb.oopEntries || [];
     var unschedItems = [];
     for (var j = 0; j < oopItems.length; j++) {
       var item = oopItems[j];
       if (item.is_active === false) continue;
-      var effectiveAmt = item.actual_amount || item.adjusted_rate || item.rate || 0;
-      var effectiveCount = item.actual_count || item.adjusted_count || item.count || 0;
-      if (effectiveCount > 0 && effectiveAmt > 0 && !item.paid && !scheduledItemIds[item.id]) {
-        unschedItems.push(item);
+      var effectiveCount = item.adjusted_count != null ? item.adjusted_count : (item.count || 0);
+      var effectiveRate = item.adjusted_rate != null ? item.adjusted_rate : (item.rate || 0);
+      var effectiveDays = item.adjusted_days != null ? item.adjusted_days : (item.days || 1);
+      var effectiveHead = item.adjusted_head_count != null ? item.adjusted_head_count : (item.head_count || 1);
+      var effectiveTotal = item.actual_amount != null ? item.actual_amount : (effectiveCount * effectiveRate * effectiveDays * effectiveHead);
+      if (effectiveTotal > 0 && !item.paid && !scheduledItemIds[item.id]) {
+        unschedItems.push({ item: item, total: effectiveTotal });
+        totalUnschedItems++;
+        totalUnschedAmount += effectiveTotal;
       }
     }
     if (unschedItems.length > 0) {
@@ -2486,18 +2495,36 @@ function renderFlagged() {
   }
 
   if (unscheduledOop.length) {
-    h += '<div class="section-title" style="color:#7B1FA2">Needs OOP Scheduling (' + unscheduledOop.length + ' projects)</div>';
-    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">These projects have OOP line items with costs that haven\'t been scheduled for payment yet. Go to Manage Resources \u2192 Out-of-Pocket to schedule them.</p>';
+    h += '<div class="section-title" style="color:#7B1FA2">OOP Finance Checklist (' + totalUnschedItems + ' items across ' + unscheduledOop.length + ' projects)</div>';
+    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">Line items with costs that haven\'t been paid or scheduled for payment. Total outstanding: <strong style="color:#7B1FA2">$' + Math.round(totalUnschedAmount).toLocaleString() + '</strong>. Schedule payments in Manage Resources \u2192 Out-of-Pocket, or mark as paid on the project page.</p>';
+
     for (var ui = 0; ui < unscheduledOop.length; ui++) {
       var uo = unscheduledOop[ui];
-      var itemNames = uo.items.map(function(it) { return it.line_item_name || 'Unnamed'; }).slice(0, 5).join(', ');
-      if (uo.items.length > 5) itemNames += ' +' + (uo.items.length - 5) + ' more';
-      var totalUnsched = 0;
+      var projTotal = 0;
+      for (var j = 0; j < uo.items.length; j++) projTotal += uo.items[j].total;
+
+      h += '<div style="background:var(--white);border-radius:8px;border-left:4px solid #7B1FA2;padding:14px 16px;margin-bottom:12px;cursor:pointer" onclick="navigate(\'project:' + uo.project.id + '\')">';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+      h += '<div style="font-weight:600;color:var(--abyss)">' + uo.project.code + ' — ' + uo.project.name + '</div>';
+      h += '<div style="font-weight:700;color:#7B1FA2">' + uo.items.length + ' item' + (uo.items.length > 1 ? 's' : '') + ' · $' + Math.round(projTotal).toLocaleString() + '</div>';
+      h += '</div>';
+
+      /* Individual line items */
+      h += '<div style="display:grid;grid-template-columns:1fr 100px 100px;gap:4px;font-size:12px;color:var(--mid-gray);padding:4px 0;border-bottom:1px solid var(--light-gray)">';
+      h += '<div style="font-weight:600">Line Item</div><div style="text-align:right;font-weight:600">Amount</div><div style="text-align:right;font-weight:600">Status</div>';
+      h += '</div>';
+
       for (var j = 0; j < uo.items.length; j++) {
-        var it = uo.items[j];
-        totalUnsched += (it.actual_amount || ((it.adjusted_count || it.count || 0) * (it.adjusted_rate || it.rate || 0)));
+        var li = uo.items[j];
+        var itemName = li.item.line_item_name || 'Unnamed';
+        h += '<div style="display:grid;grid-template-columns:1fr 100px 100px;gap:4px;font-size:12px;padding:4px 0;border-bottom:1px solid rgba(0,0,0,.05)">';
+        h += '<div style="color:var(--abyss)">' + itemName + '</div>';
+        h += '<div style="text-align:right;font-weight:600;color:var(--abyss)">$' + Math.round(li.total).toLocaleString() + '</div>';
+        h += '<div style="text-align:right"><span style="background:rgba(245,127,23,.1);color:#F57F17;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600">Unscheduled</span></div>';
+        h += '</div>';
       }
-      h += flagCard(uo.project, '#7B1FA2', uo.items.length + ' OOP item' + (uo.items.length > 1 ? 's' : '') + ' unscheduled ($' + Math.round(totalUnsched).toLocaleString() + ')', itemNames);
+
+      h += '</div>';
     }
   }
 
