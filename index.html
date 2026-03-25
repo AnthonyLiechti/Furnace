@@ -2363,14 +2363,18 @@ function renderFlagged() {
     if (isProjectCompleted(p)) continue;
     var sb = p._supabudget;
 
+    /* Skip non-billable, bizdev, and internal projects from Needs Attention entirely */
+    var isNonBill = p.projectType === 'internal' || p.projectType === 'bizdev' || p.code.indexOf('100_') === 0 || p.code.indexOf('101_') === 0 || p.code.indexOf('359_') === 0;
+    if (sb && (sb.status === 'nonbillable' || sb.status === 'bizdev')) isNonBill = true;
+
     if (!sb) {
-      /* No Supabase budget — skip non-billable/internal projects */
-      var isNonBill = p.projectType === 'internal' || p.projectType === 'bizdev' || p.code.indexOf('100_') === 0 || p.code.indexOf('101_') === 0 || p.code.indexOf('359_') === 0;
       if (!isNonBill && (p.dataSource === 'no_snapshot' || p.dataSource === 'needs_review')) {
         noBudget.push(p);
       }
       continue;
     }
+
+    if (isNonBill) { fullyLoaded.push(p); continue; }
 
     /* Has Supabase budget — check what data exists */
     var hasPrice = (sb.clientPrice || sb.client_price || 0) > 0;
