@@ -3542,7 +3542,104 @@ function sparkRenderLaborContent() {
   }
 
   h += '</tbody></table>';
+
+  /* Add Team Member button */
+  h += '<div style="padding:10px 0"><button onclick="sparkShowAddTeamMember()" style="padding:6px 16px;border-radius:6px;border:1px dashed var(--mid-gray);background:transparent;color:var(--mid-gray);cursor:pointer;font-size:12px;font-weight:600">+ Add Team Member</button></div>';
+
+  /* If no labor entries at all, show a helpful message */
+  if (!labor.length) {
+    h = '<div style="padding:20px;text-align:center;color:var(--mid-gray)">';
+    h += '<div style="font-size:14px;margin-bottom:8px">No team members assigned yet</div>';
+    h += '<div style="font-size:12px;margin-bottom:14px">Add team members to estimate labor hours by phase.</div>';
+    h += '<button onclick="sparkShowAddTeamMember()" style="padding:8px 20px;border-radius:6px;border:none;background:var(--ocean);color:var(--white);cursor:pointer;font-size:13px;font-weight:600">+ Add Team Member</button>';
+    h += '</div>';
+  }
+
   el.innerHTML = h;
+}
+
+async function sparkShowAddTeamMember() {
+  /* Fetch available team members from Supabase */
+  var allMembers = await sparkFetch('team_members', 'select=id,name,department,employment_type,billable_rate&is_active=eq.true&order=name.asc');
+  if (!allMembers || !allMembers.length) { alert('No team members found in Supabase.'); return; }
+
+  /* Filter out members already in this budget */
+  var existingIds = {};
+  if (sparkCurrentData && sparkCurrentData.labor) {
+    for (var i = 0; i < sparkCurrentData.labor.length; i++) {
+      var tmId = sparkCurrentData.labor[i].team_member_id || (sparkCurrentData.labor[i].team_member && sparkCurrentData.labor[i].team_member.id);
+      if (tmId) existingIds[tmId] = true;
+    }
+  }
+  var available = allMembers.filter(function(m) { return !existingIds[m.id]; });
+
+  if (!available.length) { alert('All active team members are already assigned.'); return; }
+
+  /* Build a simple dropdown modal */
+  var overlay = document.createElement('div');
+  overlay.id = 'sparkAddMemberOverlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center';
+
+  var modal = document.createElement('div');
+  modal.style.cssText = 'background:var(--white);border-radius:12px;padding:24px;min-width:320px;max-width:400px;max-height:500px;overflow-y:auto';
+
+  var h = '<div style="font-size:16px;font-weight:700;margin-bottom:16px">Add Team Member</div>';
+  h += '<div style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">Select team members to add to this budget:</div>';
+
+  for (var i = 0; i < available.length; i++) {
+    var m = available[i];
+    var dept = m.department || 'Other';
+    var type = m.employment_type === 'Freelancer' ? ' (FL)' : '';
+    h += '<label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;font-size:13px">';
+    h += '<input type="checkbox" value="' + m.id + '" data-dept="' + dept + '" data-type="' + (m.employment_type || 'Employee') + '">';
+    h += m.name + type + ' <span style="font-size:10px;color:var(--mid-gray)">' + dept + '</span>';
+    h += '</label>';
+  }
+
+  h += '<div style="display:flex;gap:8px;margin-top:16px">';
+  h += '<button onclick="sparkAddSelectedMembers()" style="padding:8px 20px;border-radius:6px;border:none;background:var(--ocean);color:var(--white);cursor:pointer;font-size:13px;font-weight:600;flex:1">Add Selected</button>';
+  h += '<button onclick="document.getElementById(\'sparkAddMemberOverlay\').remove()" style="padding:8px 16px;border-radius:6px;border:1px solid var(--canvas);background:var(--white);cursor:pointer;font-size:13px;color:var(--mid-gray)">Cancel</button>';
+  h += '</div>';
+
+  modal.innerHTML = h;
+  overlay.appendChild(modal);
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+}
+
+async function sparkAddSelectedMembers() {
+  var overlay = document.getElementById('sparkAddMemberOverlay');
+  if (!overlay) return;
+  var checkboxes = overlay.querySelectorAll('input[type="checkbox"]:checked');
+  if (!checkboxes.length) { overlay.remove(); return; }
+
+  var budgetId = sparkCurrentData.budget.id;
+  sparkShowSaving();
+
+  for (var i = 0; i < checkboxes.length; i++) {
+    var tmId = checkboxes[i].value;
+    var dept = checkboxes[i].getAttribute('data-dept') || null;
+    var empType = checkboxes[i].getAttribute('data-type') || 'Employee';
+    if (dept && dept !== 'Executive/Admin' && dept !== 'Account' && dept !== 'Creative' && dept !== 'Post') dept = null;
+
+    var result = await sparkFetch('labor_budget_entries', '', 'POST', {
+      budget_id: budgetId,
+      team_member_id: tmId,
+      department: dept,
+      employment_type: empType,
+      phase1: 0, phase2: 0, phase3_1: 0, phase3_2: 0, phase4: 0, phase5: 0,
+      display_order: sparkCurrentData.labor.length + i
+    });
+    if (result && result.length) {
+      sparkCurrentData.labor.push(result[0]);
+    }
+  }
+
+  sparkHideSaving();
+  overlay.remove();
+
+  /* Reload the full budget to get team_member joins */
+  await sparkLoadBudget(budgetId);
 }
 
 function sparkToggleOopSection(sectionId) {
