@@ -1626,39 +1626,138 @@ function renderClient(clientId) {
     h += '</div>';
   }
 
-  /* ── PROJECT STATUS TABLE ── */
-  h += '<div class="section-title" style="margin-top:28px">Projects</div>';
+  /* ── PROJECT STATUS TABLE (built from actual time data) ── */
+  h += '<div class="section-title" style="margin-top:28px">Projects <span style="font-size:11px;font-weight:400;color:var(--mid-gray)">(from tracked time)</span></div>';
+
+  /* Build project list from SUPA_ACTUALS_ALL, filtered by date range */
+  var _dateRange = (globalDateFilter && globalDateFilter !== 'all') ? getDateRange(globalDateFilter) : null;
+  var _projData = {}; /* code -> {name, client, hours, billHrs, oopSpent, category, projId} */
+  var _nonBill = {hours: 0, entries: 0};
+  var _bizDev = {hours: 0, entries: 0};
+
+  /* Code aliases for matching */
+  var _aliases = {'322_07_01':'322_07_02','322_07_02':'322_07_02','386_10':'386_10_XXX','320_10':'320_10_XXX','321_13_01':'321_13_01_A012','378_06_03':'378_06_05',
+    'unknown':'_NB','100_02':'_NB','100_00':'_NB','100_07_05':'_NB','100_05':'_NB','100_07_03':'_NB','100_01':'_NB','100_07_09':'_NB'};
+
+  /* Non-billable codes */
+  var _nbCodes = {'100_00_00':1,'100_10_01':1,'100_99_01':1,'100_99_02':1,'_NB':1};
+
+  if (SUPA_ACTUALS_ALL && SUPA_ACTUALS_ALL.length > 0) {
+    for (var ai = 0; ai < SUPA_ACTUALS_ALL.length; ai++) {
+      var _a = SUPA_ACTUALS_ALL[ai];
+      if (!_a.hours) continue;
+      /* Date filter */
+      if (_dateRange) {
+        var _ad = new Date(_a.work_date + 'T12:00:00');
+        if (_ad < _dateRange.start || _ad > _dateRange.end) continue;
+      }
+      var _code = _a.project_code || 'unknown';
+      if (_aliases[_code]) _code = _aliases[_code];
+
+      /* Fold non-billable */
+      if (_code === '_NB' || _nbCodes[_code] || (_code.indexOf('100_') === 0)) {
+        _nonBill.hours += _a.hours;
+        _nonBill.entries++;
+        continue;
+      }
+
+      /* Check if bizdev */
+      var _isBD = _a.is_bizdev;
+      if (!_isBD) {
+        /* Check portfolio for bizdev type */
+        for (var _ci = 0; _ci < CLIENTS.length; _ci++) {
+          for (var _pi = 0; _pi < CLIENTS[_ci].projects.length; _pi++) {
+            if (CLIENTS[_ci].projects[_pi].code === _code && CLIENTS[_ci].projects[_pi].projectType === 'bizdev') _isBD = true;
+          }
+        }
+      }
+      if (_isBD) {
+        _bizDev.hours += _a.hours;
+        _bizDev.entries++;
+        continue;
+      }
+
+      if (!_projData[_code]) {
+        /* Find name + client from portfolio */
+        var _pName = _code, _cName = '', _pId = null, _budget = 0, _oopSpent = 0;
+        for (var _ci = 0; _ci < CLIENTS.length; _ci++) {
+          for (var _pi = 0; _pi < CLIENTS[_ci].projects.length; _pi++) {
+            var _pp = CLIENTS[_ci].projects[_pi];
+            if (_pp.code === _code) {
+              _pName = _pp.name; _cName = CLIENTS[_ci].name; _pId = _pp.id;
+              _budget = _pp.totalBudget || 0;
+              if (_pp._supabudget) _oopSpent = _pp._supabudget.oopSpent || 0;
+              break;
+            }
+          }
+        }
+        /* Also check board_name for display */
+        if (_pName === _code && _a.board_name) {
+          _pName = _a.board_name.replace(/^\d+[\d_A-Za-z]*\s*-\s*/, '');
+        }
+        _projData[_code] = {name: _pName, client: _cName, hours: 0, billHrs: 0, oopSpent: _oopSpent, budget: _budget, projId: _pId, entries: 0, revenue: 0};
+      }
+      _projData[_code].hours += _a.hours;
+      if (_a.is_billable) _projData[_code].billHrs += _a.hours;
+      _projData[_code].entries++;
+      _projData[_code].revenue = _projData[_code].billHrs * 200;
+    }
+  }
+
+  /* Sort by hours descending */
+  var _projList = Object.keys(_projData).map(function(c) { return Object.assign({code: c}, _projData[c]); });
+  _projList.sort(function(a, b) { return b.hours - a.hours; });
+
   h += '<table class="phase-table"><thead><tr>';
-  h += '<th>Project</th><th>Type</th><th>Current Phase</th><th>Budget</th><th>Spent</th><th>Hours Progress</th>';
+  h += '<th onclick="masterSortProjects(\'name\')" style="cursor:pointer">Project &#x25BE;</th>';
+  h += '<th onclick="masterSortProjects(\'client\')" style="cursor:pointer">Client &#x25BE;</th>';
+  h += '<th onclick="masterSortProjects(\'category\')" style="cursor:pointer">Category &#x25BE;</th>';
+  h += '<th onclick="masterSortProjects(\'hours\')" style="cursor:pointer" class="num">Hours Spent &#x25BE;</th>';
+  h += '<th class="num">Revenue @$200</th>';
+  h += '<th class="num">Employees</th>';
+  h += '<th class="num">Entries</th>';
   h += '</tr></thead><tbody>';
 
-  for (var i = 0; i < visibleList.length; i++) {
-    var p = visibleList[i];
-    var isDone = isProjectCompleted(p);
-    var spent = filteredProjectSpent(p);
-    var prog = isDone ? 100 : pct(spent, p.totalBudget);
+  /* Non-Billable summary row */
+  if (_nonBill.hours > 0) {
+    h += '<tr style="background:rgba(0,0,0,.02)">';
+    h += '<td><div style="font-weight:600;color:var(--mid-gray)">Non-Billable</div><div style="font-size:11px;color:var(--mid-gray)">Internal, meetings, time off, tools</div></td>';
+    h += '<td style="color:var(--mid-gray)">Forge</td>';
+    h += '<td><span class="badge" style="background:var(--mid-gray);color:white;font-size:9px;padding:2px 8px;border-radius:4px">Non-Billable</span></td>';
+    h += '<td class="num" style="font-weight:600">' + _nonBill.hours.toFixed(1) + '</td>';
+    h += '<td class="num" style="color:var(--mid-gray)">—</td>';
+    h += '<td class="num">—</td>';
+    h += '<td class="num">' + _nonBill.entries + '</td>';
+    h += '</tr>';
+  }
 
-    /* Find current phase */
-    var curPhase = '—';
-    for (var j = 0; j < p.phases.length; j++) {
-      if (p.phases[j].status === 'active') { curPhase = p.phases[j].name; break; }
-    }
-    if (isDone) curPhase = '<span class="badge badge-completed">Complete</span>';
+  /* Biz Dev summary row */
+  if (_bizDev.hours > 0) {
+    h += '<tr style="background:rgba(255,183,77,.04)">';
+    h += '<td><div style="font-weight:600;color:#F57F17">Business Development</div><div style="font-size:11px;color:var(--mid-gray)">New business, pitches, proposals</div></td>';
+    h += '<td style="color:var(--mid-gray)">Various</td>';
+    h += '<td><span class="badge" style="background:#F57F17;color:white;font-size:9px;padding:2px 8px;border-radius:4px">Biz Dev</span></td>';
+    h += '<td class="num" style="font-weight:600;color:#F57F17">' + _bizDev.hours.toFixed(1) + '</td>';
+    h += '<td class="num" style="color:var(--mid-gray)">—</td>';
+    h += '<td class="num">—</td>';
+    h += '<td class="num">' + _bizDev.entries + '</td>';
+    h += '</tr>';
+  }
 
-    /* Hour type badge */
-    var typeBadge = '<span class="badge badge-billable">Billable</span>';
-    if (p.hourType === 'bizdev') typeBadge = '<span class="badge badge-bizdev">Biz Dev</span>';
-    else if (p.hourType === 'ops') typeBadge = '<span class="badge badge-ops">Ops</span>';
+  /* Individual billable projects */
+  for (var pi = 0; pi < _projList.length; pi++) {
+    var _p = _projList[pi];
+    var _isOver = _p.budget > 0 && _p.hours > _p.budget;
+    var _prog = _p.budget > 0 ? Math.min(100, Math.round(_p.hours / _p.budget * 100)) : 0;
 
-    var isOver = spent > p.totalBudget && p.totalBudget > 0;
-
-    h += '<tr onclick="navigate(\'project:' + p.id + '\')" style="cursor:pointer">';
-    h += '<td><div style="font-weight:600">' + p.name + '</div><div style="font-size:11px;color:var(--mid-gray)">' + p.code + '</div></td>';
-    h += '<td>' + typeBadge + '</td>';
-    h += '<td style="font-size:12px">' + curPhase + '</td>';
-    h += '<td>' + (p.totalBudget > 0 ? p.totalBudget.toFixed(1) : '—') + '</td>';
-    h += '<td style="' + (isOver ? 'color:#C62828;font-weight:700' : '') + '">' + spent.toFixed(1) + '</td>';
-    h += '<td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-wrap" style="height:10px;width:140px;display:inline-block;vertical-align:middle"><div class="progress-bar-fill" style="width:' + Math.min(prog, 100) + '%;background:' + (isDone ? '#2E7D32' : isOver ? '#C62828' : barColor(prog)) + '"></div></div><span style="font-size:11px;color:' + (isOver ? '#C62828' : 'var(--mid-gray)') + '">' + prog + '%</span></div></td>';
+    h += '<tr' + (_p.projId ? ' onclick="navigate(\'project:' + _p.projId + '\')" style="cursor:pointer"' : '') + '>';
+    h += '<td><div style="font-weight:600">' + _p.name + '</div><div style="font-size:11px;color:var(--mid-gray)">' + _p.code + '</div></td>';
+    h += '<td style="font-size:12px">' + (_p.client || '—') + '</td>';
+    h += '<td><span class="badge badge-billable" style="font-size:9px;padding:2px 8px">Billable</span></td>';
+    h += '<td class="num" style="font-weight:600;' + (_isOver ? 'color:#C62828' : '') + '">' + _p.hours.toFixed(1) + '</td>';
+    h += '<td class="num" style="font-weight:600;color:var(--ocean)">$' + Math.round(_p.revenue).toLocaleString() + '</td>';
+    h += '<td class="num">' + _p.entries + '</td>';
+    h += '<td class="num">' + _p.entries + '</td>';
     h += '</tr>';
   }
   h += '</tbody></table>';
