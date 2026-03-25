@@ -1387,19 +1387,51 @@ function renderMaster() {
     h += '</div>';
   }
 
-  /* ── PROJECT TABLE WITH SORTING ── */
-  /* Pre-compute sort values for each project */
+  /* ── FINANCE TABLE — date-filtered hours + OOP spent per project ── */
+  /* Compute per-project hours and revenue for the selected date range */
+  var dateRange = getDateFilter();
+  var hasDateFilter = !!(dateRange && dateRange.start && dateRange.end);
+  var periodLabel = hasDateFilter ? fmtDateShort(dateRange.start.toISOString().slice(0,10)) + ' – ' + fmtDateShort(dateRange.end.toISOString().slice(0,10)) : 'All Time';
+
   var rows = [];
   for (var i = 0; i < all.length; i++) {
     var p = all[i];
-    var sp = filteredProjectSpent(p);
+    /* Hours spent in date range from Supabase actuals */
+    var hrsInRange = 0;
+    var billableHrsInRange = 0;
+    var peopleInRange = {};
+    var entriesInRange = 0;
+    if (SUPA_ACTUALS_ALL) {
+      for (var j = 0; j < SUPA_ACTUALS_ALL.length; j++) {
+        var a = SUPA_ACTUALS_ALL[j];
+        if (a.project_code !== p.code) continue;
+        if (hasDateFilter) {
+          var ad = new Date(a.work_date + 'T00:00:00');
+          if (ad < dateRange.start || ad > dateRange.end) continue;
+        }
+        hrsInRange += a.hours || 0;
+        if (a.is_billable) billableHrsInRange += a.hours || 0;
+        if (a.person_name) peopleInRange[a.person_name] = true;
+        entriesInRange++;
+      }
+    }
+
+    var revenue = billableHrsInRange * 200; /* $200/hr agency rate */
+    var oopSpent = (p._supabudget && p._supabudget.oopSpent) ? p._supabudget.oopSpent : 0;
     var pBudget = p.dollarBudget || 0;
     var pLabor = p.laborCost || 0;
     var pOOP = p.oopCost || 0;
     var pProfit = p.profit || 0;
     var pMarginNum = pBudget > 0 ? (pProfit / pBudget) * 100 : 0;
-    rows.push({ p:p, budget:pBudget, labor:pLabor, oop:pOOP, profit:pProfit, margin:pMarginNum, spent:sp });
+
+    if (hrsInRange > 0 || (!hasDateFilter && (pBudget > 0 || (p._supabudget)))) {
+      rows.push({ p:p, budget:pBudget, labor:pLabor, oop:pOOP, oopSpent:oopSpent,
+        profit:pProfit, margin:pMarginNum, hrsInRange:hrsInRange,
+        billableHrs:billableHrsInRange, revenue:revenue,
+        people:Object.keys(peopleInRange).length, entries:entriesInRange });
+    }
   }
+
   /* Sort */
   var dir = masterSortDir === 'asc' ? 1 : -1;
   rows.sort(function(a, b) {
@@ -1408,11 +1440,12 @@ function renderMaster() {
       case 'name': va = a.p.code || ''; vb = b.p.code || ''; return va < vb ? -dir : va > vb ? dir : 0;
       case 'client': va = (a.p.clientName||'').toLowerCase(); vb = (b.p.clientName||'').toLowerCase(); return va < vb ? -dir : va > vb ? dir : 0;
       case 'budget': return (a.budget - b.budget) * dir;
-      case 'labor': return (a.labor - b.labor) * dir;
-      case 'oop': return (a.oop - b.oop) * dir;
+      case 'hours': return (a.billableHrs - b.billableHrs) * dir;
+      case 'revenue': return (a.revenue - b.revenue) * dir;
+      case 'oop': return (a.oopSpent - b.oopSpent) * dir;
       case 'profit': return (a.profit - b.profit) * dir;
       case 'margin': return (a.margin - b.margin) * dir;
-      default: return 0;
+      default: return (a.billableHrs - b.billableHrs) * -1; /* default: most hours first */
     }
   });
 
@@ -1420,37 +1453,57 @@ function renderMaster() {
     if (masterSortCol !== col) return ' <span style="opacity:.3;font-size:10px">&#9650;&#9660;</span>';
     return masterSortDir === 'asc' ? ' <span style="font-size:10px">&#9650;</span>' : ' <span style="font-size:10px">&#9660;</span>';
   };
-  var thStyle = 'cursor:pointer;user-select:none;white-space:nowrap';
+  var thStyle = 'cursor:pointer;user-select:none;white-space:nowrap;font-size:11px';
 
-  h += '<div class="section-title" style="margin-top:28px">Projects</div>';
+  /* Totals row */
+  var totalBillHrs = 0, totalRevenue = 0, totalOopSpent = 0, totalEntries = 0;
+  for (var i = 0; i < rows.length; i++) {
+    totalBillHrs += rows[i].billableHrs;
+    totalRevenue += rows[i].revenue;
+    totalOopSpent += rows[i].oopSpent;
+    totalEntries += rows[i].entries;
+  }
+
+  h += '<div class="section-title" style="margin-top:28px">Finance View <span style="font-size:12px;font-weight:400;color:var(--mid-gray)">' + periodLabel + ' &middot; ' + rows.length + ' projects &middot; ' + totalBillHrs.toFixed(1) + ' billable hrs &middot; $' + Math.round(totalRevenue).toLocaleString() + ' revenue</span></div>';
+
   h += '<table class="phase-table"><thead><tr>';
+  h += '<th style="' + thStyle + ';text-align:right;width:30px">#</th>';
   h += '<th style="' + thStyle + '" onclick="toggleMasterSort(\'name\')">Project' + sortArrow('name') + '</th>';
   h += '<th style="' + thStyle + '" onclick="toggleMasterSort(\'client\')">Client' + sortArrow('client') + '</th>';
-  h += '<th style="' + thStyle + '" onclick="toggleMasterSort(\'budget\')">Budget' + sortArrow('budget') + '</th>';
-  h += '<th style="' + thStyle + '" onclick="toggleMasterSort(\'labor\')">Labor' + sortArrow('labor') + '</th>';
-  h += '<th style="' + thStyle + '" onclick="toggleMasterSort(\'oop\')">OOP' + sortArrow('oop') + '</th>';
-  h += '<th style="' + thStyle + '" onclick="toggleMasterSort(\'profit\')">Profit' + sortArrow('profit') + '</th>';
-  h += '<th style="' + thStyle + '" onclick="toggleMasterSort(\'margin\')">Profitability' + sortArrow('margin') + '</th>';
+  h += '<th style="' + thStyle + ';text-align:right" onclick="toggleMasterSort(\'hours\')">Billable Hrs' + sortArrow('hours') + '</th>';
+  h += '<th style="' + thStyle + ';text-align:right" onclick="toggleMasterSort(\'revenue\')">Revenue @$200/hr' + sortArrow('revenue') + '</th>';
+  h += '<th style="' + thStyle + ';text-align:right" onclick="toggleMasterSort(\'oop\')">OOP Spent' + sortArrow('oop') + '</th>';
+  h += '<th style="' + thStyle + ';text-align:center">People</th>';
+  h += '<th style="' + thStyle + ';text-align:center">Entries</th>';
   h += '</tr></thead><tbody>';
 
   for (var i = 0; i < rows.length; i++) {
     var r = rows[i], p = r.p;
-    var pMargin = r.margin.toFixed(1);
-    var mColor = r.margin >= 30 ? '#81C784' : r.margin >= 15 ? 'var(--honey)' : r.margin >= 0 ? 'var(--sand)' : '#C62828';
+    var category = 'Client Billable';
+    if (p.code === '100_00_00' || p.projectType === 'internal') category = 'Non-Billable';
+    else if (p.projectType === 'bizdev') category = 'Biz Dev';
+    var catColor = category === 'Non-Billable' ? 'var(--mid-gray)' : category === 'Biz Dev' ? '#F57F17' : 'var(--ocean)';
 
     h += '<tr onclick="navigate(\'project:' + p.id + '\')" style="cursor:pointer">';
-    h += '<td><div style="font-size:11px;color:var(--mid-gray)">' + p.code + '</div><div style="font-weight:600">' + p.name + '</div></td>';
+    h += '<td style="text-align:right;font-size:11px;color:var(--mid-gray)">' + (i + 1) + '</td>';
+    h += '<td><div style="font-size:10px;color:' + catColor + ';font-weight:600">' + category + '</div><div style="font-weight:600;font-size:13px">' + p.name + '</div></td>';
     h += '<td style="font-size:12px;color:var(--mid-gray)">' + (p.clientName || '') + '</td>';
-    h += '<td>' + (r.budget > 0 ? '$' + r.budget.toLocaleString() : '$0') + '</td>';
-    h += '<td>' + (r.labor > 0 ? '$' + r.labor.toLocaleString() : '—') + '</td>';
-    h += '<td>' + (r.oop > 0 ? '$' + r.oop.toLocaleString() : '—') + '</td>';
-    h += '<td style="color:' + (r.profit >= 0 ? '' : '#C62828') + '">' + (r.budget > 0 || r.profit !== 0 ? '$' + r.profit.toLocaleString() : '—') + '</td>';
-    h += '<td><div style="display:flex;align-items:center;gap:8px">';
-    h += '<div style="height:8px;width:80px;background:rgba(0,0,0,.06);border-radius:4px;overflow:hidden"><div style="height:100%;width:' + Math.min(Math.max(r.margin, 0), 100) + '%;background:' + mColor + ';border-radius:4px"></div></div>';
-    h += '<span style="font-size:12px;font-weight:600;color:' + mColor + '">' + pMargin + '%</span>';
-    h += '</div></td>';
+    h += '<td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">' + r.billableHrs.toFixed(1) + '</td>';
+    h += '<td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">$' + Math.round(r.revenue).toLocaleString() + '</td>';
+    h += '<td style="text-align:right;font-variant-numeric:tabular-nums">' + (r.oopSpent > 0 ? '$' + Math.round(r.oopSpent).toLocaleString() : '—') + '</td>';
+    h += '<td style="text-align:center;font-size:12px">' + r.people + '</td>';
+    h += '<td style="text-align:center;font-size:12px">' + r.entries + '</td>';
     h += '</tr>';
   }
+
+  /* Totals row */
+  h += '<tr style="font-weight:700;border-top:2px solid var(--abyss);background:var(--cloud)">';
+  h += '<td></td><td>Total (' + rows.length + ' projects)</td><td></td>';
+  h += '<td style="text-align:right;font-variant-numeric:tabular-nums">' + totalBillHrs.toFixed(1) + '</td>';
+  h += '<td style="text-align:right;font-variant-numeric:tabular-nums">$' + Math.round(totalRevenue).toLocaleString() + '</td>';
+  h += '<td style="text-align:right;font-variant-numeric:tabular-nums">' + (totalOopSpent > 0 ? '$' + Math.round(totalOopSpent).toLocaleString() : '—') + '</td>';
+  h += '<td></td><td style="text-align:center">' + totalEntries + '</td>';
+  h += '</tr>';
   h += '</tbody></table>';
 
   document.getElementById('mainContent').innerHTML = h;
@@ -6038,10 +6091,29 @@ async function loadSupabaseData() {
     SUPA_ACTUALS_ALL = await sparkFetchAll('labor_actuals', 'select=id,hours,work_date,person_name,project_code,phase_key,is_billable,is_bizdev,is_timeoff,board_name&source=eq.timetracker&work_date=gte.2025-01-01&order=work_date.desc');
 
     /* 6. Build SUPA_ACTUALS keyed by project_code */
+    /* Code aliases: map 7pace board codes to Furnace project codes */
+    var CODE_ALIASES = {
+      '386_10': '386_10_XXX',     /* Synchrony Small Projects */
+      '320_10': '320_10_XXX',     /* CareCredit Small Projects */
+      '321_13_01': '321_13_01_A012', /* Provider Testimonials AuDacity */
+      '378_06_03': '378_06_05',   /* NEGU Gala Video */
+      '322_07_01': '322_07_02',   /* CES4 Social Media → Post */
+      '100_02': '100_00_00',      /* Post Depo → Non-Billable */
+      '100_00': '100_00_00',      /* Time OFF → Non-Billable */
+      '100_07_05': '100_00_00',   /* Stryke → Non-Billable */
+      '100_07_03': '100_00_00',   /* os-crnt → Non-Billable */
+      '100_05': '100_00_00',      /* Dept Small Tasks → Non-Billable */
+      '100_01': '100_00_00',      /* Leadership Meetings → Non-Billable */
+      '100_07_09': '100_00_00',   /* YT Companion → Non-Billable */
+    };
+
     SUPA_ACTUALS = {};
     for (var i = 0; i < SUPA_ACTUALS_ALL.length; i++) {
       var a = SUPA_ACTUALS_ALL[i];
       var code = a.project_code;
+      if (!code) code = '100_00_00'; /* unknown/private → Non-Billable */
+      if (CODE_ALIASES[code]) code = CODE_ALIASES[code];
+      a.project_code = code; /* update in place so downstream uses resolved code */
       if (!code) continue;
       if (!SUPA_ACTUALS[code]) SUPA_ACTUALS[code] = { totalHours: 0, phases: {}, people: {}, byDate: {} };
       var sa = SUPA_ACTUALS[code];
