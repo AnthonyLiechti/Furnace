@@ -2832,8 +2832,8 @@
         },
         {
           "id": "ces4-social-combined",
-          "name": "CES4 Social Media",
-          "code": "322_07_00",
+          "name": "CES4 Social Media Post",
+          "code": "322_07_02",
           "totalBudget": 2387,
           "hasBudgetData": true,
           "dataSource": "snapshot",
