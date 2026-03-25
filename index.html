@@ -1389,7 +1389,7 @@ function renderMaster() {
 
   /* ── FINANCE TABLE — date-filtered hours + OOP spent per project ── */
   /* Compute per-project hours and revenue for the selected date range */
-  var dateRange = getDateFilter();
+  var dateRange = getDateRange(globalDateFilter);
   var hasDateFilter = !!(dateRange && dateRange.start && dateRange.end);
   var periodLabel = hasDateFilter ? fmtDateShort(dateRange.start.toISOString().slice(0,10)) + ' – ' + fmtDateShort(dateRange.end.toISOString().slice(0,10)) : 'All Time';
 
@@ -6212,7 +6212,41 @@ async function loadData() {
 
     navigate('master');
   } catch(e) {
-    document.getElementById('mainContent').innerHTML = '<div style="padding:60px 40px;text-align:center"><h2 style="color:var(--ember)">Unable to load portfolio data</h2><p style="color:var(--mid-gray);margin-top:12px">Could not fetch data/portfolio.json</p><p style="color:var(--mid-gray);margin-top:4px;font-size:11px">' + e.message + '</p><p style="color:var(--mid-gray);margin-top:16px;font-size:12px">If running locally, start a server:<br><code style="background:#f5f3f0;padding:2px 6px;border-radius:3px">npx serve .</code></p></div>';
+    console.error('loadData error:', e);
+    /* Try to continue with empty data — Supabase may still work */
+    if (!CLIENTS || CLIENTS.length === 0) {
+      CLIENTS = [];
+      /* On web without portfolio.json, build minimal client list from Supabase */
+      await sparkCheckStatus();
+      if (sparkAuth.connected) {
+        try {
+          await loadSupabaseData();
+          /* Build CLIENTS from SUPA_BUDGETS */
+          var clientMap = {};
+          for (var code in SUPA_BUDGETS) {
+            var sb = SUPA_BUDGETS[code];
+            var proj = sb.projects || {};
+            var cl = proj.clients || {};
+            var cn = (cl.client_number || code.split('_')[0] || '???');
+            if (!clientMap[cn]) clientMap[cn] = { id: cn, code: cn, name: cl.name || cn, color: '#306D7C', projects: [] };
+            clientMap[cn].projects.push({
+              id: code, code: code, name: sb.name || code,
+              clientId: cn, clientName: clientMap[cn].name, clientCode: cn,
+              status: sb.status || 'active', projectType: 'billable',
+              dollarBudget: sb.client_price || 0, laborCost: sb.laborTotal || 0,
+              oopCost: sb.oopTotal || 0, profit: (sb.client_price || 0) - (sb.total_amount || 0),
+              totalBudget: sb.laborHours || 0, phases: [], hasBudgetData: true,
+              dataSource: 'supabase', _supabudget: sb
+            });
+          }
+          CLIENTS = Object.values(clientMap);
+          enrichProjectsWithSupabase();
+          navigate('master');
+          return;
+        } catch(se) { console.error('Supabase fallback failed:', se); }
+      }
+      document.getElementById('mainContent').innerHTML = '<div style="padding:60px 40px;text-align:center"><h2 style="color:var(--ember)">Unable to load data</h2><p style="color:var(--mid-gray);margin-top:12px">' + e.message + '</p><p style="color:var(--mid-gray);margin-top:16px;font-size:12px">Go to <a href="#" onclick="navigate(\'settings\');return false" style="color:var(--ocean)">Settings</a> and connect to Furnace.</p></div>';
+    }
   }
 }
 
