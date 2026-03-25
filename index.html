@@ -3380,11 +3380,21 @@ function sparkFmtDec(n) {
 }
 
 function sparkGetRate(entry) {
+  /* All Active Billable projects use flat $200/hr client rate */
+  if (entry.rate_override != null && entry.rate_override > 0) return entry.rate_override;
+  if (entry.employment_type === 'Freelancer' || (entry.team_member && entry.team_member.employment_type === 'Freelancer')) {
+    return entry.ad_hoc_rate || 200;
+  }
+  return 200;
+}
+
+function sparkGetInternalRate(entry) {
+  /* Internal cost rate per person — used for internal cost tracking */
   if (entry.rate_override != null && entry.rate_override > 0) return entry.rate_override;
   if (entry.employment_type === 'Freelancer' || (entry.team_member && entry.team_member.employment_type === 'Freelancer')) {
     return entry.ad_hoc_rate || 0;
   }
-  return (entry.team_member && entry.team_member.billable_rate) || 0;
+  return (entry.team_member && entry.team_member.fully_burdened_rate) || 185;
 }
 
 function sparkEntryHours(entry, phaseKey) {
@@ -4160,11 +4170,14 @@ function sparkRenderBudgetContent(embedded) {
   var reserveAmt = tcv * (reservePct / 100);
 
   /* Compute labor total + hours */
-  var totalLaborCost = 0;
+  var totalLaborCost = 0;  /* Client-facing @ $200/hr */
+  var totalLaborInternal = 0;  /* Internal cost @ actual rates */
   var totalLaborHrs = 0;
   for (var i = 0; i < data.labor.length; i++) {
-    totalLaborCost += sparkEntryTotal(data.labor[i]);
-    totalLaborHrs += sparkEntryHours(data.labor[i], 'all');
+    var hrs = sparkEntryHours(data.labor[i], 'all');
+    totalLaborCost += hrs * sparkGetRate(data.labor[i]);
+    totalLaborInternal += hrs * sparkGetInternalRate(data.labor[i]);
+    totalLaborHrs += hrs;
   }
   /* Compute OOP total */
   var totalOop = 0;
