@@ -1285,12 +1285,8 @@ function renderMaster() {
     if (p.dataSource === 'supabase' || p.dataSource === 'snapshot') {
       totalDollarBudget += p.dollarBudget || 0;
       totalLaborMU += p.laborCost || 0;
-      /* Use actual labor cost from Supabase, or 0.833 fallback for old snapshots */
-      if (p._supabudget) {
-        totalLaborCost += p._supabudget.laborCostInternal || 0;
-      } else {
-        totalLaborCost += (p.laborCost || 0) * 0.833;
-      }
+      /* All labor at $200/hr */
+      totalLaborCost += p.laborCost || 0;
       totalOOP += p.oopCost || 0;
       totalProfit += p.profit || 0;
       snapshotCount++;
@@ -1536,12 +1532,8 @@ function renderClient(clientId) {
     if (p.dataSource === 'supabase' || p.dataSource === 'snapshot') {
       totalDollarBudget += p.dollarBudget || 0;
       totalLaborMU += p.laborCost || 0;
-      /* Use actual labor cost from Supabase, or 0.833 fallback for old snapshots */
-      if (p._supabudget) {
-        totalLaborCost += p._supabudget.laborCostInternal || 0;
-      } else {
-        totalLaborCost += (p.laborCost || 0) * 0.833;
-      }
+      /* All labor at $200/hr */
+      totalLaborCost += p.laborCost || 0;
       totalOOP += p.oopCost || 0;
       totalEstProfit += p.profit || 0;
       totalActiveProfit += p.profit || 0;
@@ -1873,11 +1865,10 @@ function renderProject(projectId) {
     var oopPredicted = oopGetPredictedForProject(p.code);
     var oopRemaining = oopBudget - oopSpent;
 
-    /* Convert to dollars for the progress bar using budget's labor cost */
-    var laborBudget$ = sb.laborTotal || 0;  /* total estimated labor cost from snapshot */
-    var laborSpentPct = (sb.laborHours || 0) > 0 ? (saHrs / sb.laborHours) : 0;
-    var laborSpent$ = Math.min(laborBudget$, laborBudget$ * laborSpentPct);  /* proportional spend */
-    var laborRemaining$ = Math.max(0, laborBudget$ - laborSpent$);
+    /* Convert to dollars for the progress bar — flat $200/hr */
+    var agencyRate = 200;
+    var laborSpent$ = saHrs * agencyRate;
+    var laborRemaining$ = Math.max(0, hrsRemaining) * agencyRate;
     var barTotal = tcvPrice > 0 ? tcvPrice : 1;
     var profitBar$ = Math.max(0, tcvPrice - laborSpent$ - laborRemaining$ - oopSpent - Math.max(0, oopRemaining));
 
@@ -1887,7 +1878,7 @@ function renderProject(projectId) {
     h += '<div class="snap-fin-item"><div class="sf-label">Client Price</div><div class="sf-value sf-gold">$' + Math.round(tcvPrice).toLocaleString() + '</div>';
     if (hasDisc) h += '<div class="sf-sub">Before discount: $' + Math.round(rawPrice).toLocaleString() + '</div>';
     h += '</div>';
-    h += '<div class="snap-fin-item"><div class="sf-label">Labor Cost</div><div class="sf-value">$' + Math.round(sb.laborCostInternal || 0).toLocaleString() + '</div><div class="sf-sub">Client: $' + Math.round(sb.laborTotal || 0).toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Labor Cost</div><div class="sf-value">$' + Math.round(sb.laborTotal || 0).toLocaleString() + '</div><div class="sf-sub">' + (sb.laborHours || 0).toFixed(0) + ' hrs @ $200/hr</div></div>';
     h += '<div class="snap-fin-item"><div class="sf-label">OOP Cost</div><div class="sf-value">$' + Math.round(sb.oopTotal || 0).toLocaleString() + '</div></div>';
     h += '<div class="snap-fin-item"><div class="sf-label">Profit</div><div class="sf-value ' + (profitVal >= 0 ? 'sf-green' : '') + '">$' + Math.round(profitVal).toLocaleString() + '</div><div class="sf-sub">' + profitPctVal + '%</div></div>';
     h += '</div>';
@@ -3382,21 +3373,13 @@ function sparkFmtDec(n) {
 }
 
 function sparkGetRate(entry) {
-  /* All Active Billable projects use flat $200/hr client rate */
-  if (entry.rate_override != null && entry.rate_override > 0) return entry.rate_override;
-  if (entry.employment_type === 'Freelancer' || (entry.team_member && entry.team_member.employment_type === 'Freelancer')) {
-    return entry.ad_hoc_rate || 200;
-  }
+  /* Flat $200/hr agency rate for all labor, always */
   return 200;
 }
 
 function sparkGetInternalRate(entry) {
-  /* Internal cost rate per person — used for internal cost tracking */
-  if (entry.rate_override != null && entry.rate_override > 0) return entry.rate_override;
-  if (entry.employment_type === 'Freelancer' || (entry.team_member && entry.team_member.employment_type === 'Freelancer')) {
-    return entry.ad_hoc_rate || 0;
-  }
-  return (entry.team_member && entry.team_member.fully_burdened_rate) || 185;
+  /* Flat $200/hr — same as client rate, no internal distinction */
+  return 200;
 }
 
 function sparkEntryHours(entry, phaseKey) {
@@ -6449,16 +6432,14 @@ async function loadSupabaseData() {
       b.labor = laborByBudget[b.id] || [];
       b.oop = oopByBudget[b.id] || [];
 
-      /* Compute labor totals */
-      var laborHours = 0, laborCost = 0;
+      /* Compute labor totals — flat $200/hr agency rate for everything */
+      var laborHours = 0;
       for (var k = 0; k < b.labor.length; k++) {
         var le = b.labor[k];
         var hrs = (le.phase1 || 0) + (le.phase2 || 0) + (le.phase3_1 || 0) + (le.phase3_2 || 0) + (le.phase4 || 0) + (le.phase5 || 0);
         laborHours += hrs;
-        var rate = le.rate_override || (le.team_member ? le.team_member.fully_burdened_rate : 185) || 185;
-        laborCost += hrs * rate;
       }
-      var laborCostMU = laborCost * (1 / 0.833); // markup to client-facing
+      var laborCost = laborHours * 200;
 
       /* Compute OOP totals: planned, effective (cascade), and spent (paid only) */
       var oopPlanned = 0, oopEffective = 0, oopSpent = 0;
@@ -6482,7 +6463,7 @@ async function loadSupabaseData() {
       }
 
       b.laborHours = laborHours;
-      b.laborTotal = laborCostMU;
+      b.laborTotal = laborCost;
       b.laborCostInternal = laborCost;
       b.oopTotal = oopPlanned;
       b.oopEffective = oopEffective;
