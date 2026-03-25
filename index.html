@@ -2377,9 +2377,11 @@ function renderFlagged() {
     var hasLabor = (sb.laborHours || 0) > 0;
     var hasOop = (sb.oopEffective || sb.oopTotal || 0) > 0;
 
-    if (hasPrice && hasLabor && hasOop) {
+    var noOopNeeded = sb.no_oop === true;
+
+    if (hasPrice && hasLabor && (hasOop || noOopNeeded)) {
       fullyLoaded.push(p);
-    } else if (hasPrice && hasLabor && !hasOop) {
+    } else if (hasPrice && hasLabor && !hasOop && !noOopNeeded) {
       needsOop.push(p);
     } else if (hasPrice && !hasLabor) {
       budgetNoLabor.push(p);
@@ -2443,14 +2445,58 @@ function renderFlagged() {
     }
   }
 
-  /* ── 3. NEEDS OOP ── */
+  /* ── 3. NEEDS OOP DATA ── */
   if (needsOop.length) {
-    h += '<div class="section-title" style="color:#FF9800">Has Labor — Needs OOP Data (' + needsOop.length + ')</div>';
-    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">These projects have labor estimates but no out-of-pocket costs entered. Open the Budget Snapshot and fill in the OOP sections (Creative, Camera, Talent, Travel &amp; Meals).</p>';
+    h += '<div class="section-title" style="color:#FF9800">Needs OOP Data (' + needsOop.length + ')</div>';
+    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">These projects have labor estimates but no out-of-pocket costs entered. Toggle "No OOP" on the project if this project has no out-of-pocket expenses, or fill in the OOP sections.</p>';
     for (var i = 0; i < needsOop.length; i++) {
       var p = needsOop[i];
       var hrs = p._supabudget ? (p._supabudget.laborHours || 0) : 0;
-      h += flagCard(p, '#FF9800', 'Labor hours set (' + hrs.toFixed(0) + 'h) but no OOP entries', 'Open Budget Snapshot \u2192 OOP sections to add out-of-pocket costs');
+      h += flagCard(p, '#FF9800', 'Labor hours set (' + hrs.toFixed(0) + 'h) but no OOP entries', 'Open Budget Snapshot \u2192 toggle "No OOP" or add out-of-pocket costs');
+    }
+  }
+
+  /* ── 3b. NEEDS OOP SCHEDULING ── */
+  /* Find projects with OOP line items that have costs but no scheduled payment date */
+  var unscheduledOop = [];
+  var oopScheduleEntries = (OOP_SCHEDULE && OOP_SCHEDULE.entries) ? OOP_SCHEDULE.entries : [];
+  var scheduledItemIds = {};
+  for (var si = 0; si < oopScheduleEntries.length; si++) {
+    if (oopScheduleEntries[si].oopEntryId) scheduledItemIds[oopScheduleEntries[si].oopEntryId] = true;
+  }
+
+  for (var i = 0; i < fullyLoaded.length; i++) {
+    var p = fullyLoaded[i];
+    if (!p._supabudget || !p._supabudget.oopEntries) continue;
+    var oopItems = p._supabudget.oopEntries || [];
+    var unschedItems = [];
+    for (var j = 0; j < oopItems.length; j++) {
+      var item = oopItems[j];
+      if (item.is_active === false) continue;
+      var effectiveAmt = item.actual_amount || item.adjusted_rate || item.rate || 0;
+      var effectiveCount = item.actual_count || item.adjusted_count || item.count || 0;
+      if (effectiveCount > 0 && effectiveAmt > 0 && !item.paid && !scheduledItemIds[item.id]) {
+        unschedItems.push(item);
+      }
+    }
+    if (unschedItems.length > 0) {
+      unscheduledOop.push({ project: p, items: unschedItems });
+    }
+  }
+
+  if (unscheduledOop.length) {
+    h += '<div class="section-title" style="color:#7B1FA2">Needs OOP Scheduling (' + unscheduledOop.length + ' projects)</div>';
+    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">These projects have OOP line items with costs that haven\'t been scheduled for payment yet. Go to Manage Resources \u2192 Out-of-Pocket to schedule them.</p>';
+    for (var ui = 0; ui < unscheduledOop.length; ui++) {
+      var uo = unscheduledOop[ui];
+      var itemNames = uo.items.map(function(it) { return it.line_item_name || 'Unnamed'; }).slice(0, 5).join(', ');
+      if (uo.items.length > 5) itemNames += ' +' + (uo.items.length - 5) + ' more';
+      var totalUnsched = 0;
+      for (var j = 0; j < uo.items.length; j++) {
+        var it = uo.items[j];
+        totalUnsched += (it.actual_amount || ((it.adjusted_count || it.count || 0) * (it.adjusted_rate || it.rate || 0)));
+      }
+      h += flagCard(uo.project, '#7B1FA2', uo.items.length + ' OOP item' + (uo.items.length > 1 ? 's' : '') + ' unscheduled ($' + Math.round(totalUnsched).toLocaleString() + ')', itemNames);
     }
   }
 
@@ -4211,7 +4257,14 @@ function sparkRenderBudgetContent(embedded) {
   }
 
   /* ── OOP Section ── */
-  h += '<div class="section-title" style="margin-top:28px">Out-of-Pocket (OOP)</div>';
+  /* OOP section with No OOP toggle */
+  var noOopChecked = data.budget.no_oop === true;
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:28px">';
+  h += '<div class="section-title" style="margin:0">Out-of-Pocket (OOP)</div>';
+  h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--mid-gray)">';
+  h += '<span>No OOP</span>';
+  h += '<div style="position:relative;display:inline-block;width:36px;height:20px"><input type="checkbox" ' + (noOopChecked ? 'checked' : '') + ' onchange="sparkPatchBudgetField(\'no_oop\',this.checked)" style="opacity:0;width:0;height:0"><span style="position:absolute;top:0;left:0;right:0;bottom:0;background:' + (noOopChecked ? 'var(--ocean)' : 'rgba(0,0,0,.15)') + ';border-radius:10px;transition:.3s;cursor:pointer"></span><span style="position:absolute;left:' + (noOopChecked ? '18px' : '2px') + ';top:2px;width:16px;height:16px;background:white;border-radius:50%;transition:.3s;cursor:pointer"></span></div>';
+  h += '</label></div>';
   h += '<div id="sparkOopContent"></div>';
 
   /* ── Summary Bar ── */
@@ -6301,7 +6354,7 @@ async function loadSupabaseData() {
   if (!sparkAuth.connected) return;
   try {
     /* 1. Fetch all visible budgets with project info */
-    var budgets = await sparkFetchAll('budgets', 'select=id,name,status,client_price,total_amount,has_discount,discount_percentage,reserve_percentage,oop_markup_percentage,project_id,projects(id,project_code,name)&visibility=eq.visible');
+    var budgets = await sparkFetchAll('budgets', 'select=id,name,status,client_price,total_amount,has_discount,discount_percentage,reserve_percentage,oop_markup_percentage,no_oop,project_id,projects(id,project_code,name)&visibility=eq.visible');
     if (!budgets || !budgets.length) { console.warn('No Supabase budgets found'); return; }
 
     /* 2. Fetch labor_budget_entries and oop_budget_entries for all budgets */
