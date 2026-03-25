@@ -1271,7 +1271,13 @@ function renderMaster() {
   var all = showFinalized ? allProjects() : activeProjects();
   var doneCount = completedProjects().length;
   var needsReviewCount = 0;
-  for (var i = 0; i < all.length; i++) { if (all[i].dataSource === 'no_snapshot' || all[i].dataSource === 'needs_review') needsReviewCount++; }
+  for (var i = 0; i < all.length; i++) {
+    var ap = all[i];
+    if (ap.dataSource === 'no_snapshot' || ap.dataSource === 'needs_review') {
+      var isNB = ap.projectType === 'internal' || ap.projectType === 'bizdev' || ap.code.indexOf('100_') === 0 || ap.code.indexOf('101_') === 0 || ap.code.indexOf('359_') === 0;
+      if (!isNB) needsReviewCount++;
+    }
+  }
 
   /* Aggregate financials from all visible projects with snapshots or Supabase budgets */
   var totalBudgetHrs = 0, totalSpentHrs = 0;
@@ -2265,8 +2271,9 @@ function renderFlagged() {
     var sb = p._supabudget;
 
     if (!sb) {
-      /* No Supabase budget */
-      if (p.dataSource === 'no_snapshot' || p.dataSource === 'needs_review') {
+      /* No Supabase budget — skip non-billable/internal projects */
+      var isNonBill = p.projectType === 'internal' || p.projectType === 'bizdev' || p.code.indexOf('100_') === 0 || p.code.indexOf('101_') === 0 || p.code.indexOf('359_') === 0;
+      if (!isNonBill && (p.dataSource === 'no_snapshot' || p.dataSource === 'needs_review')) {
         noBudget.push(p);
       }
       continue;
@@ -6160,7 +6167,13 @@ function enrichProjectsWithSupabase() {
         p.totalBudget = sb.laborHours || 0;
       } else {
         p._supabudget = null;
-        p.dataSource = 'needs_review';
+        /* Non-billable and internal projects don't need a budget */
+        var isNonBillable = p.projectType === 'internal' || p.projectType === 'bizdev' || p.code.indexOf('100_') === 0 || p.code.indexOf('101_') === 0 || p.code.indexOf('359_') === 0;
+        if (isNonBillable) {
+          p.dataSource = p.dataSource || 'snapshot'; /* keep existing, don't flag */
+        } else {
+          p.dataSource = 'needs_review';
+        }
       }
       var sa = SUPA_ACTUALS[p.code];
       if (sa) {
