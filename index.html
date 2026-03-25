@@ -1873,10 +1873,11 @@ function renderProject(projectId) {
     var oopPredicted = oopGetPredictedForProject(p.code);
     var oopRemaining = oopBudget - oopSpent;
 
-    /* Convert hours to dollars for the progress bar (at $200/hr agency rate) */
-    var agencyRate = 200;
-    var laborSpent$ = saHrs * agencyRate;
-    var laborRemaining$ = Math.max(0, hrsRemaining) * agencyRate;
+    /* Convert to dollars for the progress bar using budget's labor cost */
+    var laborBudget$ = sb.laborTotal || 0;  /* total estimated labor cost from snapshot */
+    var laborSpentPct = (sb.laborHours || 0) > 0 ? (saHrs / sb.laborHours) : 0;
+    var laborSpent$ = Math.min(laborBudget$, laborBudget$ * laborSpentPct);  /* proportional spend */
+    var laborRemaining$ = Math.max(0, laborBudget$ - laborSpent$);
     var barTotal = tcvPrice > 0 ? tcvPrice : 1;
     var profitBar$ = Math.max(0, tcvPrice - laborSpent$ - laborRemaining$ - oopSpent - Math.max(0, oopRemaining));
 
