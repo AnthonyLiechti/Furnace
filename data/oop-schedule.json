@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "oop_1711300000_a1b2",
+      "projectCode": "320_30_10",
+      "projectName": "CES4 Design & Post",
+      "lineItemName": "Captions",
+      "amount": 6500,
+      "date": "2026-03-24",
+      "weekOf": "2026-03-23",
+      "paid": false,
+      "notes": ""
+    },
+    {
+      "id": "oop_1711300001_c3d4",
+      "projectCode": "320_30_10",
+      "projectName": "CES4 Design & Post",
+      "lineItemName": "Stock Footage",
+      "amount": 1200,
+      "date": "2026-03-25",
+      "weekOf": "2026-03-23",
+      "paid": true,
+      "notes": "Invoice #4521"
+    },
+    {
+      "id": "oop_1711300002_e5f6",
+      "projectCode": "320_30_10",
+      "projectName": "CES4 Design & Post",
+      "lineItemName": "Music License",
+      "amount": 3000,
+      "date": "2026-03-27",
+      "weekOf": "2026-03-23",
+      "paid": false,
+      "notes": ""
+    },
+    {
+      "id": "oop_1774407564184_qd1j",
+      "projectCode": "100_00_00",
+      "projectName": "Non-Billable",
+      "lineItemName": "Graphic Designer",
+      "amount": 2000,
+      "date": "2026-03-25",
+      "weekOf": "2026-03-23",
+      "paid": false,
+      "notes": "",
+      "supaOopId": "64c4080b-6747-4b9a-8dd8-58eeea9dd95a"
+    }
+  ]
+}

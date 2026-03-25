@@ -18,4 +18,8 @@ contextBridge.exposeInMainWorld('furnaceAPI', {
   // Spark config
   sparkReadConfig: () => ipcRenderer.invoke('spark-config-read'),
   sparkWriteConfig: (config) => ipcRenderer.invoke('spark-config-write', config),
+
+  // OOP Schedule
+  readOopSchedule: () => ipcRenderer.invoke('read-json', 'oop-schedule.json'),
+  writeOopSchedule: (data) => ipcRenderer.invoke('write-json', 'oop-schedule.json', data),
 });

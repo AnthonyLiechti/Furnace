@@ -387,6 +387,56 @@ body { font-family: Arial, 'TT Hoves Pro', sans-serif; background: var(--light-g
 .cap-yellow { color:var(--honey); }
 .cap-red { color:var(--ember); }
 
+/* ── Resource Sub-Tab Toggle ── */
+.alloc-tab-bar { display:flex; gap:0; margin-bottom:0; background:var(--white); border-bottom:2px solid var(--canvas); padding:0 18px; flex-shrink:0; }
+.alloc-tab-btn { padding:10px 20px; font-size:13px; font-weight:600; color:var(--mid-gray); cursor:pointer; border:none; background:none; border-bottom:2px solid transparent; margin-bottom:-2px; font-family:inherit; transition:color .15s, border-color .15s; }
+.alloc-tab-btn:hover { color:var(--abyss); }
+.alloc-tab-btn.active { color:var(--ocean); border-bottom-color:var(--ocean); }
+
+/* ── OOP Resource Planner ── */
+.oop-planner-layout { display:grid; grid-template-columns:220px 1fr; gap:0; height:calc(100vh - 160px); }
+.oop-planner-grid-area { display:flex; flex-direction:column; overflow:hidden; }
+.oop-planner-toolbar { display:flex; align-items:center; gap:12px; padding:12px 18px; border-bottom:1px solid var(--canvas); background:var(--white); flex-shrink:0; }
+.oop-planner-toolbar button { background:var(--white); border:1px solid var(--canvas); border-radius:6px; padding:5px 12px; cursor:pointer; font-size:12px; color:var(--abyss); font-family:inherit; }
+.oop-planner-toolbar button:hover { background:var(--light-gray); }
+.oop-planner-toolbar .at-label { font-size:14px; font-weight:700; color:var(--abyss); min-width:200px; text-align:center; }
+.oop-planner-scroll { flex:1; overflow:auto; background:var(--light-gray); }
+.oop-grid { display:grid; min-width:100%; }
+.oop-corner { background:var(--white); border-bottom:2px solid var(--canvas); border-right:1px solid var(--canvas); padding:8px 12px; position:sticky; left:0; top:0; z-index:3; font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--mid-gray); }
+.oop-col-hdr { background:var(--white); border-bottom:2px solid var(--canvas); padding:8px 6px; text-align:center; font-size:11px; font-weight:600; color:var(--abyss); position:sticky; top:0; z-index:2; }
+.oop-col-hdr .oop-day { font-size:9px; color:var(--mid-gray); font-weight:400; display:block; }
+.oop-row-hdr { background:var(--white); border-right:1px solid var(--canvas); border-bottom:1px solid var(--light-gray); padding:6px 12px; position:sticky; left:0; z-index:1; font-size:11px; font-weight:500; color:var(--abyss); display:flex; align-items:center; gap:6px; min-width:150px; }
+.oop-row-hdr .oop-proj-code { font-size:9px; color:var(--mid-gray); font-family:monospace; }
+.oop-row-hdr .oop-row-total { font-size:10px; color:var(--mid-gray); margin-left:auto; font-weight:400; font-variant-numeric:tabular-nums; }
+.oop-cell { border-bottom:1px solid var(--light-gray); border-right:1px solid rgba(0,0,0,.04); padding:4px; min-height:44px; cursor:pointer; transition:background .1s; position:relative; }
+.oop-cell:hover { background:rgba(48,109,124,.06); }
+.oop-cell-empty { width:100%; height:100%; min-height:36px; border-radius:4px; border:1px dashed transparent; display:flex; align-items:center; justify-content:center; }
+.oop-cell:hover .oop-cell-empty { border-color:var(--canvas); }
+.oop-chip { border-radius:5px; padding:3px 8px; font-size:11px; font-weight:600; margin:2px 0; display:flex; justify-content:space-between; align-items:center; gap:4px; cursor:pointer; }
+.oop-chip.scheduled { background:rgba(245,127,23,.15); color:#F57F17; }
+.oop-chip.paid { background:rgba(46,125,50,.15); color:#2E7D32; }
+.oop-chip .oop-chip-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100px; font-size:10px; }
+.oop-chip .oop-chip-amt { font-variant-numeric:tabular-nums; font-size:11px; }
+.oop-total-cell { background:var(--white); border-bottom:1px solid var(--light-gray); padding:6px 8px; text-align:right; font-size:12px; font-weight:700; font-variant-numeric:tabular-nums; color:var(--abyss); }
+.oop-grand-total { background:var(--abyss); color:var(--white); padding:6px 8px; font-size:12px; font-weight:700; font-variant-numeric:tabular-nums; text-align:right; }
+.oop-footer { display:flex; justify-content:space-between; padding:12px 18px; background:var(--white); border-top:1px solid var(--canvas); font-size:12px; color:var(--abyss); }
+.oop-footer .oop-stat { font-weight:600; }
+.oop-footer .oop-stat-label { font-size:10px; color:var(--mid-gray); text-transform:uppercase; letter-spacing:.5px; }
+
+/* OOP Modal */
+.oop-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:9999; display:flex; align-items:center; justify-content:center; }
+.oop-modal { background:var(--white); border-radius:12px; padding:24px; width:380px; box-shadow:0 8px 32px rgba(0,0,0,.2); }
+.oop-modal h3 { font-size:15px; margin:0 0 16px; color:var(--abyss); }
+.oop-modal label { display:block; font-size:11px; font-weight:600; color:var(--mid-gray); text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; margin-top:12px; }
+.oop-modal input, .oop-modal select, .oop-modal textarea { width:100%; padding:8px 10px; border:1px solid var(--canvas); border-radius:6px; font-size:13px; font-family:inherit; outline:none; box-sizing:border-box; }
+.oop-modal input:focus, .oop-modal select:focus, .oop-modal textarea:focus { border-color:var(--ocean); }
+.oop-modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:20px; }
+.oop-modal-actions button { padding:8px 18px; border-radius:6px; border:1px solid var(--canvas); background:var(--white); font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; }
+.oop-modal-actions button.primary { background:var(--ocean); color:var(--white); border-color:var(--ocean); }
+.oop-modal-actions button.primary:hover { background:var(--abyss); }
+.oop-modal-actions button.danger { color:var(--ember); border-color:var(--ember); }
+.oop-modal-actions button.danger:hover { background:var(--ember); color:var(--white); }
+
 /* ── DARK MODE TOGGLE ── */
 .dark-toggle { display:flex; align-items:center; gap:8px; padding:10px 16px; cursor:pointer; font-size:12px; color:rgba(255,255,255,.6); transition:color .15s; user-select:none; }
 .dark-toggle:hover { color:rgba(255,255,255,.9); }
@@ -513,6 +563,23 @@ html.dark .alloc-grid-scroll { background:var(--dm-bg); }
 html.dark .alloc-proj-sidebar .aps-header { background:var(--dm-surface); border-bottom-color:var(--dm-border); }
 html.dark .alloc-proj-sidebar .aps-search:focus { background:var(--dm-surface); }
 html.dark .aps-item:hover { background:var(--dm-surface2); }
+html.dark .alloc-tab-bar { background:var(--dm-surface); border-bottom-color:var(--dm-border); }
+html.dark .alloc-tab-btn { color:var(--dm-text-muted); }
+html.dark .alloc-tab-btn:hover { color:var(--dm-text); }
+html.dark .alloc-tab-btn.active { color:var(--ocean); }
+html.dark .oop-planner-toolbar { background:var(--dm-surface); border-bottom-color:var(--dm-border); }
+html.dark .oop-planner-toolbar button { background:var(--dm-surface2); border-color:var(--dm-border); color:var(--dm-text); }
+html.dark .oop-planner-toolbar .at-label { color:var(--dm-text); }
+html.dark .oop-planner-scroll { background:var(--dm-bg); }
+html.dark .oop-corner { background:var(--dm-surface); border-color:var(--dm-border); color:var(--dm-text-muted); }
+html.dark .oop-col-hdr { background:var(--dm-surface); color:var(--dm-text); border-bottom-color:var(--dm-border); }
+html.dark .oop-row-hdr { background:var(--dm-surface); border-color:var(--dm-border); color:var(--dm-text); }
+html.dark .oop-cell { border-color:var(--dm-border); }
+html.dark .oop-total-cell { background:var(--dm-surface); color:var(--dm-text); border-color:var(--dm-border); }
+html.dark .oop-footer { background:var(--dm-surface); border-top-color:var(--dm-border); color:var(--dm-text); }
+html.dark .oop-modal { background:var(--dm-surface); color:var(--dm-text); }
+html.dark .oop-modal input, html.dark .oop-modal select, html.dark .oop-modal textarea { background:var(--dm-surface2); border-color:var(--dm-border); color:var(--dm-text); }
+html.dark .oop-modal-actions button { background:var(--dm-surface2); border-color:var(--dm-border); color:var(--dm-text); }
 
 /* ── DARK MODE: Global Toolbar & Selects ── */
 html.dark #globalToolbar { border-bottom-color:var(--dm-border); }
@@ -810,6 +877,16 @@ var allocWeekOf = null; /* currently selected week (Monday ISO string) */
 var allocProject = ''; /* currently selected project for entry */
 var allocPendingRows = []; /* in-progress person rows before save */
 var allocSaveTimer = null;
+var allocResourceTab = 'hours';
+var oopViewMode = 'week';
+var oopDayOffset = 0; /* 'hours' or 'oop' */
+
+/* ── OOP SCHEDULE DATA ── */
+var OOP_SCHEDULE = { version: 1, entries: [] };
+var oopProjSearch = '';
+var oopSelectedProject = '';
+var oopSaveTimer = null;
+var _oopEntryLookup = {}; /* temp lookup for modal editing */
 
 /* ── RESOURCE HELPERS ── */
 function getWeekMon(ds) {
@@ -1612,7 +1689,7 @@ function renderProject(projectId) {
     /* OOP metrics */
     var oopBudget = sb.oopEffective || sb.oopTotal || 0;
     var oopSpent = sb.oopSpent || 0;
-    var oopPredicted = 0; /* TODO: from OOP resource manager */
+    var oopPredicted = oopGetPredictedForProject(p.code);
     var oopRemaining = oopBudget - oopSpent;
 
     /* Convert hours to dollars for the progress bar (at $200/hr agency rate) */
@@ -2094,68 +2171,123 @@ function renderFlagged() {
 
   var all = allProjects();
 
-  /* Needs Review — projects without a Furnace budget */
-  var needsReview = [];
-  for (var i = 0; i < all.length; i++) {
-    if (all[i].dataSource === 'no_snapshot' || all[i].dataSource === 'needs_review') needsReview.push(all[i]);
-  }
+  /* Categorize ALL projects by data completeness using Supabase data */
+  var noBudget = [];      /* No Supabase budget at all */
+  var budgetNoLabor = []; /* Has budget $ but no labor entries */
+  var needsOop = [];      /* Has labor but no OOP data */
+  var fullyLoaded = [];   /* Has budget + labor + OOP */
+  var possiblyDone = [];  /* 95%+ hours consumed */
 
-  if (needsReview.length) {
-    h += '<div class="section-title" style="color:var(--honey)">Needs Furnace Budget (' + needsReview.length + ')</div>';
-    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">These projects don\'t have a budget snapshot in Furnace yet. Click into any project and use "Create Budget" to start one.</p>';
-    var byClient = {};
-    for (var i = 0; i < needsReview.length; i++) {
-      var p = needsReview[i];
-      if (!byClient[p.clientId]) byClient[p.clientId] = {name:p.clientName, code:p.clientCode, projects:[]};
-      byClient[p.clientId].projects.push(p);
-    }
-    for (var cid in byClient) {
-      var g = byClient[cid];
-      h += '<div style="margin-bottom:12px"><div style="font-size:12px;font-weight:600;color:var(--mid-gray);margin-bottom:6px">' + g.code + ' ' + g.name + ' (' + g.projects.length + ')</div>';
-      for (var j = 0; j < g.projects.length; j++) {
-        var p = g.projects[j];
-        h += '<div class="flagged-card" style="border-left-color:var(--honey);margin-bottom:8px;cursor:pointer" onclick="navigate(\'project:' + p.id + '\')">';
-        h += '<div class="flag-title">' + p.name + '</div>';
-        h += '<div class="flag-reason" style="color:var(--honey)">No Furnace budget — click to create one</div>';
-        h += '<div class="flag-client">' + p.code + '</div>';
-        h += '</div>';
-      }
-      h += '</div>';
-    }
-  }
-
-  if (FLAGGED_NO_STRUCTURE.length) {
-    h += '<div class="section-title">No Phase Structure</div>';
-    for (var i = 0; i < FLAGGED_NO_STRUCTURE.length; i++) {
-      var f = FLAGGED_NO_STRUCTURE[i];
-      h += '<div class="flagged-card"><div class="flag-title">' + f.name + '</div><div class="flag-reason">' + f.reason + '</div><div class="flag-client">' + f.clientCode + ' ' + f.client + ' &middot; ' + f.code + '</div></div>';
-    }
-  }
-
-  /* Possibly Finished — over budget or all phases complete but still marked active */
-  var possiblyDone = [];
   for (var i = 0; i < all.length; i++) {
     var p = all[i];
     if (isProjectCompleted(p)) continue;
-    if (!p.hasBudgetData) continue;
-    var totalPlanned = 0, totalSpent = 0;
-    for (var j = 0; j < p.phases.length; j++) { totalPlanned += p.phases[j].planned; totalSpent += p.phases[j].spent; }
-    if (totalPlanned > 0 && totalSpent >= totalPlanned * 0.95) {
-      possiblyDone.push({name:p.name, code:p.code, clientName:p.clientName, clientCode:p.clientCode, spent:Math.round(totalSpent), planned:Math.round(totalPlanned), pct:Math.round(totalSpent/totalPlanned*100)});
+    var sb = p._supabudget;
+
+    if (!sb) {
+      /* No Supabase budget */
+      if (p.dataSource === 'no_snapshot' || p.dataSource === 'needs_review') {
+        noBudget.push(p);
+      }
+      continue;
     }
-  }
-  if (possiblyDone.length) {
-    h += '<div class="section-title" style="color:#1565C0">Possibly Finished — Confirm Status</div>';
-    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">These projects have consumed 95%+ of their budgeted hours and may be finished. Please confirm so they can be moved to the Completed tab.</p>';
-    for (var i = 0; i < possiblyDone.length; i++) {
-      var f = possiblyDone[i];
-      h += '<div class="flagged-card" style="border-left-color:#1565C0"><div class="flag-title">' + f.name + '</div><div class="flag-reason" style="color:#1565C0">Budget ' + f.pct + '% consumed (' + f.spent + '/' + f.planned + ' hrs)</div><div class="flag-client">' + f.clientCode + ' ' + f.clientName + ' &middot; ' + f.code + '</div></div>';
+
+    /* Has Supabase budget — check what data exists */
+    var hasPrice = (sb.clientPrice || sb.client_price || 0) > 0;
+    var hasLabor = (sb.laborHours || 0) > 0;
+    var hasOop = (sb.oopEffective || sb.oopTotal || 0) > 0;
+
+    if (hasPrice && hasLabor && hasOop) {
+      fullyLoaded.push(p);
+    } else if (hasPrice && hasLabor && !hasOop) {
+      needsOop.push(p);
+    } else if (hasPrice && !hasLabor) {
+      budgetNoLabor.push(p);
+    } else if (!hasPrice) {
+      noBudget.push(p);
+    }
+
+    /* Check if possibly finished */
+    var budgetHrs = sb.laborHours || 0;
+    var spentHrs = 0;
+    if (SUPA_ACTUALS && SUPA_ACTUALS[p.code]) spentHrs = SUPA_ACTUALS[p.code].totalHours || 0;
+    if (budgetHrs > 0 && spentHrs >= budgetHrs * 0.95) {
+      possiblyDone.push({p:p, spent:Math.round(spentHrs), planned:Math.round(budgetHrs), pct:Math.round(spentHrs/budgetHrs*100)});
     }
   }
 
-  if (!needsReview.length && !FLAGGED_NO_STRUCTURE.length && !possiblyDone.length) {
+  /* Summary counts at top */
+  var totalIssues = noBudget.length + budgetNoLabor.length + needsOop.length + possiblyDone.length;
+  h += '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px">';
+  h += '<div style="background:var(--white);border-radius:8px;padding:14px;text-align:center;border-left:4px solid #E53935"><div style="font-size:28px;font-weight:700;color:#E53935">' + noBudget.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">No Budget</div></div>';
+  h += '<div style="background:var(--white);border-radius:8px;padding:14px;text-align:center;border-left:4px solid var(--honey)"><div style="font-size:28px;font-weight:700;color:var(--honey)">' + budgetNoLabor.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Needs Labor</div></div>';
+  h += '<div style="background:var(--white);border-radius:8px;padding:14px;text-align:center;border-left:4px solid #FF9800"><div style="font-size:28px;font-weight:700;color:#FF9800">' + needsOop.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Needs OOP</div></div>';
+  h += '<div style="background:var(--white);border-radius:8px;padding:14px;text-align:center;border-left:4px solid #1565C0"><div style="font-size:28px;font-weight:700;color:#1565C0">' + possiblyDone.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Possibly Done</div></div>';
+  h += '<div style="background:var(--white);border-radius:8px;padding:14px;text-align:center;border-left:4px solid #81C784"><div style="font-size:28px;font-weight:700;color:#81C784">' + fullyLoaded.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Fully Loaded</div></div>';
+  h += '</div>';
+
+  /* Helper to render a flagged card */
+  function flagCard(p, color, reason, detail) {
+    var price = p._supabudget ? (p._supabudget.clientPrice || p._supabudget.client_price || 0) : (p.dollarBudget || 0);
+    var priceStr = price > 0 ? '$' + Math.round(price).toLocaleString() : 'No budget set';
+    var card = '<div class="flagged-card" style="border-left-color:' + color + ';margin-bottom:8px;cursor:pointer;padding:12px 16px" onclick="navigate(\'project:' + p.id + '\')">';
+    card += '<div style="display:flex;justify-content:space-between;align-items:flex-start">';
+    card += '<div><div class="flag-title" style="margin-bottom:4px">' + p.name + '</div>';
+    card += '<div class="flag-reason" style="color:' + color + ';margin-bottom:4px">' + reason + '</div>';
+    if (detail) card += '<div style="font-size:11px;color:var(--mid-gray)">' + detail + '</div>';
+    card += '</div>';
+    card += '<div style="text-align:right"><div style="font-size:14px;font-weight:600;color:var(--abyss)">' + priceStr + '</div>';
+    card += '<div style="font-size:10px;color:var(--mid-gray)">' + p.code + '</div></div>';
+    card += '</div></div>';
+    return card;
+  }
+
+  /* ── 1. NO BUDGET ── */
+  if (noBudget.length) {
+    h += '<div class="section-title" style="color:#E53935">No Furnace Budget (' + noBudget.length + ')</div>';
+    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">These projects have no budget data in Furnace. Click into any project to create a new budget, or port data from an existing Google Sheets snapshot.</p>';
+    for (var i = 0; i < noBudget.length; i++) {
+      var p = noBudget[i];
+      var hasOldSnapshot = p.dollarBudget > 0;
+      var detail = hasOldSnapshot ? 'Has old snapshot data ($' + Math.round(p.dollarBudget).toLocaleString() + ') that can be ported' : 'No existing data — start fresh';
+      h += flagCard(p, '#E53935', 'No Furnace budget created', detail);
+    }
+  }
+
+  /* ── 2. BUDGET ONLY — NO LABOR ── */
+  if (budgetNoLabor.length) {
+    h += '<div class="section-title" style="color:var(--honey)">Has Budget — Needs Labor Hours (' + budgetNoLabor.length + ')</div>';
+    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">These projects have a budget amount set but no labor hour estimates per person. Open the Budget Snapshot and add team members to the Labor Fee section.</p>';
+    for (var i = 0; i < budgetNoLabor.length; i++) {
+      h += flagCard(budgetNoLabor[i], 'var(--honey)', 'Budget set but no labor hours entered', 'Open Budget Snapshot \u2192 Labor Fee section to add team hour estimates');
+    }
+  }
+
+  /* ── 3. NEEDS OOP ── */
+  if (needsOop.length) {
+    h += '<div class="section-title" style="color:#FF9800">Has Labor — Needs OOP Data (' + needsOop.length + ')</div>';
+    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">These projects have labor estimates but no out-of-pocket costs entered. Open the Budget Snapshot and fill in the OOP sections (Creative, Camera, Talent, Travel &amp; Meals).</p>';
+    for (var i = 0; i < needsOop.length; i++) {
+      var p = needsOop[i];
+      var hrs = p._supabudget ? (p._supabudget.laborHours || 0) : 0;
+      h += flagCard(p, '#FF9800', 'Labor hours set (' + hrs.toFixed(0) + 'h) but no OOP entries', 'Open Budget Snapshot \u2192 OOP sections to add out-of-pocket costs');
+    }
+  }
+
+  /* ── 4. POSSIBLY FINISHED ── */
+  if (possiblyDone.length) {
+    h += '<div class="section-title" style="color:#1565C0">Possibly Finished — Confirm Status (' + possiblyDone.length + ')</div>';
+    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">These projects have consumed 95%+ of their budgeted hours. If finished, mark them as "Finished" in the Project Overview to move them to Completed.</p>';
+    for (var i = 0; i < possiblyDone.length; i++) {
+      var f = possiblyDone[i];
+      h += flagCard(f.p, '#1565C0', 'Budget ' + f.pct + '% consumed (' + f.spent + '/' + f.planned + ' hrs)', 'If complete, click into project and set status to "Finished"');
+    }
+  }
+
+  /* ── ALL CLEAR ── */
+  if (totalIssues === 0) {
     h += '<div style="text-align:center;color:var(--mid-gray);padding:60px 0"><p style="font-size:40px;margin-bottom:12px">&#10003;</p><p>All projects have complete data</p></div>';
   }
+
   document.getElementById('mainContent').innerHTML = h;
 }
 
@@ -4137,6 +4269,18 @@ function renderAllocations() {
   var mc = document.getElementById('mainContent');
   var h = '';
 
+  /* ── SUB-TAB TOGGLE ── */
+  h += '<div class="alloc-tab-bar">';
+  h += '<button class="alloc-tab-btn' + (allocResourceTab === 'hours' ? ' active' : '') + '" onclick="allocResourceTab=\'hours\';renderAllocations()">Hours</button>';
+  h += '<button class="alloc-tab-btn' + (allocResourceTab === 'oop' ? ' active' : '') + '" onclick="allocResourceTab=\'oop\';renderAllocations()">Out-of-Pocket</button>';
+  h += '</div>';
+
+  if (allocResourceTab === 'oop') {
+    mc.innerHTML = h;
+    renderOopPlanner();
+    return;
+  }
+
   h += '<div class="alloc-layout">';
 
   /* ── PROJECT SIDEBAR ── */
@@ -4173,6 +4317,763 @@ function renderAllocations() {
   renderAllocProjList();
   renderAllocGrid();
   renderCapacityPanel();
+}
+
+/* ── OOP PLANNER HELPERS ── */
+
+function oopGetProjectEntries(projName, mondayISO) {
+  var days = getWeekDays(mondayISO);
+  var entries = OOP_SCHEDULE.entries || [];
+  var matched = [];
+  for (var i = 0; i < entries.length; i++) {
+    if (entries[i].projectName === projName && days.indexOf(entries[i].date) >= 0) matched.push(entries[i]);
+  }
+  return matched;
+}
+
+function oopGetDayEntries(projName, dateISO) {
+  var entries = OOP_SCHEDULE.entries || [];
+  var matched = [];
+  for (var i = 0; i < entries.length; i++) {
+    if (entries[i].projectName === projName && entries[i].date === dateISO) matched.push(entries[i]);
+  }
+  return matched;
+}
+
+function oopGetDayTotal(dateISO) {
+  var entries = OOP_SCHEDULE.entries || [];
+  var total = 0;
+  for (var i = 0; i < entries.length; i++) {
+    if (entries[i].date === dateISO) total += entries[i].amount || 0;
+  }
+  return total;
+}
+
+function oopGetProjectWeekTotal(projName, mondayISO) {
+  var items = oopGetProjectEntries(projName, mondayISO);
+  var total = 0;
+  for (var i = 0; i < items.length; i++) total += items[i].amount || 0;
+  return total;
+}
+
+function oopGetWeekGrandTotal(mondayISO) {
+  var days = getWeekDays(mondayISO);
+  var entries = OOP_SCHEDULE.entries || [];
+  var total = 0;
+  for (var i = 0; i < entries.length; i++) {
+    if (days.indexOf(entries[i].date) >= 0) total += entries[i].amount || 0;
+  }
+  return total;
+}
+
+function oopGetProjectsWithEntries(mondayISO) {
+  var days = getWeekDays(mondayISO);
+  var entries = OOP_SCHEDULE.entries || [];
+  var names = {};
+  for (var i = 0; i < entries.length; i++) {
+    if (days.indexOf(entries[i].date) >= 0) names[entries[i].projectName] = true;
+  }
+  return names;
+}
+
+async function saveOopSchedule() {
+  if (window.furnaceAPI) await window.furnaceAPI.writeOopSchedule(OOP_SCHEDULE);
+}
+
+function oopDebouncedSave() {
+  if (oopSaveTimer) clearTimeout(oopSaveTimer);
+  oopSaveTimer = setTimeout(function() {
+    saveOopSchedule();
+    var el = document.getElementById('oopSaveStatus');
+    if (el) { el.textContent = 'Saved'; setTimeout(function() { if (el) el.textContent = ''; }, 1500); }
+  }, 400);
+}
+
+function oopAddEntry(projName, projCode, lineItemName, amount, dateISO, notes, supaOopId) {
+  var entry = {
+    id: 'oop_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+    projectCode: projCode,
+    projectName: projName,
+    lineItemName: lineItemName,
+    amount: amount,
+    date: dateISO,
+    weekOf: getMondayOfWeek(dateISO),
+    paid: false,
+    notes: notes || '',
+    supaOopId: supaOopId || null
+  };
+  OOP_SCHEDULE.entries.push(entry);
+  oopDebouncedSave();
+  return entry;
+}
+
+function oopUpdateEntry(id, updates) {
+  var entries = OOP_SCHEDULE.entries || [];
+  for (var i = 0; i < entries.length; i++) {
+    if (entries[i].id === id) {
+      for (var k in updates) { if (updates.hasOwnProperty(k)) entries[i][k] = updates[k]; }
+      oopDebouncedSave();
+      return;
+    }
+  }
+}
+
+function oopDeleteEntry(id) {
+  var entries = OOP_SCHEDULE.entries || [];
+  for (var i = 0; i < entries.length; i++) {
+    if (entries[i].id === id) {
+      entries.splice(i, 1);
+      oopDebouncedSave();
+      return;
+    }
+  }
+}
+
+function oopTogglePaid(id) {
+  var entries = OOP_SCHEDULE.entries || [];
+  for (var i = 0; i < entries.length; i++) {
+    if (entries[i].id === id) {
+      entries[i].paid = !entries[i].paid;
+      oopDebouncedSave();
+      renderOopGrid();
+      return;
+    }
+  }
+}
+
+function oopGetPredictedForProject(projectCode) {
+  var entries = OOP_SCHEDULE.entries || [];
+  var today = new Date().toISOString().slice(0, 10);
+  var total = 0;
+  for (var i = 0; i < entries.length; i++) {
+    if (entries[i].projectCode === projectCode && !entries[i].paid && entries[i].date >= today) {
+      total += entries[i].amount || 0;
+    }
+  }
+  return total;
+}
+
+function oopShowModal(projName, projCode, dateISO, editId) {
+  var existing = document.getElementById('oopModalOverlay');
+  if (existing) existing.remove();
+
+  var editEntry = editId ? _oopEntryLookup[editId] || null : null;
+  var isEdit = !!editEntry;
+  var h = '<div class="oop-modal-overlay" id="oopModalOverlay" onclick="if(event.target===this)this.remove()">';
+  h += '<div class="oop-modal">';
+  h += '<h3>' + (isEdit ? 'Edit' : 'Add') + ' OOP Payment</h3>';
+  h += '<div style="font-size:11px;color:var(--mid-gray);margin-bottom:8px">' + projName + ' &middot; ' + dateISO + '</div>';
+
+  h += '<label>Line Item Name</label>';
+  h += '<input type="text" id="oopModalName" value="' + (isEdit ? (editEntry.lineItemName || '').replace(/"/g, '&quot;') : '') + '" placeholder="e.g. Captions, Stock Footage...">';
+
+  h += '<label>Amount ($)</label>';
+  h += '<input type="number" id="oopModalAmount" value="' + (isEdit ? editEntry.amount : '') + '" placeholder="0.00" step="0.01" min="0">';
+
+  h += '<label>Notes</label>';
+  h += '<textarea id="oopModalNotes" rows="2" placeholder="Optional notes...">' + (isEdit ? (editEntry.notes || '') : '') + '</textarea>';
+
+  if (isEdit) {
+    h += '<div style="margin-top:12px"><label style="display:inline;cursor:pointer"><input type="checkbox" id="oopModalPaid"' + (editEntry.paid ? ' checked' : '') + '> Mark as Paid</label></div>';
+  }
+
+  h += '<div class="oop-modal-actions">';
+  if (isEdit) {
+    h += '<button class="danger" onclick="oopDeleteEntry(\'' + editEntry.id + '\');document.getElementById(\'oopModalOverlay\').remove();renderOopGrid()">Delete</button>';
+  }
+  h += '<button onclick="document.getElementById(\'oopModalOverlay\').remove()">Cancel</button>';
+
+  if (isEdit) {
+    h += '<button class="primary" onclick="oopSaveModal(\'' + projName.replace(/'/g, "\\'") + '\',\'' + projCode + '\',\'' + dateISO + '\',\'' + editEntry.id + '\')">Save</button>';
+  } else {
+    h += '<button class="primary" onclick="oopSaveModal(\'' + projName.replace(/'/g, "\\'") + '\',\'' + projCode + '\',\'' + dateISO + '\',null)">Add</button>';
+  }
+  h += '</div></div></div>';
+
+  document.body.insertAdjacentHTML('beforeend', h);
+  var nameInput = document.getElementById('oopModalName');
+  if (nameInput) nameInput.focus();
+}
+
+function oopSaveModal(projName, projCode, dateISO, editId) {
+  var name = (document.getElementById('oopModalName').value || '').trim();
+  var amount = parseFloat(document.getElementById('oopModalAmount').value) || 0;
+  var notes = (document.getElementById('oopModalNotes').value || '').trim();
+  if (!name || amount <= 0) { alert('Please enter a name and amount.'); return; }
+
+  if (editId) {
+    var paidEl = document.getElementById('oopModalPaid');
+    var paid = paidEl ? paidEl.checked : false;
+    oopUpdateEntry(editId, { lineItemName: name, amount: amount, notes: notes, paid: paid });
+  } else {
+    oopAddEntry(projName, projCode, name, amount, dateISO, notes);
+  }
+
+  var overlay = document.getElementById('oopModalOverlay');
+  if (overlay) overlay.remove();
+  renderOopGrid();
+}
+
+/* ── RENDER: OOP PLANNER ── */
+function renderOopPlanner() {
+  if (!allocWeekOf) allocWeekOf = getNextMonday();
+
+  var mc = document.getElementById('mainContent');
+  var h = mc.innerHTML; /* keep the tab bar already written */
+
+  h += '<div class="oop-planner-layout">';
+
+  /* ── PROJECT SIDEBAR ── */
+  h += '<div class="alloc-proj-sidebar">';
+  h += '<div class="aps-header">Projects</div>';
+  h += '<input class="aps-search" type="text" placeholder="Search projects..." value="' + (oopProjSearch || '') + '" oninput="oopProjSearch=this.value;renderOopProjList()" id="oopProjSearchInput">';
+  h += '<div id="oopProjListInner"></div>';
+  h += '</div>';
+
+  /* ── MAIN GRID AREA ── */
+  h += '<div class="oop-planner-grid-area">';
+  /* Toolbar */
+  h += '<div class="oop-planner-toolbar">';
+  if (oopViewMode === 'day') {
+    h += '<button onclick="oopDayOffset=(oopDayOffset||0)-1;renderOopGrid()">&#9664;</button>';
+    h += '<div class="at-label" id="oopWeekLabel"></div>';
+    h += '<button onclick="oopDayOffset=(oopDayOffset||0)+1;renderOopGrid()">&#9654;</button>';
+    h += '<button onclick="oopDayOffset=0;renderOopGrid()" style="font-size:11px">Today</button>';
+  } else {
+    var navStep = oopViewMode === 'month' ? 4 : 1;
+    h += '<button onclick="allocWeekOf=shiftWeek(allocWeekOf,-' + navStep + ');renderOopGrid()">&#9664;</button>';
+    h += '<div class="at-label" id="oopWeekLabel"></div>';
+    h += '<button onclick="allocWeekOf=shiftWeek(allocWeekOf,' + navStep + ');renderOopGrid()">&#9654;</button>';
+    h += '<button onclick="allocWeekOf=getCurrentMonday();renderOopGrid()" style="font-size:11px">Today</button>';
+  }
+  h += '<span id="oopSaveStatus" class="alloc-save-status"></span>';
+  h += '<div class="alloc-view-toggle" style="margin-left:auto">';
+  h += '<button class="' + (oopViewMode === 'day' ? 'active' : '') + '" onclick="oopViewMode=\'day\';renderOopPlanner()">Day</button>';
+  h += '<button class="' + (oopViewMode === 'week' ? 'active' : '') + '" onclick="oopViewMode=\'week\';renderOopPlanner()">Week</button>';
+  h += '<button class="' + (oopViewMode === 'month' ? 'active' : '') + '" onclick="oopViewMode=\'month\';renderOopPlanner()">Month</button>';
+  h += '</div>';
+  h += '</div>';
+  /* Grid container */
+  h += '<div class="oop-planner-scroll" id="oopGridScroll"></div>';
+  /* Footer stats */
+  h += '<div class="oop-footer" id="oopFooter"></div>';
+  h += '</div>';
+
+  h += '</div>'; /* end oop-planner-layout */
+
+  mc.innerHTML = h;
+  renderOopProjList();
+  renderOopGrid();
+}
+
+async function oopToggleLineItemPaid(supaOopId, newPaid, projCode) {
+  /* Update Supabase oop_budget_entries paid field */
+  await sparkFetch('oop_budget_entries?id=eq.' + supaOopId, '', 'PATCH', { paid: newPaid });
+  /* Update local cache */
+  if (SUPA_BUDGETS && SUPA_BUDGETS[projCode] && SUPA_BUDGETS[projCode]._oopEntries) {
+    var entries = SUPA_BUDGETS[projCode]._oopEntries;
+    for (var i = 0; i < entries.length; i++) {
+      if (entries[i].id === supaOopId) { entries[i].paid = newPaid; break; }
+    }
+    /* Recalc oopSpent */
+    var spent = 0;
+    for (var i = 0; i < entries.length; i++) {
+      if (entries[i].paid && entries[i].is_active !== false) {
+        var eff;
+        if (entries[i].actual_amount != null) eff = entries[i].actual_amount;
+        else if (entries[i].adjusted_count != null || entries[i].adjusted_rate != null) {
+          eff = (entries[i].adjusted_count != null ? entries[i].adjusted_count : (entries[i].count||0)) * (entries[i].adjusted_rate != null ? entries[i].adjusted_rate : (entries[i].rate||0)) * (entries[i].adjusted_days != null ? entries[i].adjusted_days : (entries[i].days||1)) * (entries[i].adjusted_head_count != null ? entries[i].adjusted_head_count : (entries[i].head_count||1));
+        } else {
+          eff = (entries[i].count||0) * (entries[i].rate||0) * (entries[i].days||1) * (entries[i].head_count||1);
+        }
+        spent += eff;
+      }
+    }
+    SUPA_BUDGETS[projCode].oopSpent = spent;
+  }
+  renderOopProjList();
+  renderOopGrid();
+}
+
+function oopScheduleLineItem(projName, projCode, itemName, amount, supaOopId) {
+  /* Show a date picker modal to schedule the payment */
+  var existing = document.getElementById('oopModalOverlay');
+  if (existing) existing.remove();
+
+  var today = new Date().toISOString().slice(0, 10);
+  var h = '<div class="oop-modal-overlay" id="oopModalOverlay" onclick="if(event.target===this)this.remove()">';
+  h += '<div class="oop-modal">';
+  h += '<h3>Schedule OOP Payment</h3>';
+  h += '<div style="font-size:11px;color:var(--mid-gray);margin-bottom:12px">' + projName + '</div>';
+  h += '<div style="background:var(--cloud);padding:10px 14px;border-radius:6px;margin-bottom:12px">';
+  h += '<div style="font-size:13px;font-weight:600">' + itemName + '</div>';
+  h += '<div style="font-size:16px;font-weight:700;color:var(--ocean);margin-top:4px">$' + Math.round(amount).toLocaleString() + '</div>';
+  h += '</div>';
+
+  h += '<label>Scheduled Payment Date</label>';
+  h += '<input type="date" id="oopSchedDate" value="' + today + '" style="width:100%;padding:8px 10px;border:1px solid var(--canvas);border-radius:6px;font-size:13px;font-family:inherit">';
+
+  h += '<label>Adjust Amount (optional)</label>';
+  h += '<input type="number" id="oopSchedAmount" value="' + amount + '" step="0.01" min="0" style="width:100%;padding:8px 10px;border:1px solid var(--canvas);border-radius:6px;font-size:13px;font-family:inherit">';
+
+  h += '<label>Notes</label>';
+  h += '<textarea id="oopSchedNotes" rows="2" placeholder="Optional notes..." style="width:100%;padding:8px 10px;border:1px solid var(--canvas);border-radius:6px;font-size:13px;font-family:inherit;resize:vertical"></textarea>';
+
+  h += '<div class="oop-modal-actions">';
+  h += '<button onclick="document.getElementById(\'oopModalOverlay\').remove()">Cancel</button>';
+  h += '<button class="primary" onclick="oopConfirmSchedule(\'' + projName.replace(/'/g, "\\'") + '\',\'' + projCode + '\',\'' + itemName.replace(/'/g, "\\'") + '\',\'' + supaOopId + '\')">Schedule</button>';
+  h += '</div></div></div>';
+
+  document.body.insertAdjacentHTML('beforeend', h);
+}
+
+async function oopConfirmSchedule(projName, projCode, itemName, supaOopId) {
+  var dateVal = document.getElementById('oopSchedDate').value;
+  var amount = parseFloat(document.getElementById('oopSchedAmount').value) || 0;
+  var notes = (document.getElementById('oopSchedNotes').value || '').trim();
+  if (!dateVal || amount <= 0) { alert('Please pick a date and enter an amount.'); return; }
+
+  /* If amount was adjusted, update the actual_amount in Supabase */
+  var origEntries = oopGetProjectLineItems(projCode);
+  var origEntry = null;
+  for (var i = 0; i < origEntries.length; i++) {
+    if (origEntries[i].id === supaOopId) { origEntry = origEntries[i]; break; }
+  }
+  if (origEntry) {
+    var origEffective = (origEntry.count||0) * (origEntry.rate||0) * (origEntry.days||1) * (origEntry.head_count||1);
+    if (origEntry.adjusted_count != null || origEntry.adjusted_rate != null) {
+      origEffective = (origEntry.adjusted_count != null ? origEntry.adjusted_count : (origEntry.count||0)) * (origEntry.adjusted_rate != null ? origEntry.adjusted_rate : (origEntry.rate||0));
+    }
+    if (Math.abs(amount - origEffective) > 0.01) {
+      /* Amount was adjusted — save as actual_amount in Supabase */
+      await sparkFetch('oop_budget_entries?id=eq.' + supaOopId, '', 'PATCH', { actual_amount: amount });
+      origEntry.actual_amount = amount;
+    }
+  }
+
+  /* Add to OOP schedule */
+  oopAddEntry(projName, projCode, itemName, amount, dateVal, notes, supaOopId);
+
+  var overlay = document.getElementById('oopModalOverlay');
+  if (overlay) overlay.remove();
+  renderOopProjList();
+  renderOopGrid();
+}
+
+function oopGetProjectLineItems(projCode) {
+  /* Fetch OOP line items from SUPA_BUDGETS cache for this project */
+  if (!SUPA_BUDGETS || !SUPA_BUDGETS[projCode]) return [];
+  var sb = SUPA_BUDGETS[projCode];
+  /* The oopEntries are stored during loadSupabaseData */
+  return sb._oopEntries || [];
+}
+
+function renderOopProjList() {
+  var el = document.getElementById('oopProjListInner');
+  if (!el) return;
+  var projects = getProjectList();
+  var search = (oopProjSearch || '').toLowerCase();
+
+  /* Build sets: projects with OOP schedule entries AND projects with OOP budget entries in Supabase */
+  var hasSchedule = {};
+  var entries = OOP_SCHEDULE.entries || [];
+  for (var i = 0; i < entries.length; i++) hasSchedule[entries[i].projectName] = true;
+
+  var hasOopBudget = {};
+  if (SUPA_BUDGETS) {
+    for (var code in SUPA_BUDGETS) {
+      var sb = SUPA_BUDGETS[code];
+      if ((sb.oopTotal || 0) > 0 || (sb.oopEffective || 0) > 0) {
+        for (var pi = 0; pi < projects.length; pi++) {
+          if (projects[pi].code === code) { hasOopBudget[projects[pi].name] = true; break; }
+        }
+      }
+    }
+  }
+
+  var h = '';
+  var lastClient = '';
+  var shown = 0;
+  for (var i = 0; i < projects.length; i++) {
+    var p = projects[i];
+    if (!search && !hasOopBudget[p.name] && !hasSchedule[p.name]) continue;
+    if (search && p.name.toLowerCase().indexOf(search) < 0 && p.code.toLowerCase().indexOf(search) < 0 && p.client.toLowerCase().indexOf(search) < 0) continue;
+    if (p.client !== lastClient) {
+      h += '<div class="aps-client"><span style="color:' + p.clientColor + '">&#9679;</span> ' + p.clientCode + ' ' + p.client + '</div>';
+      lastClient = p.client;
+    }
+    var isActive = oopSelectedProject === p.name;
+    var schedCount = 0;
+    for (var si = 0; si < entries.length; si++) { if (entries[si].projectName === p.name) schedCount++; }
+
+    h += '<div class="aps-item' + (isActive ? ' active' : '') + '" onclick="oopSelectedProject=' + (isActive ? 'null' : '\'' + p.name.replace(/'/g, "\\'") + '\'') + ';renderOopProjList();renderOopGrid()">';
+    h += '<span style="font-size:9px;margin-right:4px">' + (isActive ? '\u25BC' : '\u25B6') + '</span>';
+    h += '<span class="aps-code">' + p.code + '</span> ' + p.name;
+    if (schedCount > 0) h += '<span style="margin-left:auto;background:#F57F17;color:white;font-size:9px;padding:1px 5px;border-radius:8px;font-weight:600">' + schedCount + '</span>';
+    h += '</div>';
+
+    /* Expanded: show line items from snapshot */
+    if (isActive) {
+      var lineItems = oopGetProjectLineItems(p.code);
+      var activeItems = [];
+      for (var li = 0; li < lineItems.length; li++) {
+        var oi = lineItems[li];
+        if (oi.is_active === false) continue;
+        /* Calculate effective value using cascade */
+        var planned = (oi.count || 0) * (oi.rate || 0) * (oi.days || 1) * (oi.head_count || 1);
+        var effective;
+        if (oi.actual_amount != null) {
+          effective = oi.actual_amount;
+        } else if (oi.adjusted_count != null || oi.adjusted_rate != null) {
+          effective = (oi.adjusted_count != null ? oi.adjusted_count : (oi.count||0)) * (oi.adjusted_rate != null ? oi.adjusted_rate : (oi.rate||0)) * (oi.adjusted_days != null ? oi.adjusted_days : (oi.days||1)) * (oi.adjusted_head_count != null ? oi.adjusted_head_count : (oi.head_count||1));
+        } else {
+          effective = planned;
+        }
+        if (effective > 0) activeItems.push({id: oi.id, name: oi.line_item_name || 'Unnamed', effective: effective, paid: oi.paid || false, supaId: oi.id});
+      }
+
+      if (activeItems.length > 0) {
+        h += '<div style="background:rgba(0,0,0,.03);padding:6px 8px 8px 20px;border-bottom:1px solid var(--canvas)">';
+        for (var ai = 0; ai < activeItems.length; ai++) {
+          var item = activeItems[ai];
+          /* Check if this item is already scheduled */
+          var isScheduled = false;
+          for (var si = 0; si < entries.length; si++) {
+            if (entries[si].projectCode === p.code && entries[si].lineItemName === item.name && entries[si].supaOopId === item.supaId) {
+              isScheduled = true; break;
+            }
+          }
+          var paidBg = item.paid ? 'background:rgba(46,125,50,.1);' : '';
+          h += '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:11px;' + paidBg + 'border-radius:4px;padding:4px 6px;margin-bottom:2px">';
+          /* Paid checkbox — syncs to Supabase */
+          h += '<input type="checkbox" ' + (item.paid ? 'checked' : '') + ' onclick="event.stopPropagation();oopToggleLineItemPaid(\'' + item.supaId + '\',' + !item.paid + ',\'' + p.code + '\')" style="cursor:pointer" title="Mark as paid">';
+          h += '<span style="flex:1;' + (item.paid ? 'text-decoration:line-through;opacity:.5' : '') + '">' + item.name + '</span>';
+          h += '<span style="font-weight:600;font-variant-numeric:tabular-nums;' + (item.paid ? 'color:#2E7D32' : '') + '">$' + Math.round(item.effective).toLocaleString() + '</span>';
+          /* Schedule button */
+          if (!isScheduled && !item.paid) {
+            h += '<button onclick="event.stopPropagation();oopScheduleLineItem(\'' + p.name.replace(/'/g, "\\'") + '\',\'' + p.code + '\',\'' + item.name.replace(/'/g, "\\'") + '\',' + item.effective + ',\'' + item.supaId + '\')" style="padding:2px 6px;border-radius:4px;border:1px solid var(--ocean);background:transparent;color:var(--ocean);cursor:pointer;font-size:9px;font-weight:600;white-space:nowrap" title="Schedule payment date">📅</button>';
+          } else if (isScheduled) {
+            h += '<span style="font-size:9px;color:#F57F17;font-weight:600" title="Already scheduled">\u2713 Sched</span>';
+          }
+          h += '</div>';
+        }
+        h += '</div>';
+      } else {
+        h += '<div style="padding:8px 20px;font-size:10px;color:var(--mid-gray)">No OOP line items with cost in snapshot</div>';
+      }
+    }
+    shown++;
+  }
+  if (!shown && search) h = '<div style="padding:14px;font-size:11px;color:var(--mid-gray)">No projects match.</div>';
+  if (!shown && !search) h = '<div style="padding:14px;font-size:11px;color:var(--mid-gray)">No projects with OOP data. Add OOP entries in a project\'s Budget Snapshot first.</div>';
+  el.innerHTML = h;
+}
+
+function renderOopGrid() {
+  var el = document.getElementById('oopGridScroll');
+  var lbl = document.getElementById('oopWeekLabel');
+  if (!el) return;
+
+  /* Build entry lookup for modal editing */
+  _oopEntryLookup = {};
+  var allEnt = OOP_SCHEDULE.entries || [];
+  for (var li = 0; li < allEnt.length; li++) _oopEntryLookup[allEnt[li].id] = allEnt[li];
+
+  if (!oopSelectedProject) {
+    if (lbl) lbl.innerHTML = '';
+    el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--mid-gray);font-size:14px">Select a project from the sidebar to schedule OOP payments</div>';
+    renderOopFooter();
+    return;
+  }
+
+  /* Find project code */
+  var projCode = '';
+  var projects = getProjectList();
+  for (var i = 0; i < projects.length; i++) {
+    if (projects[i].name === oopSelectedProject) { projCode = projects[i].code; break; }
+  }
+
+  if (oopViewMode === 'month') {
+    renderOopGridMonth(el, lbl, projCode);
+  } else if (oopViewMode === 'day') {
+    renderOopGridDay(el, lbl, projCode);
+  } else {
+    renderOopGridWeek(el, lbl, projCode);
+  }
+  renderOopFooter();
+}
+
+function renderOopGridWeek(el, lbl, projCode) {
+  var days = getWeekDays(allocWeekOf);
+  if (lbl) lbl.innerHTML = getAllocWeekLabel(allocWeekOf);
+  var cols = days.length;
+  var gridCols = '60px';
+  for (var c = 0; c < cols; c++) gridCols += ' 1fr';
+  gridCols += ' 80px';
+
+  var h = '<div class="oop-grid" style="grid-template-columns:' + gridCols + '">';
+
+  /* Header row */
+  h += '<div class="oop-corner"></div>';
+  for (var c = 0; c < days.length; c++) {
+    var isToday = days[c] === new Date().toISOString().slice(0, 10);
+    h += '<div class="oop-col-hdr" style="' + (isToday ? 'background:rgba(48,109,124,.08)' : '') + '">';
+    h += '<span class="oop-day">' + fmtDayShort(days[c]) + '</span> ' + fmtMonShort(days[c]) + ' ' + fmtDayNum(days[c]);
+    h += '</div>';
+  }
+  h += '<div class="oop-col-hdr" style="font-size:10px">Week Total</div>';
+
+  /* Project row */
+  h += '<div class="oop-row-hdr"><span class="oop-proj-code">' + projCode + '</span></div>';
+  var weekTotal = 0;
+  for (var c = 0; c < days.length; c++) {
+    var dayEntries = oopGetDayEntries(oopSelectedProject, days[c]);
+    var isToday = days[c] === new Date().toISOString().slice(0, 10);
+    h += '<div class="oop-cell" style="' + (isToday ? 'background:rgba(48,109,124,.04)' : '') + '" onclick="oopShowModal(\'' + oopSelectedProject.replace(/'/g, "\\'") + '\',\'' + projCode + '\',\'' + days[c] + '\',null)">';
+    if (dayEntries.length === 0) {
+      h += '<div class="oop-cell-empty"><span style="font-size:18px;color:var(--canvas)">+</span></div>';
+    } else {
+      for (var e = 0; e < dayEntries.length; e++) {
+        var ent = dayEntries[e];
+        weekTotal += ent.amount || 0;
+        var chipClass = ent.paid ? 'paid' : 'scheduled';
+        h += '<div class="oop-chip ' + chipClass + '" onclick="event.stopPropagation();oopShowModal(\'' + oopSelectedProject.replace(/'/g, "\\'") + '\',\'' + projCode + '\',\'' + days[c] + '\',\'' + ent.id + '\')">';
+        h += '<span class="oop-chip-name">' + (ent.lineItemName || '') + '</span>';
+        h += '<span class="oop-chip-amt">$' + Math.round(ent.amount).toLocaleString() + '</span>';
+        h += '</div>';
+      }
+      h += '<div style="text-align:center;margin-top:2px"><span style="font-size:14px;color:var(--canvas);cursor:pointer" title="Add another">+</span></div>';
+    }
+    h += '</div>';
+  }
+  h += '<div class="oop-total-cell">$' + Math.round(weekTotal).toLocaleString() + '</div>';
+
+  /* Daily totals row */
+  h += '<div class="oop-row-hdr" style="font-size:10px;color:var(--mid-gray)">All Projects</div>';
+  var grandTotal = 0;
+  for (var c = 0; c < days.length; c++) {
+    var dayTotal = oopGetDayTotal(days[c]);
+    grandTotal += dayTotal;
+    h += '<div class="oop-grand-total" style="background:var(--abyss);color:var(--white);border-bottom:1px solid rgba(255,255,255,.1)">' + (dayTotal > 0 ? '$' + Math.round(dayTotal).toLocaleString() : '&mdash;') + '</div>';
+  }
+  h += '<div class="oop-grand-total">$' + Math.round(grandTotal).toLocaleString() + '</div>';
+  h += '</div>';
+
+  /* Entry list below */
+  h += renderOopEntryList(projCode);
+  el.innerHTML = h;
+}
+
+function renderOopGridDay(el, lbl, projCode) {
+  var today = new Date();
+  today.setDate(today.getDate() + (oopDayOffset || 0));
+  var dayStr = today.toISOString().slice(0, 10);
+  var dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  if (lbl) lbl.innerHTML = dayNames[today.getDay()] + ', ' + monthNames[today.getMonth()] + ' ' + today.getDate() + ', ' + today.getFullYear();
+
+  var dayEntries = oopGetDayEntries(oopSelectedProject, dayStr);
+  var allDayEntries = (OOP_SCHEDULE.entries || []).filter(function(e) { return e.date === dayStr; });
+  var dayTotal = 0;
+  for (var i = 0; i < dayEntries.length; i++) dayTotal += dayEntries[i].amount || 0;
+  var allTotal = 0;
+  for (var i = 0; i < allDayEntries.length; i++) allTotal += allDayEntries[i].amount || 0;
+
+  var h = '<div style="max-width:600px;margin:0 auto">';
+
+  /* Day header */
+  h += '<div style="background:var(--abyss);color:var(--white);padding:16px 20px;border-radius:10px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">';
+  h += '<div><div style="font-size:14px;font-weight:700">' + oopSelectedProject + '</div><div style="font-size:11px;opacity:.5">' + projCode + '</div></div>';
+  h += '<div style="text-align:right"><div style="font-size:10px;opacity:.5">Day Total</div><div style="font-size:22px;font-weight:700;color:var(--honey)">$' + Math.round(dayTotal).toLocaleString() + '</div></div>';
+  h += '</div>';
+
+  /* Entries for selected project */
+  if (dayEntries.length === 0) {
+    h += '<div style="text-align:center;padding:40px;color:var(--mid-gray)">';
+    h += '<div style="font-size:32px;margin-bottom:8px">+</div>';
+    h += '<div style="font-size:13px">No OOP scheduled for this day</div>';
+    h += '<button onclick="oopShowModal(\'' + oopSelectedProject.replace(/'/g, "\\'") + '\',\'' + projCode + '\',\'' + dayStr + '\',null)" style="margin-top:12px;padding:8px 20px;border-radius:6px;border:none;background:var(--ocean);color:var(--white);cursor:pointer;font-size:12px;font-weight:600">Add OOP Payment</button>';
+    h += '</div>';
+  } else {
+    for (var i = 0; i < dayEntries.length; i++) {
+      var ent = dayEntries[i];
+      var borderColor = ent.paid ? '#81C784' : '#FFB74D';
+      h += '<div style="background:var(--white);border-radius:8px;border-left:4px solid ' + borderColor + ';padding:14px 18px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center" onclick="oopShowModal(\'' + oopSelectedProject.replace(/'/g, "\\'") + '\',\'' + projCode + '\',\'' + dayStr + '\',\'' + ent.id + '\')">';
+      h += '<div>';
+      h += '<div style="font-size:14px;font-weight:600">' + (ent.lineItemName || 'Unnamed') + '</div>';
+      if (ent.notes) h += '<div style="font-size:11px;color:var(--mid-gray);margin-top:2px">' + ent.notes + '</div>';
+      h += '</div>';
+      h += '<div style="text-align:right">';
+      h += '<div style="font-size:18px;font-weight:700;font-variant-numeric:tabular-nums">$' + Math.round(ent.amount).toLocaleString() + '</div>';
+      h += '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;' + (ent.paid ? 'background:rgba(46,125,50,.15);color:#2E7D32' : 'background:rgba(245,127,23,.15);color:#F57F17') + '">' + (ent.paid ? 'Paid' : 'Scheduled') + '</span>';
+      h += '</div></div>';
+    }
+    h += '<button onclick="oopShowModal(\'' + oopSelectedProject.replace(/'/g, "\\'") + '\',\'' + projCode + '\',\'' + dayStr + '\',null)" style="width:100%;padding:10px;border-radius:6px;border:1px dashed var(--canvas);background:transparent;color:var(--mid-gray);cursor:pointer;font-size:12px;margin-top:4px">+ Add Another</button>';
+  }
+
+  /* All projects summary for this day */
+  if (allDayEntries.length > 0) {
+    h += '<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--canvas)">';
+    h += '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);font-weight:600;margin-bottom:8px">All Projects on ' + dayStr + '</div>';
+    var byProj = {};
+    for (var i = 0; i < allDayEntries.length; i++) {
+      var e = allDayEntries[i];
+      if (!byProj[e.projectName]) byProj[e.projectName] = 0;
+      byProj[e.projectName] += e.amount || 0;
+    }
+    for (var pn in byProj) {
+      h += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px">';
+      h += '<span>' + pn + '</span>';
+      h += '<span style="font-weight:600;font-variant-numeric:tabular-nums">$' + Math.round(byProj[pn]).toLocaleString() + '</span>';
+      h += '</div>';
+    }
+    h += '<div style="display:flex;justify-content:space-between;padding:8px 0 0;font-size:13px;font-weight:700;border-top:1px solid var(--canvas);margin-top:4px">';
+    h += '<span>Grand Total</span><span>$' + Math.round(allTotal).toLocaleString() + '</span></div>';
+    h += '</div>';
+  }
+
+  h += '</div>';
+  el.innerHTML = h;
+}
+
+function renderOopGridMonth(el, lbl, projCode) {
+  /* Get the first Monday of the month containing allocWeekOf */
+  var baseDate = new Date(allocWeekOf + 'T00:00:00');
+  var monthStart = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+  var monthEnd = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0);
+  var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  if (lbl) lbl.innerHTML = monthNames[baseDate.getMonth()] + ' ' + baseDate.getFullYear();
+
+  /* Find the Monday on or before the 1st */
+  var firstDay = new Date(monthStart);
+  while (firstDay.getDay() !== 1) firstDay.setDate(firstDay.getDate() - 1);
+
+  /* Build 5-6 weeks worth of dates */
+  var weeks = [];
+  var cursor = new Date(firstDay);
+  while (cursor <= monthEnd || weeks.length < 5) {
+    var week = [];
+    for (var d = 0; d < 5; d++) { /* Mon-Fri */
+      week.push(cursor.toISOString().slice(0, 10));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    cursor.setDate(cursor.getDate() + 2); /* skip weekend */
+    weeks.push(week);
+    if (weeks.length >= 6) break;
+  }
+
+  var todayStr = new Date().toISOString().slice(0, 10);
+  var curMonth = baseDate.getMonth();
+
+  /* Grid: 6 columns (Mon-Fri + Week Total) */
+  var h = '<div style="display:grid;grid-template-columns:repeat(5,1fr) 80px;gap:1px;background:var(--canvas);border-radius:8px;overflow:hidden">';
+
+  /* Day headers */
+  var dayNames = ['Mon','Tue','Wed','Thu','Fri'];
+  for (var d = 0; d < 5; d++) {
+    h += '<div style="padding:8px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);font-weight:600;text-align:center;background:var(--white)">' + dayNames[d] + '</div>';
+  }
+  h += '<div style="padding:8px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);font-weight:600;text-align:center;background:var(--white)">Total</div>';
+
+  /* Week rows */
+  for (var w = 0; w < weeks.length; w++) {
+    var weekDays = weeks[w];
+    var weekTotal = 0;
+
+    for (var d = 0; d < 5; d++) {
+      var day = weekDays[d];
+      var dayDate = new Date(day + 'T00:00:00');
+      var isThisMonth = dayDate.getMonth() === curMonth;
+      var isToday = day === todayStr;
+      var dayEntries = oopGetDayEntries(oopSelectedProject, day);
+      var dayAmt = 0;
+      for (var e = 0; e < dayEntries.length; e++) dayAmt += dayEntries[e].amount || 0;
+      weekTotal += dayAmt;
+
+      var bg = isToday ? 'rgba(48,109,124,.06)' : 'var(--white)';
+      var opacity = isThisMonth ? '1' : '0.4';
+
+      h += '<div style="background:' + bg + ';padding:6px 8px;min-height:70px;opacity:' + opacity + ';cursor:pointer;position:relative" onclick="oopShowModal(\'' + oopSelectedProject.replace(/'/g, "\\'") + '\',\'' + projCode + '\',\'' + day + '\',null)">';
+      h += '<div style="font-size:11px;font-weight:600;color:' + (isToday ? 'var(--ocean)' : 'var(--abyss)') + ';margin-bottom:4px">' + dayDate.getDate() + '</div>';
+
+      for (var e = 0; e < dayEntries.length; e++) {
+        var ent = dayEntries[e];
+        var chipColor = ent.paid ? '#81C784' : '#FFB74D';
+        h += '<div style="font-size:9px;padding:2px 5px;border-radius:3px;background:' + chipColor + '33;color:' + (ent.paid ? '#2E7D32' : '#F57F17') + ';margin-bottom:2px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" onclick="event.stopPropagation();oopShowModal(\'' + oopSelectedProject.replace(/'/g, "\\'") + '\',\'' + projCode + '\',\'' + day + '\',\'' + ent.id + '\')">';
+        h += (ent.lineItemName || '') + ' $' + Math.round(ent.amount).toLocaleString();
+        h += '</div>';
+      }
+      if (dayEntries.length === 0 && isThisMonth) {
+        h += '<div style="font-size:14px;color:var(--canvas);text-align:center;margin-top:8px">+</div>';
+      }
+      h += '</div>';
+    }
+    /* Week total */
+    h += '<div style="background:var(--abyss);color:var(--white);padding:8px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">' + (weekTotal > 0 ? '$' + Math.round(weekTotal).toLocaleString() : '\u2014') + '</div>';
+  }
+
+  /* Month total row */
+  var monthTotal = 0;
+  var monthEntries = (OOP_SCHEDULE.entries || []).filter(function(e) {
+    if (e.projectName !== oopSelectedProject) return false;
+    var ed = new Date(e.date + 'T00:00:00');
+    return ed.getMonth() === curMonth && ed.getFullYear() === baseDate.getFullYear();
+  });
+  for (var i = 0; i < monthEntries.length; i++) monthTotal += monthEntries[i].amount || 0;
+
+  h += '<div style="grid-column:1/6;background:var(--abyss);color:var(--white);padding:10px 14px;font-size:11px;font-weight:600">Month Total</div>';
+  h += '<div style="background:var(--abyss);color:var(--honey);padding:10px;font-size:14px;font-weight:700;text-align:center">$' + Math.round(monthTotal).toLocaleString() + '</div>';
+
+  h += '</div>';
+
+  /* Entry list below */
+  h += renderOopEntryList(projCode);
+  el.innerHTML = h;
+}
+
+/* (week view day cells rendered inline in renderOopGridWeek) */
+
+function renderOopEntryList(projCode) {
+  var allEntries = (OOP_SCHEDULE.entries || []).filter(function(e) { return e.projectName === oopSelectedProject; });
+  if (allEntries.length === 0) return '';
+  allEntries.sort(function(a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+  var h = '<div style="padding:16px 18px;background:var(--white);border-top:1px solid var(--canvas)">';
+  h += '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);font-weight:600;margin-bottom:8px">All Scheduled OOP for ' + oopSelectedProject + '</div>';
+  h += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+  h += '<tr style="border-bottom:1px solid var(--canvas);font-size:10px;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px">';
+  h += '<th style="text-align:left;padding:6px 8px">Date</th><th style="text-align:left;padding:6px 8px">Line Item</th><th style="text-align:right;padding:6px 8px">Amount</th><th style="text-align:center;padding:6px 8px">Status</th><th style="text-align:left;padding:6px 8px">Notes</th></tr>';
+  var allTotal = 0;
+  for (var i = 0; i < allEntries.length; i++) {
+    var ent = allEntries[i];
+    allTotal += ent.amount || 0;
+    h += '<tr style="border-bottom:1px solid var(--light-gray);cursor:pointer" onclick="oopShowModal(\'' + oopSelectedProject.replace(/'/g, "\\'") + '\',\'' + projCode + '\',\'' + ent.date + '\',\'' + ent.id + '\')">';
+    h += '<td style="padding:6px 8px;font-variant-numeric:tabular-nums">' + ent.date + '</td>';
+    h += '<td style="padding:6px 8px">' + (ent.lineItemName || '') + '</td>';
+    h += '<td style="padding:6px 8px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums">$' + Math.round(ent.amount).toLocaleString() + '</td>';
+    h += '<td style="padding:6px 8px;text-align:center"><span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;' + (ent.paid ? 'background:rgba(46,125,50,.15);color:#2E7D32' : 'background:rgba(245,127,23,.15);color:#F57F17') + '">' + (ent.paid ? 'Paid' : 'Scheduled') + '</span></td>';
+    h += '<td style="padding:6px 8px;color:var(--mid-gray);font-size:11px">' + (ent.notes || '') + '</td>';
+    h += '</tr>';
+  }
+  h += '<tr style="font-weight:700"><td style="padding:6px 8px" colspan="2">Total</td><td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums">$' + Math.round(allTotal).toLocaleString() + '</td><td colspan="2"></td></tr>';
+  h += '</table></div>';
+  return h;
+}
+
+function renderOopFooter() {
+  var el = document.getElementById('oopFooter');
+  if (!el) return;
+  var entries = OOP_SCHEDULE.entries || [];
+  var totalScheduled = 0, totalPaid = 0, count = 0;
+  for (var i = 0; i < entries.length; i++) {
+    count++;
+    if (entries[i].paid) totalPaid += entries[i].amount || 0;
+    else totalScheduled += entries[i].amount || 0;
+  }
+  var h = '<div><span class="oop-stat-label">Total Entries</span> <span class="oop-stat">' + count + '</span></div>';
+  h += '<div><span class="oop-stat-label">Scheduled</span> <span class="oop-stat" style="color:#F57F17">$' + Math.round(totalScheduled).toLocaleString() + '</span></div>';
+  h += '<div><span class="oop-stat-label">Paid</span> <span class="oop-stat" style="color:#2E7D32">$' + Math.round(totalPaid).toLocaleString() + '</span></div>';
+  h += '<div><span class="oop-stat-label">Grand Total</span> <span class="oop-stat">$' + Math.round(totalScheduled + totalPaid).toLocaleString() + '</span></div>';
+  el.innerHTML = h;
 }
 
 function renderAllocProjList() {
@@ -4665,6 +5566,7 @@ async function loadSupabaseData() {
       b.oopTotal = oopPlanned;
       b.oopEffective = oopEffective;
       b.oopSpent = oopSpent;
+      b._oopEntries = b.oop; /* store raw OOP entries for planner sidebar */
 
       SUPA_BUDGETS[projCode] = b;
     }
@@ -4757,6 +5659,8 @@ async function loadData() {
         var actualsData = await window.furnaceAPI.readActuals();
         if (actualsData) ACTUALS = actualsData;
         computeResourceWeeks();
+        var oopData = await window.furnaceAPI.readOopSchedule();
+        if (oopData) OOP_SCHEDULE = oopData;
       } catch(ae) {
         console.warn('Could not load native allocations:', ae);
       }
