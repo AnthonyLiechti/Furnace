@@ -3597,6 +3597,11 @@ async function sparkPatchBudgetField(field, value) {
   patch[field] = value;
   await sparkFetch('budgets?id=eq.' + budgetId, '', 'PATCH', patch);
   sparkCurrentData.budget[field] = value;
+  /* Also update the global SUPA_BUDGETS cache so other pages (Needs Attention) see the change */
+  var projCode = sparkCurrentData.budget.projects ? sparkCurrentData.budget.projects.project_code : null;
+  if (projCode && SUPA_BUDGETS && SUPA_BUDGETS[projCode]) {
+    SUPA_BUDGETS[projCode][field] = value;
+  }
   sparkHideSaving();
   /* Re-render to reflect changes */
   sparkRenderBudgetContent(true);
