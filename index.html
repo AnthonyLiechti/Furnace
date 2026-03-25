@@ -463,6 +463,8 @@ html.dark .settings-card { background:var(--dm-surface); box-shadow:0 1px 4px rg
 html.dark .settings-card h3 { color:var(--dm-text); }
 html.dark .rate-input { background:var(--dm-surface2); border-color:var(--dm-border); color:var(--dm-text); }
 html.dark .flagged-card { background:var(--dm-surface); box-shadow:0 1px 4px rgba(0,0,0,.3); }
+.oop-checklist-card { background:var(--white); }
+html.dark .oop-checklist-card { background:var(--dm-surface); box-shadow:0 1px 4px rgba(0,0,0,.3); color:var(--dm-text); }
 html.dark .page-title { color:var(--dm-text); }
 html.dark .page-subtitle { color:var(--dm-text-muted); }
 html.dark .section-title { color:var(--dm-text); }
@@ -2495,32 +2497,32 @@ function renderFlagged() {
   }
 
   if (unscheduledOop.length) {
-    h += '<div class="section-title" style="color:#7B1FA2">OOP Finance Checklist (' + totalUnschedItems + ' items across ' + unscheduledOop.length + ' projects)</div>';
-    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">Line items with costs that haven\'t been paid or scheduled for payment. Total outstanding: <strong style="color:#7B1FA2">$' + Math.round(totalUnschedAmount).toLocaleString() + '</strong>. Schedule payments in Manage Resources \u2192 Out-of-Pocket, or mark as paid on the project page.</p>';
+    h += '<div class="section-title" style="color:#CE93D8">OOP Finance Checklist (' + totalUnschedItems + ' items across ' + unscheduledOop.length + ' projects)</div>';
+    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">Line items with costs that haven\'t been paid or scheduled for payment. Total outstanding: <strong style="color:#CE93D8">$' + Math.round(totalUnschedAmount).toLocaleString() + '</strong>. Schedule payments in Manage Resources \u2192 Out-of-Pocket, or mark as paid on the project page.</p>';
 
     for (var ui = 0; ui < unscheduledOop.length; ui++) {
       var uo = unscheduledOop[ui];
       var projTotal = 0;
       for (var j = 0; j < uo.items.length; j++) projTotal += uo.items[j].total;
 
-      h += '<div style="background:var(--white);border-radius:8px;border-left:4px solid #7B1FA2;padding:14px 16px;margin-bottom:12px;cursor:pointer" onclick="navigate(\'project:' + uo.project.id + '\')">';
+      h += '<div class="oop-checklist-card" style="border-radius:8px;border-left:4px solid #CE93D8;padding:14px 16px;margin-bottom:12px;cursor:pointer" onclick="navigate(\'project:' + uo.project.id + '\')">';
       h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
-      h += '<div style="font-weight:600;color:var(--abyss)">' + uo.project.code + ' — ' + uo.project.name + '</div>';
-      h += '<div style="font-weight:700;color:#7B1FA2">' + uo.items.length + ' item' + (uo.items.length > 1 ? 's' : '') + ' · $' + Math.round(projTotal).toLocaleString() + '</div>';
+      h += '<div style="font-weight:600">' + uo.project.code + ' — ' + uo.project.name + '</div>';
+      h += '<div style="font-weight:700;color:#CE93D8">' + uo.items.length + ' item' + (uo.items.length > 1 ? 's' : '') + ' · $' + Math.round(projTotal).toLocaleString() + '</div>';
       h += '</div>';
 
       /* Individual line items */
-      h += '<div style="display:grid;grid-template-columns:1fr 100px 100px;gap:4px;font-size:12px;color:var(--mid-gray);padding:4px 0;border-bottom:1px solid var(--light-gray)">';
+      h += '<div style="display:grid;grid-template-columns:1fr 100px 100px;gap:4px;font-size:12px;color:var(--mid-gray);padding:4px 0;border-bottom:1px solid rgba(128,128,128,.2)">';
       h += '<div style="font-weight:600">Line Item</div><div style="text-align:right;font-weight:600">Amount</div><div style="text-align:right;font-weight:600">Status</div>';
       h += '</div>';
 
       for (var j = 0; j < uo.items.length; j++) {
         var li = uo.items[j];
         var itemName = li.item.line_item_name || 'Unnamed';
-        h += '<div style="display:grid;grid-template-columns:1fr 100px 100px;gap:4px;font-size:12px;padding:4px 0;border-bottom:1px solid rgba(0,0,0,.05)">';
-        h += '<div style="color:var(--abyss)">' + itemName + '</div>';
-        h += '<div style="text-align:right;font-weight:600;color:var(--abyss)">$' + Math.round(li.total).toLocaleString() + '</div>';
-        h += '<div style="text-align:right"><span style="background:rgba(245,127,23,.1);color:#F57F17;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600">Unscheduled</span></div>';
+        h += '<div style="display:grid;grid-template-columns:1fr 100px 100px;gap:4px;font-size:12px;padding:4px 0;border-bottom:1px solid rgba(128,128,128,.1)">';
+        h += '<div>' + itemName + '</div>';
+        h += '<div style="text-align:right;font-weight:600">$' + Math.round(li.total).toLocaleString() + '</div>';
+        h += '<div style="text-align:right"><span style="background:rgba(245,127,23,.15);color:#FFB74D;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600">Unscheduled</span></div>';
         h += '</div>';
       }
 
