@@ -1132,6 +1132,7 @@ function renderSidebar() {
   var html = '';
   html += '<div class="nav-item ' + (currentView === 'master' ? 'active' : '') + '" onclick="navigate(\'master\')"><span class="icon">&#9673;</span> Master Dashboard</div>';
   html += '<div class="nav-item ' + (currentView === 'flagged' ? 'active' : '') + '" onclick="navigate(\'flagged\')"><span class="icon">&#9888;</span> Needs Attention</div>';
+  html += '<div class="nav-item ' + (currentView === 'importTime' ? 'active' : '') + '" onclick="navigate(\'importTime\')"><span class="icon">&#128337;</span> Import Time</div>';
   html += '<div class="nav-item ' + (currentView === 'allocations' ? 'active' : '') + '" onclick="navigate(\'allocations\')"><span class="icon">&#9881;</span> Manage Resources</div>';
   html += '<div class="nav-item ' + (currentView === 'resource' ? 'active' : '') + '" onclick="navigate(\'resource\')"><span class="icon">&#9202;</span> Resource Analytics</div>';
   html += '<div class="nav-item ' + (currentView === 'completed' ? 'active' : '') + '" onclick="navigate(\'completed\')"><span class="icon">&#10003;</span> Completed Projects</div>';
@@ -2289,6 +2290,297 @@ function renderFlagged() {
   }
 
   document.getElementById('mainContent').innerHTML = h;
+}
+
+/* ── RENDER: IMPORT TIME ── */
+var importTimeState = { status: 'idle', parsed: null, log: [] };
+
+function renderImportTime() {
+  var h = '<h1 class="page-title">Import Time</h1>';
+  h += '<p class="page-subtitle">Upload 7pace Timetracker exports to sync actual hours into Furnace</p>';
+
+  /* Stats: current actuals in Supabase */
+  var totalActuals = SUPA_ACTUALS_ALL ? SUPA_ACTUALS_ALL.length : 0;
+  var dateRange = '';
+  if (SUPA_ACTUALS_ALL && SUPA_ACTUALS_ALL.length > 0) {
+    var dates = SUPA_ACTUALS_ALL.map(function(a) { return a.work_date; }).filter(Boolean).sort();
+    dateRange = dates[0] + ' to ' + dates[dates.length - 1];
+  }
+  h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px">';
+  h += '<div style="background:var(--white);border-radius:8px;padding:14px;border-left:4px solid var(--ocean)"><div style="font-size:28px;font-weight:700;color:var(--ocean)">' + totalActuals.toLocaleString() + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Time Entries in Supabase</div></div>';
+  h += '<div style="background:var(--white);border-radius:8px;padding:14px;border-left:4px solid var(--honey)"><div style="font-size:14px;font-weight:600;color:var(--abyss)">' + (dateRange || 'No data yet') + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Date Range</div></div>';
+  var uniquePeople = {};
+  if (SUPA_ACTUALS_ALL) { for (var i = 0; i < SUPA_ACTUALS_ALL.length; i++) { if (SUPA_ACTUALS_ALL[i].person_name) uniquePeople[SUPA_ACTUALS_ALL[i].person_name] = true; } }
+  h += '<div style="background:var(--white);border-radius:8px;padding:14px;border-left:4px solid #81C784"><div style="font-size:28px;font-weight:700;color:#2E7D32">' + Object.keys(uniquePeople).length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Team Members Tracked</div></div>';
+  h += '</div>';
+
+  /* Drop zone */
+  h += '<div id="importDropZone" style="border:2px dashed var(--canvas);border-radius:12px;padding:48px 24px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:20px"';
+  h += ' ondragover="event.preventDefault();this.style.borderColor=\'var(--ocean)\';this.style.background=\'rgba(48,109,124,.04)\'"';
+  h += ' ondragleave="this.style.borderColor=\'var(--canvas)\';this.style.background=\'transparent\'"';
+  h += ' ondrop="event.preventDefault();this.style.borderColor=\'var(--canvas)\';this.style.background=\'transparent\';importHandleDrop(event)"';
+  h += ' onclick="document.getElementById(\'importFileInput\').click()">';
+  h += '<div style="font-size:36px;margin-bottom:8px">📂</div>';
+  h += '<div style="font-size:14px;font-weight:600;color:var(--abyss);margin-bottom:4px">Drop 7pace XLSX file here</div>';
+  h += '<div style="font-size:12px;color:var(--mid-gray)">or click to browse — exports from Times Explorer in Monday.com</div>';
+  h += '<input type="file" id="importFileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="importHandleFile(this.files[0])">';
+  h += '</div>';
+
+  /* Status area */
+  h += '<div id="importStatus"></div>';
+
+  /* Log area */
+  h += '<div id="importLog"></div>';
+
+  document.getElementById('mainContent').innerHTML = h;
+}
+
+function importHandleDrop(event) {
+  var files = event.dataTransfer.files;
+  if (files.length > 0) importHandleFile(files[0]);
+}
+
+async function importHandleFile(file) {
+  if (!file) return;
+  var statusEl = document.getElementById('importStatus');
+  var logEl = document.getElementById('importLog');
+  if (!statusEl) return;
+
+  statusEl.innerHTML = '<div style="background:#E3F2FD;border-radius:8px;padding:16px;margin-bottom:12px"><div style="font-weight:600;color:#1565C0;margin-bottom:4px">&#9203; Processing: ' + file.name + '</div><div style="font-size:12px;color:#1565C0" id="importProgress">Reading file...</div></div>';
+
+  /* Load SheetJS from CDN if not already loaded */
+  if (typeof XLSX === 'undefined') {
+    var script = document.createElement('script');
+    script.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+    document.head.appendChild(script);
+    await new Promise(function(resolve) { script.onload = resolve; });
+  }
+
+  var prog = document.getElementById('importProgress');
+  prog.textContent = 'Parsing XLSX...';
+
+  /* Read file */
+  var data = await file.arrayBuffer();
+  var wb = XLSX.read(data, { type: 'array', cellDates: true });
+  var ws = wb.Sheets[wb.SheetNames[0]];
+  var rows = XLSX.utils.sheet_to_json(ws);
+
+  prog.textContent = 'Parsed ' + rows.length + ' rows. Checking for duplicates...';
+
+  /* Map columns — handle both column name variants */
+  function col(row, names) {
+    for (var i = 0; i < names.length; i++) { if (row[names[i]] !== undefined) return row[names[i]]; }
+    return null;
+  }
+
+  /* Build entries */
+  var entries = [];
+  var skipped = 0;
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    var hours = parseFloat(col(r, ['Logged Time', 'Hours', 'Duration']) || 0);
+    if (!hours || hours === 0) { skipped++; continue; }
+
+    var person = col(r, ['Person', 'User', 'Member']) || '';
+    var board = col(r, ['Board', 'Project']) || '';
+    var dateRaw = col(r, ['Date Logged', 'Date', 'Start']);
+    var group = col(r, ['Group', 'Phase']) || '';
+    var item = col(r, ['Item Name', 'Task', 'Item']) || '';
+    var nb = String(col(r, ['Non Billable', 'NonBillable']) || '').toUpperCase() === 'TRUE';
+    var bd = String(col(r, ['Biz Dev', 'BizDev']) || '').toUpperCase() === 'TRUE';
+    var to = String(col(r, ['Time Off', 'TimeOff']) || '').toUpperCase() === 'TRUE';
+
+    /* Parse date */
+    var workDate;
+    if (dateRaw instanceof Date) {
+      workDate = dateRaw.toISOString().slice(0, 10);
+    } else if (typeof dateRaw === 'string') {
+      workDate = dateRaw.slice(0, 10);
+    } else if (typeof dateRaw === 'number') {
+      /* Excel serial date */
+      var d = new Date((dateRaw - 25569) * 86400 * 1000);
+      workDate = d.toISOString().slice(0, 10);
+    } else {
+      workDate = null;
+    }
+    if (!workDate) { skipped++; continue; }
+
+    /* Extract project code from board name */
+    var codeMatch = board.match(/^(\d+_\d+_\d+)/);
+    var projCode = codeMatch ? codeMatch[1] : (board.match(/^(\d+_\d+)/) || [null, null])[1];
+
+    /* Phase mapping */
+    var phaseKey = null;
+    var gl = group.toLowerCase();
+    if (gl.indexOf('phase 1') >= 0) phaseKey = 'phase1';
+    else if (gl.indexOf('phase 2') >= 0) phaseKey = 'phase2';
+    else if (gl.indexOf('phase 3.1') >= 0 || gl.indexOf('(pre)') >= 0) phaseKey = 'phase3_1';
+    else if (gl.indexOf('phase 3.2') >= 0 || gl.indexOf('(pro)') >= 0 || gl.indexOf('(working)') >= 0) phaseKey = 'phase3_2';
+    else if (gl.indexOf('phase 4') >= 0) phaseKey = 'phase4';
+    else if (gl.indexOf('phase 5') >= 0) phaseKey = 'phase5';
+
+    /* Dedup hash: person + board + date + start time + hours */
+    var startRaw = col(r, ['Start', 'Start Time']) || '';
+    var startStr = startRaw instanceof Date ? startRaw.toISOString() : String(startRaw);
+    var hash = person + '|' + board + '|' + workDate + '|' + startStr + '|' + hours;
+
+    entries.push({
+      hours: hours, work_date: workDate, person_name: person,
+      project_code: projCode, board_name: board.substring(0, 200),
+      phase_group: group.substring(0, 200), phase_key: phaseKey,
+      item_name: (item || '').substring(0, 200),
+      is_billable: !nb, is_bizdev: bd, is_timeoff: to,
+      source: 'timetracker', _hash: hash
+    });
+  }
+
+  prog.textContent = 'Parsed ' + entries.length + ' valid entries (skipped ' + skipped + ' empty). Checking for duplicates in Supabase...';
+
+  /* Build set of existing hashes from SUPA_ACTUALS_ALL for dedup */
+  var existingHashes = {};
+  if (SUPA_ACTUALS_ALL) {
+    for (var i = 0; i < SUPA_ACTUALS_ALL.length; i++) {
+      var a = SUPA_ACTUALS_ALL[i];
+      var eh = (a.person_name || '') + '|' + (a.board_name || '') + '|' + (a.work_date || '') + '|' + (a.item_name || '') + '|' + (a.hours || 0);
+      existingHashes[eh] = true;
+    }
+  }
+
+  /* Also check by person + date + board + hours as a simpler dedup */
+  var simpleHashes = {};
+  if (SUPA_ACTUALS_ALL) {
+    for (var i = 0; i < SUPA_ACTUALS_ALL.length; i++) {
+      var a = SUPA_ACTUALS_ALL[i];
+      var sh = (a.person_name || '') + '|' + (a.board_name || '') + '|' + (a.work_date || '') + '|' + (a.hours || 0);
+      simpleHashes[sh] = true;
+    }
+  }
+
+  /* Filter out duplicates */
+  var newEntries = [];
+  var dupes = 0;
+  for (var i = 0; i < entries.length; i++) {
+    var e = entries[i];
+    var simpleHash = e.person_name + '|' + e.board_name + '|' + e.work_date + '|' + e.hours;
+    if (simpleHashes[simpleHash]) {
+      dupes++;
+    } else {
+      newEntries.push(e);
+      simpleHashes[simpleHash] = true; /* prevent self-duplication within file */
+    }
+  }
+
+  prog.textContent = 'Found ' + newEntries.length + ' new entries (' + dupes + ' duplicates skipped). Importing...';
+
+  if (newEntries.length === 0) {
+    statusEl.innerHTML = '<div style="background:#E8F5E9;border-radius:8px;padding:16px;margin-bottom:12px"><div style="font-weight:600;color:#2E7D32;margin-bottom:4px">&#10003; All caught up!</div><div style="font-size:12px;color:#2E7D32">All ' + entries.length + ' entries already exist in Supabase. No new data to import.</div></div>';
+    return;
+  }
+
+  /* Preview what we're about to import */
+  var byPerson = {};
+  var dateMin = '9999', dateMax = '0000';
+  var totalHrs = 0;
+  for (var i = 0; i < newEntries.length; i++) {
+    var e = newEntries[i];
+    byPerson[e.person_name] = (byPerson[e.person_name] || 0) + e.hours;
+    if (e.work_date < dateMin) dateMin = e.work_date;
+    if (e.work_date > dateMax) dateMax = e.work_date;
+    totalHrs += e.hours;
+  }
+
+  var preview = '<div style="background:var(--white);border-radius:8px;padding:16px;margin-bottom:12px;border:1px solid var(--canvas)">';
+  preview += '<div style="font-weight:600;color:var(--abyss);margin-bottom:8px">Preview: ' + newEntries.length + ' new entries to import</div>';
+  preview += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">';
+  preview += '<div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray)">Date Range</div><div style="font-weight:600">' + dateMin + ' to ' + dateMax + '</div></div>';
+  preview += '<div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray)">Total Hours</div><div style="font-weight:600">' + totalHrs.toFixed(1) + 'h</div></div>';
+  preview += '<div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray)">People</div><div style="font-weight:600">' + Object.keys(byPerson).length + '</div></div>';
+  preview += '</div>';
+
+  /* Person breakdown */
+  preview += '<div style="max-height:200px;overflow-y:auto;font-size:12px">';
+  var sortedPeople = Object.keys(byPerson).sort(function(a,b) { return byPerson[b] - byPerson[a]; });
+  for (var i = 0; i < sortedPeople.length; i++) {
+    var pn = sortedPeople[i];
+    preview += '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--light-gray)"><span>' + pn + '</span><span style="font-weight:600;font-variant-numeric:tabular-nums">' + byPerson[pn].toFixed(1) + 'h</span></div>';
+  }
+  preview += '</div>';
+
+  preview += '<div style="margin-top:12px;display:flex;gap:8px">';
+  preview += '<button onclick="importExecute()" style="padding:8px 24px;border-radius:6px;border:none;background:var(--ocean);color:white;cursor:pointer;font-size:13px;font-weight:600">Import ' + newEntries.length + ' Entries</button>';
+  preview += '<button onclick="importTimeState.status=\'idle\';renderImportTime()" style="padding:8px 16px;border-radius:6px;border:1px solid var(--canvas);background:transparent;color:var(--mid-gray);cursor:pointer;font-size:13px">Cancel</button>';
+  preview += '</div></div>';
+
+  statusEl.innerHTML = preview;
+
+  /* Store parsed entries for the import button */
+  importTimeState.parsed = newEntries;
+  importTimeState.status = 'preview';
+}
+
+async function importExecute() {
+  var entries = importTimeState.parsed;
+  if (!entries || entries.length === 0) return;
+
+  var statusEl = document.getElementById('importStatus');
+  statusEl.innerHTML = '<div style="background:#E3F2FD;border-radius:8px;padding:16px;margin-bottom:12px"><div style="font-weight:600;color:#1565C0;margin-bottom:4px">&#9203; Importing...</div><div style="font-size:12px;color:#1565C0" id="importProgress">0 / ' + entries.length + '</div><div style="background:var(--canvas);border-radius:4px;height:6px;margin-top:8px"><div id="importBar" style="background:var(--ocean);height:100%;border-radius:4px;width:0%;transition:width .3s"></div></div></div>';
+
+  var prog = document.getElementById('importProgress');
+  var bar = document.getElementById('importBar');
+  var batchSize = 500;
+  var imported = 0;
+  var errors = 0;
+
+  /* Resolve team_member_id and budget_id for entries */
+  /* Build lookups from Supabase data already loaded */
+  var tmByName = {};
+  if (SUPA_BUDGETS) {
+    /* We don't have team member lookup readily available in browser — skip for now, set to null */
+  }
+
+  for (var i = 0; i < entries.length; i += batchSize) {
+    var batch = entries.slice(i, i + batchSize);
+    /* Remove _hash field before sending */
+    var cleanBatch = batch.map(function(e) {
+      var c = {};
+      for (var k in e) { if (k !== '_hash') c[k] = e[k]; }
+      return c;
+    });
+
+    try {
+      var result = await sparkFetch('labor_actuals', '', 'POST', cleanBatch);
+      if (result && !result.error) {
+        imported += batch.length;
+      } else {
+        errors += batch.length;
+        console.error('Import batch error:', result);
+      }
+    } catch (ex) {
+      errors += batch.length;
+      console.error('Import exception:', ex);
+    }
+
+    var pct = Math.round((i + batch.length) / entries.length * 100);
+    if (prog) prog.textContent = (i + batch.length) + ' / ' + entries.length + (errors > 0 ? ' (' + errors + ' errors)' : '');
+    if (bar) bar.style.width = pct + '%';
+  }
+
+  /* Done */
+  var icon = errors === 0 ? '&#10003;' : '&#9888;';
+  var bg = errors === 0 ? '#E8F5E9' : '#FFF8E1';
+  var color = errors === 0 ? '#2E7D32' : '#F57F17';
+  statusEl.innerHTML = '<div style="background:' + bg + ';border-radius:8px;padding:16px;margin-bottom:12px"><div style="font-weight:600;color:' + color + ';margin-bottom:4px">' + icon + ' Import Complete</div><div style="font-size:12px;color:' + color + '">' + imported + ' entries imported' + (errors > 0 ? ', ' + errors + ' errors' : '') + '. Refreshing data...</div></div>';
+
+  /* Reload actuals from Supabase */
+  importTimeState.status = 'done';
+  importTimeState.parsed = null;
+
+  /* Refresh SUPA_ACTUALS_ALL */
+  if (typeof loadSupabaseData === 'function') {
+    await loadSupabaseData();
+    enrichProjectsWithSupabase();
+  }
+  renderImportTime();
 }
 
 /* ── RENDER: COMPLETED ── */
@@ -5345,6 +5637,7 @@ function navigate(view) {
   renderSidebar();
   if (view === 'master') renderMaster();
   else if (view === 'flagged') renderFlagged();
+  else if (view === 'importTime') renderImportTime();
   else if (view === 'completed') renderCompleted();
   else if (view === 'resource') renderResource();
   else if (view === 'allocations') renderAllocations();
