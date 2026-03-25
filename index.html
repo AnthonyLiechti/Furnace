@@ -1424,11 +1424,17 @@ function renderMaster() {
     var pProfit = p.profit || 0;
     var pMarginNum = pBudget > 0 ? (pProfit / pBudget) * 100 : 0;
 
+    /* Determine category */
+    var category = 'Client Billable';
+    if (p.code === '100_00_00' || p.projectType === 'internal' || (p._supabudget && p._supabudget.status === 'nonbillable')) category = 'Non-Billable';
+    else if (p.projectType === 'bizdev' || (p._supabudget && p._supabudget.status === 'bizdev')) category = 'Biz Dev';
+
     if (hrsInRange > 0 || (!hasDateFilter && (pBudget > 0 || (p._supabudget)))) {
       rows.push({ p:p, budget:pBudget, labor:pLabor, oop:pOOP, oopSpent:oopSpent,
         profit:pProfit, margin:pMarginNum, hrsInRange:hrsInRange,
         billableHrs:billableHrsInRange, revenue:revenue,
-        people:Object.keys(peopleInRange).length, entries:entriesInRange });
+        people:Object.keys(peopleInRange).length, entries:entriesInRange,
+        category: category });
     }
   }
 
@@ -1439,6 +1445,7 @@ function renderMaster() {
     switch (masterSortCol) {
       case 'name': va = a.p.code || ''; vb = b.p.code || ''; return va < vb ? -dir : va > vb ? dir : 0;
       case 'client': va = (a.p.clientName||'').toLowerCase(); vb = (b.p.clientName||'').toLowerCase(); return va < vb ? -dir : va > vb ? dir : 0;
+      case 'category': va = a.category; vb = b.category; return va < vb ? -dir : va > vb ? dir : 0;
       case 'budget': return (a.budget - b.budget) * dir;
       case 'hours': return (a.billableHrs - b.billableHrs) * dir;
       case 'revenue': return (a.revenue - b.revenue) * dir;
@@ -1468,29 +1475,26 @@ function renderMaster() {
 
   h += '<table class="phase-table"><thead><tr>';
   h += '<th style="' + thStyle + ';text-align:right;width:30px">#</th>';
-  h += '<th style="' + thStyle + '" onclick="toggleMasterSort(\'name\')">Project' + sortArrow('name') + '</th>';
+  h += '<th style="' + thStyle + '" onclick="toggleMasterSort(\'category\')">Category' + sortArrow('category') + '</th>';
   h += '<th style="' + thStyle + '" onclick="toggleMasterSort(\'client\')">Client' + sortArrow('client') + '</th>';
+  h += '<th style="' + thStyle + '" onclick="toggleMasterSort(\'name\')">Project' + sortArrow('name') + '</th>';
   h += '<th style="' + thStyle + ';text-align:right" onclick="toggleMasterSort(\'hours\')">Billable Hrs' + sortArrow('hours') + '</th>';
   h += '<th style="' + thStyle + ';text-align:right" onclick="toggleMasterSort(\'revenue\')">Revenue @$200/hr' + sortArrow('revenue') + '</th>';
-  h += '<th style="' + thStyle + ';text-align:right" onclick="toggleMasterSort(\'oop\')">OOP Spent' + sortArrow('oop') + '</th>';
   h += '<th style="' + thStyle + ';text-align:center">People</th>';
   h += '<th style="' + thStyle + ';text-align:center">Entries</th>';
   h += '</tr></thead><tbody>';
 
   for (var i = 0; i < rows.length; i++) {
     var r = rows[i], p = r.p;
-    var category = 'Client Billable';
-    if (p.code === '100_00_00' || p.projectType === 'internal') category = 'Non-Billable';
-    else if (p.projectType === 'bizdev') category = 'Biz Dev';
-    var catColor = category === 'Non-Billable' ? 'var(--mid-gray)' : category === 'Biz Dev' ? '#F57F17' : 'var(--ocean)';
+    var catColor = r.category === 'Non-Billable' ? 'var(--mid-gray)' : r.category === 'Biz Dev' ? '#F57F17' : 'var(--ocean)';
 
     h += '<tr onclick="navigate(\'project:' + p.id + '\')" style="cursor:pointer">';
     h += '<td style="text-align:right;font-size:11px;color:var(--mid-gray)">' + (i + 1) + '</td>';
-    h += '<td><div style="font-size:10px;color:' + catColor + ';font-weight:600">' + category + '</div><div style="font-weight:600;font-size:13px">' + p.name + '</div></td>';
+    h += '<td><span style="font-size:11px;font-weight:600;color:' + catColor + ';padding:2px 8px;border-radius:8px;background:' + catColor + '15">' + r.category + '</span></td>';
     h += '<td style="font-size:12px;color:var(--mid-gray)">' + (p.clientName || '') + '</td>';
-    h += '<td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">' + r.billableHrs.toFixed(1) + '</td>';
+    h += '<td><div style="font-size:10px;color:var(--mid-gray);font-family:monospace">' + p.code + '</div><div style="font-weight:600;font-size:13px">' + p.name + '</div></td>';
+    h += '<td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">' + r.billableHrs.toFixed(2) + '</td>';
     h += '<td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">$' + Math.round(r.revenue).toLocaleString() + '</td>';
-    h += '<td style="text-align:right;font-variant-numeric:tabular-nums">' + (r.oopSpent > 0 ? '$' + Math.round(r.oopSpent).toLocaleString() : '—') + '</td>';
     h += '<td style="text-align:center;font-size:12px">' + r.people + '</td>';
     h += '<td style="text-align:center;font-size:12px">' + r.entries + '</td>';
     h += '</tr>';
@@ -1498,10 +1502,9 @@ function renderMaster() {
 
   /* Totals row */
   h += '<tr style="font-weight:700;border-top:2px solid var(--abyss);background:var(--cloud)">';
-  h += '<td></td><td>Total (' + rows.length + ' projects)</td><td></td>';
-  h += '<td style="text-align:right;font-variant-numeric:tabular-nums">' + totalBillHrs.toFixed(1) + '</td>';
+  h += '<td></td><td></td><td></td><td>Total (' + rows.length + ' projects)</td>';
+  h += '<td style="text-align:right;font-variant-numeric:tabular-nums">' + totalBillHrs.toFixed(2) + '</td>';
   h += '<td style="text-align:right;font-variant-numeric:tabular-nums">$' + Math.round(totalRevenue).toLocaleString() + '</td>';
-  h += '<td style="text-align:right;font-variant-numeric:tabular-nums">' + (totalOopSpent > 0 ? '$' + Math.round(totalOopSpent).toLocaleString() : '—') + '</td>';
   h += '<td></td><td style="text-align:center">' + totalEntries + '</td>';
   h += '</tr>';
   h += '</tbody></table>';
