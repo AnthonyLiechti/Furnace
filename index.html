@@ -6454,6 +6454,20 @@ function enrichProjectsWithSupabase() {
           p.dataSource = 'needs_review';
         }
       }
+
+      /* Check Supabase budget status — nonbillable/bizdev/complete don't need attention */
+      if (p._supabudget) {
+        var bStatus = p._supabudget.status;
+        if (bStatus === 'nonbillable' || bStatus === 'bizdev') {
+          p.dataSource = 'supabase';
+          if (bStatus === 'nonbillable') p.projectType = 'internal';
+          if (bStatus === 'bizdev') p.projectType = 'bizdev';
+        }
+        if (bStatus === 'complete') {
+          p.status = 'complete';
+          p.dataSource = 'supabase';
+        }
+      }
       var sa = SUPA_ACTUALS[p.code];
       if (sa) {
         p._supaactuals = sa;
