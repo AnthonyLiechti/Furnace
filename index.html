@@ -5072,7 +5072,7 @@ function computeResourceWeeks() {
 }
 
 /* ── ALLOCATION HELPERS ── */
-var allocViewMode = 'week'; /* 'day' or 'week' */
+var allocViewMode = 'day'; /* 'day' or 'week' */
 var allocProjSearch = '';
 var allocEditingCell = null; /* {person, date} when inline editing */
 
@@ -5140,6 +5140,48 @@ function getProjectList() {
   return list;
 }
 
+async function saveAllocationToSupabase(person, project, date, hours, weekOf) {
+  if (!sparkAuth.connected) return;
+  if (!sparkConfig) {
+    if (window.furnaceAPI && window.furnaceAPI.sparkReadConfig) {
+      sparkConfig = await window.furnaceAPI.sparkReadConfig();
+    } else {
+      sparkConfig = {
+        supabaseUrl: 'https://jnwdscddyqujjikesdpb.supabase.co',
+        supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impud2RzY2RkeXF1amppa2VzZHBiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyODgxOTEsImV4cCI6MjA4OTg2NDE5MX0.EQueTlfX30ULmpLDF7ijSv0xR0_baAT2kPjYoK_RnpA'
+      };
+    }
+  }
+  if (!sparkConfig) return;
+  var token;
+  if (window.furnaceAPI && window.furnaceAPI.sparkGetToken) {
+    token = await window.furnaceAPI.sparkGetToken();
+  } else {
+    token = await sparkBrowserGetToken();
+  }
+  if (!token) return;
+  var headers = {
+    'apikey': sparkConfig.supabaseAnonKey,
+    'Authorization': 'Bearer ' + token,
+    'Content-Type': 'application/json'
+  };
+  try {
+    if (hours > 0) {
+      headers['Prefer'] = 'return=minimal,resolution=merge-duplicates';
+      await fetch(sparkConfig.supabaseUrl + '/rest/v1/allocations', {
+        method: 'POST', headers: headers,
+        body: JSON.stringify({ person: person, project: project, date: date, hours_per_day: hours, week_of: weekOf })
+      });
+    } else {
+      await fetch(sparkConfig.supabaseUrl + '/rest/v1/allocations?person=eq.' + encodeURIComponent(person) + '&project=eq.' + encodeURIComponent(project) + '&date=eq.' + date, {
+        method: 'DELETE', headers: headers
+      });
+    }
+  } catch (err) {
+    console.error('saveAllocationToSupabase error:', err);
+  }
+}
+
 async function saveAllocations() {
   if (window.furnaceAPI) await window.furnaceAPI.writeAllocations(ALLOCATIONS);
   computeResourceWeeks();
@@ -5182,6 +5224,7 @@ function allocSetCell(project, person, dateISO, hours) {
   for (var i = 0; i < allocs.length; i++) {
     if (allocs[i].project === project && allocs[i].person === person && allocs[i].date === dateISO) { idx = i; break; }
   }
+  var weekOf = getMondayOfWeek(dateISO);
   if (hours <= 0) {
     if (idx >= 0) allocs.splice(idx, 1);
   } else if (idx >= 0) {
@@ -5192,11 +5235,13 @@ function allocSetCell(project, person, dateISO, hours) {
       id: 'a_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
       person: person, project: project, date: dateISO,
       hoursPerDay: hours,
-      weekOf: getMondayOfWeek(dateISO),
+      weekOf: weekOf,
       totalHours: hours, days: 1, notes: '',
       created: new Date().toISOString(), modified: new Date().toISOString()
     });
   }
+  /* Save to Supabase if connected */
+  saveAllocationToSupabase(person, project, dateISO, hours, weekOf);
   allocDebouncedSave();
 }
 
@@ -6690,6 +6735,31 @@ async function loadSupabaseData() {
         if (!sa.byDate[a.work_date]) sa.byDate[a.work_date] = 0;
         sa.byDate[a.work_date] += a.hours || 0;
       }
+    }
+
+    /* 7. Fetch allocations from Supabase */
+    var supaAllocs = await sparkFetchAll('allocations', 'select=id,person,project,date,hours_per_day,week_of&order=date.asc');
+    if (supaAllocs && supaAllocs.length > 0) {
+      ALLOCATIONS.allocations = supaAllocs.map(function(a) {
+        return { id: a.id, person: a.person, project: a.project, date: a.date, hoursPerDay: a.hours_per_day, weekOf: a.week_of };
+      });
+      /* Build team list from allocations */
+      var teamSet = {};
+      for (var i = 0; i < ALLOCATIONS.allocations.length; i++) {
+        teamSet[ALLOCATIONS.allocations[i].person] = true;
+      }
+      ALLOCATIONS.team = Object.keys(teamSet).sort();
+      /* Build forecastProjects from allocations, merged with any existing local forecastProjects */
+      var projSet = {};
+      var existingForecast = (ALLOCATIONS.forecastProjects || []);
+      for (var i = 0; i < existingForecast.length; i++) {
+        projSet[existingForecast[i]] = true;
+      }
+      for (var i = 0; i < ALLOCATIONS.allocations.length; i++) {
+        projSet[ALLOCATIONS.allocations[i].project] = true;
+      }
+      ALLOCATIONS.forecastProjects = Object.keys(projSet).sort();
+      console.log('Supabase allocations loaded:', ALLOCATIONS.allocations.length, 'entries,', ALLOCATIONS.team.length, 'team members,', ALLOCATIONS.forecastProjects.length, 'forecast projects');
     }
 
     SUPA_LOADED = true;
