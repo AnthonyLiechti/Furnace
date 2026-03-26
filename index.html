@@ -6151,6 +6151,8 @@ function renderAllocGrid() {
     if (rowTotal > 0) h += '<span class="ag-person-total">' + rowTotal.toFixed(1) + 'h</span>';
     h += '</div>';
 
+    /* In day view, show capacity indicator under each cell */
+
     /* Cells */
     for (var c = 0; c < days.length; c++) {
       var cellKey, cellVal;
@@ -6189,6 +6191,16 @@ function renderAllocGrid() {
       } else {
         h += '<div class="ag-cell-empty"></div>';
       }
+      /* Day view: show capacity bar (X/8h across all projects) */
+      if (allocViewMode === 'day' && !isEditing) {
+        var dayTotal = getPersonDayTotal(person, cellKey);
+        var capPct = Math.min(100, dayTotal / 8 * 100);
+        var capColor = dayTotal > 8 ? 'var(--ember)' : dayTotal >= 7 ? 'var(--honey)' : 'rgba(48,109,124,.3)';
+        h += '<div style="margin-top:2px;font-size:9px;color:var(--mid-gray);display:flex;align-items:center;gap:3px">';
+        h += '<div style="flex:1;height:3px;border-radius:2px;background:rgba(0,0,0,.08)"><div style="height:100%;border-radius:2px;background:' + capColor + ';width:' + capPct.toFixed(0) + '%"></div></div>';
+        h += '<span style="white-space:nowrap;color:' + (dayTotal > 8 ? 'var(--ember)' : 'var(--mid-gray)') + '">' + dayTotal.toFixed(1) + '/8</span>';
+        h += '</div>';
+      }
       h += '</div>';
     }
 
@@ -6204,6 +6216,37 @@ function renderAllocGrid() {
   for (var c = 0; c <= cols; c++) h += '<div class="ag-cell" style="border-bottom:none"></div>';
 
   h += '</div>';
+
+  /* ── PROJECT HOURS SUMMARY for the week ── */
+  var weekDays = getWeekDays(allocWeekOf);
+  var projTotals = {};
+  var allocs = ALLOCATIONS.allocations;
+  for (var a = 0; a < allocs.length; a++) {
+    var al = allocs[a];
+    if (weekDays.indexOf(al.date) >= 0 && al.hoursPerDay > 0) {
+      if (!projTotals[al.project]) projTotals[al.project] = 0;
+      projTotals[al.project] += al.hoursPerDay;
+    }
+  }
+  var projList = [];
+  for (var pn in projTotals) projList.push({ name: pn, hours: projTotals[pn] });
+  projList.sort(function(a, b) { return b.hours - a.hours; });
+
+  if (projList.length > 0) {
+    var grandTotal = projList.reduce(function(s, p) { return s + p.hours; }, 0);
+    h += '<div style="margin-top:16px;border-top:2px solid var(--canvas);padding-top:12px">';
+    h += '<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);margin-bottom:8px">Weekly Project Hours Summary</div>';
+    h += '<div style="display:grid;grid-template-columns:1fr auto;gap:4px 16px;font-size:12px">';
+    for (var pi = 0; pi < projList.length; pi++) {
+      var isActive = projList[pi].name === allocProject;
+      h += '<div style="padding:4px 8px;border-radius:4px;' + (isActive ? 'background:rgba(48,109,124,.1);font-weight:600;color:var(--ocean)' : 'color:var(--text)') + '">' + projList[pi].name + '</div>';
+      h += '<div style="padding:4px 8px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600;' + (isActive ? 'color:var(--ocean)' : '') + '">' + projList[pi].hours.toFixed(1) + 'h</div>';
+    }
+    h += '<div style="padding:4px 8px;border-top:1px solid var(--canvas);font-weight:700;color:var(--text)">Total</div>';
+    h += '<div style="padding:4px 8px;text-align:right;border-top:1px solid var(--canvas);font-weight:700;font-variant-numeric:tabular-nums">' + grandTotal.toFixed(1) + 'h</div>';
+    h += '</div></div>';
+  }
+
   el.innerHTML = h;
 
   /* Focus input if editing */
