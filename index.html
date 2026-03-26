@@ -2401,14 +2401,38 @@ function renderFlagged() {
     }
   }
 
+  /* Pre-compute OOP scheduling count for summary card */
+  var _oopSchedEntries = (OOP_SCHEDULE && OOP_SCHEDULE.entries) ? OOP_SCHEDULE.entries : [];
+  var _scheduledIds = {};
+  for (var si = 0; si < _oopSchedEntries.length; si++) {
+    if (_oopSchedEntries[si].oopEntryId) _scheduledIds[_oopSchedEntries[si].oopEntryId] = true;
+  }
+  var _oopUnschedCount = 0;
+  var _allForOopPre = all.filter(function(p) { return p._supabudget && !isProjectCompleted(p); });
+  for (var i = 0; i < _allForOopPre.length; i++) {
+    var _sb = _allForOopPre[i]._supabudget;
+    var _oopItems = _sb._oopEntries || _sb.oopEntries || [];
+    for (var j = 0; j < _oopItems.length; j++) {
+      var _it = _oopItems[j];
+      if (_it.is_active === false) continue;
+      var _ec = _it.adjusted_count != null ? _it.adjusted_count : (_it.count || 0);
+      var _er = _it.adjusted_rate != null ? _it.adjusted_rate : (_it.rate || 0);
+      var _ed = _it.adjusted_days != null ? _it.adjusted_days : (_it.days || 1);
+      var _eh = _it.adjusted_head_count != null ? _it.adjusted_head_count : (_it.head_count || 1);
+      var _et = _it.actual_amount != null ? _it.actual_amount : (_ec * _er * _ed * _eh);
+      if (_et > 0 && !_it.paid && !_scheduledIds[_it.id]) _oopUnschedCount++;
+    }
+  }
+
   /* Summary counts at top */
-  var totalIssues = noBudget.length + budgetNoLabor.length + needsOop.length + possiblyDone.length;
-  h += '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px">';
-  h += '<div style="background:var(--white);border-radius:8px;padding:14px;text-align:center;border-left:4px solid #E53935"><div style="font-size:28px;font-weight:700;color:#E53935">' + noBudget.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">No Budget</div></div>';
-  h += '<div style="background:var(--white);border-radius:8px;padding:14px;text-align:center;border-left:4px solid var(--honey)"><div style="font-size:28px;font-weight:700;color:var(--honey)">' + budgetNoLabor.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Needs Labor</div></div>';
-  h += '<div style="background:var(--white);border-radius:8px;padding:14px;text-align:center;border-left:4px solid #FF9800"><div style="font-size:28px;font-weight:700;color:#FF9800">' + needsOop.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Needs OOP</div></div>';
-  h += '<div style="background:var(--white);border-radius:8px;padding:14px;text-align:center;border-left:4px solid #1565C0"><div style="font-size:28px;font-weight:700;color:#1565C0">' + possiblyDone.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Possibly Done</div></div>';
-  h += '<div style="background:var(--white);border-radius:8px;padding:14px;text-align:center;border-left:4px solid #81C784"><div style="font-size:28px;font-weight:700;color:#81C784">' + fullyLoaded.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Fully Loaded</div></div>';
+  var totalIssues = noBudget.length + budgetNoLabor.length + needsOop.length + possiblyDone.length + _oopUnschedCount;
+  h += '<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:24px">';
+  h += '<div class="oop-checklist-card" style="border-radius:8px;padding:14px;text-align:center;border-left:4px solid #E53935"><div style="font-size:28px;font-weight:700;color:#E53935">' + noBudget.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">No Budget</div></div>';
+  h += '<div class="oop-checklist-card" style="border-radius:8px;padding:14px;text-align:center;border-left:4px solid var(--honey)"><div style="font-size:28px;font-weight:700;color:var(--honey)">' + budgetNoLabor.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Needs Labor</div></div>';
+  h += '<div class="oop-checklist-card" style="border-radius:8px;padding:14px;text-align:center;border-left:4px solid #FF9800"><div style="font-size:28px;font-weight:700;color:#FF9800">' + needsOop.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Needs OOP</div></div>';
+  h += '<div class="oop-checklist-card" style="border-radius:8px;padding:14px;text-align:center;border-left:4px solid #CE93D8"><div style="font-size:28px;font-weight:700;color:#CE93D8">' + _oopUnschedCount + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">OOP Unscheduled</div></div>';
+  h += '<div class="oop-checklist-card" style="border-radius:8px;padding:14px;text-align:center;border-left:4px solid #1565C0"><div style="font-size:28px;font-weight:700;color:#1565C0">' + possiblyDone.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Possibly Done</div></div>';
+  h += '<div class="oop-checklist-card" style="border-radius:8px;padding:14px;text-align:center;border-left:4px solid #81C784"><div style="font-size:28px;font-weight:700;color:#81C784">' + fullyLoaded.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Fully Loaded</div></div>';
   h += '</div>';
 
   /* Helper to render a flagged card */
