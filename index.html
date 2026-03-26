@@ -865,6 +865,7 @@ var SUPA_BUDGETS = {};   // project_code -> {budget object with labor entries, o
 var SUPA_ACTUALS = {};   // project_code -> {totalHours, phases: {phase_key: hours}, people: {name: hours}, byDate: {date: hours}}
 var SUPA_ACTUALS_ALL = []; // raw labor_actuals array
 var SUPA_LOADED = false;
+var FURNACE_TEAM_MEMBERS = [];
 
 /* ── NATIVE ALLOCATION DATA ── */
 var ALLOCATIONS = { version: 1, allocations: [], team: [], weeklyCapacity: 40 };
@@ -1340,7 +1341,7 @@ function renderMaster() {
     h += '<div class="snap-fin-item"><div class="sf-label">Total Client Budget</div><div class="sf-value sf-gold">$' + totalDollarBudget.toLocaleString() + '</div></div>';
     h += '<div class="snap-fin-item"><div class="sf-label">FMG Labor</div><div class="sf-value">$' + totalLaborMU.toLocaleString() + '</div><div class="sf-sub">Cost: $' + Math.round(totalLaborCost).toLocaleString() + '</div></div>';
     h += '<div class="snap-fin-item"><div class="sf-label">Out-of-Pocket</div><div class="sf-value">$' + totalOOP.toLocaleString() + '</div></div>';
-    h += '<div class="snap-fin-item"><div class="sf-label">Portfolio Profit</div><div class="sf-value ' + (totalProfit >= 0 ? 'sf-green' : '') + '">$' + totalProfit.toLocaleString() + '</div><div class="sf-sub">' + overallProfitPct + '%</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Portfolio Reserve</div><div class="sf-value ' + (totalProfit >= 0 ? 'sf-green' : '') + '">$' + totalProfit.toLocaleString() + '</div><div class="sf-sub">' + overallProfitPct + '%</div></div>';
     h += '</div>';
 
     /* Row 2: Hours tracking */
@@ -1356,7 +1357,7 @@ function renderMaster() {
     var profPctNum = parseFloat(overallProfitPct);
     var gaugeColor = profPctNum >= 30 ? '#81C784' : profPctNum >= 15 ? 'var(--honey)' : profPctNum >= 0 ? 'var(--sand)' : '#C62828';
     h += '<div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:20px">';
-    h += '<div style="font-size:11px;font-weight:600;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px">Portfolio Profitability</div>';
+    h += '<div style="font-size:11px;font-weight:600;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px">Portfolio Reserve %</div>';
     h += '<div style="flex:1;height:12px;background:rgba(255,255,255,.08);border-radius:6px;overflow:hidden"><div style="height:100%;width:' + Math.min(Math.max(profPctNum, 0), 100) + '%;background:' + gaugeColor + ';border-radius:6px;transition:width .3s"></div></div>';
     h += '<div style="font-size:18px;font-weight:700;color:' + gaugeColor + '">' + overallProfitPct + '%</div>';
     h += '</div>';
@@ -1380,7 +1381,7 @@ function renderMaster() {
     h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ember)"></div>Labor Spent</div>';
     h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ocean)"></div>Labor Remaining</div>';
     h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--sand)"></div>OOP</div>';
-    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Profit</div>';
+    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Reserve</div>';
     h += '</div></div>';
     h += '</div>';
   }
@@ -1569,8 +1570,8 @@ function renderClient(clientId) {
     h += '<div class="snap-fin-item"><div class="sf-label">Total Client Budget</div><div class="sf-value sf-gold">$' + totalDollarBudget.toLocaleString() + '</div></div>';
     h += '<div class="snap-fin-item"><div class="sf-label">FMG Labor</div><div class="sf-value">$' + totalLaborMU.toLocaleString() + '</div><div class="sf-sub">Cost: $' + totalLaborCost.toLocaleString() + '</div></div>';
     h += '<div class="snap-fin-item"><div class="sf-label">Out-of-Pocket</div><div class="sf-value">$' + totalOOP.toLocaleString() + '</div></div>';
-    h += '<div class="snap-fin-item"><div class="sf-label">Est. Profit</div><div class="sf-value sf-green">$' + totalEstProfit.toLocaleString() + '</div><div class="sf-sub">' + estProfitPct + '%</div></div>';
-    h += '<div class="snap-fin-item"><div class="sf-label">Active Profit</div><div class="sf-value sf-green">$' + totalActiveProfit.toLocaleString() + '</div><div class="sf-sub">' + actProfitPct + '%</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Est. Reserve</div><div class="sf-value sf-green">$' + totalEstProfit.toLocaleString() + '</div><div class="sf-sub">' + estProfitPct + '%</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Active Reserve</div><div class="sf-value sf-green">$' + totalActiveProfit.toLocaleString() + '</div><div class="sf-sub">' + actProfitPct + '%</div></div>';
     h += '</div>';
 
     /* Row 2: Hours tracking */
@@ -1601,7 +1602,7 @@ function renderClient(clientId) {
     h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ember)"></div>Labor Spent</div>';
     h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ocean)"></div>Labor Remaining</div>';
     h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--sand)"></div>OOP</div>';
-    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Profit</div>';
+    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Reserve</div>';
     h += '</div></div>';
     h += '</div>';
   } else {
@@ -1874,6 +1875,17 @@ function renderProject(projectId) {
     var barTotal = tcvPrice > 0 ? tcvPrice : 1;
     var profitBar$ = Math.max(0, tcvPrice - laborSpent$ - laborRemaining$ - oopSpent - Math.max(0, oopRemaining));
 
+    /* Margin % = (TCV - Internal Labor Cost - OOP Effective) / TCV */
+    var internalLaborCost = sb.laborCostInternal || sb.laborTotal || 0;
+    var oopInternal = sb.oopEffective || sb.oopTotal || 0;
+    var marginPctVal = tcvPrice > 0 ? ((tcvPrice - internalLaborCost - oopInternal) / tcvPrice * 100).toFixed(1) : 0;
+    var marginColor = parseFloat(marginPctVal) > 30 ? '#81C784' : parseFloat(marginPctVal) >= 15 ? 'var(--honey)' : '#C62828';
+
+    /* Effective Rate = TCV / Actual Hours Spent */
+    var effRate = saHrs > 0 ? (tcvPrice / saHrs) : 0;
+    var effRateDisplay = saHrs > 0 ? '$' + Math.round(effRate).toLocaleString() + '/hr' : '\u2014';
+    var effRateColor = effRate >= 200 ? '#81C784' : effRate > 0 ? 'var(--ember)' : 'var(--white)';
+
     h += '<div class="snapshot-banner" style="margin-bottom:16px">';
     h += '<div class="snap-header"><div class="snap-title">Project Financials</div><div class="snap-version">Live from Furnace &#128293;</div></div>';
     h += '<div class="snap-financials">';
@@ -1882,7 +1894,9 @@ function renderProject(projectId) {
     h += '</div>';
     h += '<div class="snap-fin-item"><div class="sf-label">Labor Cost</div><div class="sf-value">$' + Math.round(sb.laborTotal || 0).toLocaleString() + '</div><div class="sf-sub">' + (sb.laborHours || 0).toFixed(0) + ' hrs @ $200/hr</div></div>';
     h += '<div class="snap-fin-item"><div class="sf-label">OOP Cost</div><div class="sf-value">$' + Math.round(sb.oopTotal || 0).toLocaleString() + '</div></div>';
-    h += '<div class="snap-fin-item"><div class="sf-label">Profit</div><div class="sf-value ' + (profitVal >= 0 ? 'sf-green' : '') + '">$' + Math.round(profitVal).toLocaleString() + '</div><div class="sf-sub">' + profitPctVal + '%</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Reserve</div><div class="sf-value ' + (profitVal >= 0 ? 'sf-green' : '') + '">$' + Math.round(profitVal).toLocaleString() + '</div><div class="sf-sub">' + profitPctVal + '%</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Margin</div><div class="sf-value" style="color:' + marginColor + '">' + marginPctVal + '%</div><div class="sf-sub">Internal cost: $' + Math.round(internalLaborCost).toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Eff. Rate</div><div class="sf-value" style="color:' + effRateColor + '">' + effRateDisplay + '</div>' + (saHrs > 0 ? '<div class="sf-sub">vs $200 target</div>' : '<div class="sf-sub">No hours tracked</div>') + '</div>';
     h += '</div>';
 
     /* ── Progress Bar ── */
@@ -1904,7 +1918,7 @@ function renderProject(projectId) {
     h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ocean)"></div>Labor Remaining</div>';
     h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#F57F17"></div>OOP Spent</div>';
     h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#FFE0B2"></div>OOP Remaining</div>';
-    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Profit</div>';
+    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Reserve</div>';
     h += '</div></div>';
 
     /* ── Hours Row ── */
@@ -1966,7 +1980,7 @@ function renderProject(projectId) {
     h += '<div class="snap-fin-item"><div class="sf-label">Total Client Budget</div><div class="sf-value sf-gold">$' + aggBudget.toLocaleString() + '</div></div>';
     h += '<div class="snap-fin-item"><div class="sf-label">Total FMG Labor</div><div class="sf-value">$' + aggLabor.toLocaleString() + '</div></div>';
     h += '<div class="snap-fin-item"><div class="sf-label">Total OOP</div><div class="sf-value">$' + aggOop.toLocaleString() + '</div></div>';
-    h += '<div class="snap-fin-item"><div class="sf-label">Total Profit</div><div class="sf-value ' + (aggProfit >= 0 ? 'sf-green' : '') + '">$' + aggProfit.toLocaleString() + '</div><div class="sf-sub">' + aggMargin + '%</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Total Reserve</div><div class="sf-value ' + (aggProfit >= 0 ? 'sf-green' : '') + '">$' + aggProfit.toLocaleString() + '</div><div class="sf-sub">' + aggMargin + '%</div></div>';
     h += '</div>';
     h += '<div class="snap-financials" style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1)">';
     h += '<div class="snap-fin-item"><div class="sf-label">Hours Budgeted</div><div class="sf-value">' + aggHrsBudget.toFixed(1) + '</div></div>';
@@ -1991,7 +2005,7 @@ function renderProject(projectId) {
       h += '<div class="snap-fin-item"><div class="sf-label">Budget</div><div class="sf-value sf-gold" style="font-size:18px">$' + (ss.dollarBudget || 0).toLocaleString() + '</div></div>';
       h += '<div class="snap-fin-item"><div class="sf-label">FMG Labor</div><div class="sf-value" style="font-size:18px">$' + (ss.laborCost || 0).toLocaleString() + '</div></div>';
       h += '<div class="snap-fin-item"><div class="sf-label">OOP</div><div class="sf-value" style="font-size:18px">$' + (ss.oopCost || 0).toLocaleString() + '</div></div>';
-      h += '<div class="snap-fin-item"><div class="sf-label">Profit</div><div class="sf-value ' + ((ss.profit || 0) >= 0 ? 'sf-green' : '') + '" style="font-size:18px">$' + (ss.profit || 0).toLocaleString() + '</div><div class="sf-sub">' + ssMargin + '%</div></div>';
+      h += '<div class="snap-fin-item"><div class="sf-label">Reserve</div><div class="sf-value ' + ((ss.profit || 0) >= 0 ? 'sf-green' : '') + '" style="font-size:18px">$' + (ss.profit || 0).toLocaleString() + '</div><div class="sf-sub">' + ssMargin + '%</div></div>';
       h += '</div>';
       h += '<div class="snap-financials" style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08)">';
       h += '<div class="snap-fin-item"><div class="sf-label">Hrs Budgeted</div><div class="sf-value" style="font-size:16px">' + ssHrsBudget.toFixed(1) + '</div></div>';
@@ -2006,7 +2020,7 @@ function renderProject(projectId) {
       h += '<div class="snap-financials" style="margin-top:10px">';
       h += '<div class="snap-fin-item"><div class="sf-label">Hours Tracked</div><div class="sf-value" style="font-size:18px;color:var(--sand)">' + unallocHrs.toFixed(1) + '</div></div>';
       h += '<div class="snap-fin-item"><div class="sf-label">Budget</div><div class="sf-value" style="font-size:18px">—</div></div>';
-      h += '<div class="snap-fin-item"><div class="sf-label">Profit</div><div class="sf-value" style="font-size:18px">—</div></div>';
+      h += '<div class="snap-fin-item"><div class="sf-label">Reserve</div><div class="sf-value" style="font-size:18px">—</div></div>';
       h += '</div></div>';
     }
 
@@ -2045,7 +2059,7 @@ function renderProject(projectId) {
     h += '<div class="snap-fin-item"><div class="sf-label">Client Budget</div><div class="sf-value sf-gold">$' + db.toLocaleString() + '</div></div>';
     h += '<div class="snap-fin-item"><div class="sf-label">FMG Labor</div><div class="sf-value">$' + lm.toLocaleString() + '</div><div class="sf-sub">Cost: $' + Math.round(lc).toLocaleString() + '</div></div>';
     h += '<div class="snap-fin-item"><div class="sf-label">Out-of-Pocket</div><div class="sf-value">$' + oop.toLocaleString() + '</div></div>';
-    h += '<div class="snap-fin-item"><div class="sf-label">Est. Profit</div><div class="sf-value ' + (proft >= 0 ? 'sf-green' : '') + '">$' + proft.toLocaleString() + '</div><div class="sf-sub">' + pm + '%</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Est. Reserve</div><div class="sf-value ' + (proft >= 0 ? 'sf-green' : '') + '">$' + proft.toLocaleString() + '</div><div class="sf-sub">' + pm + '%</div></div>';
     h += '</div>';
 
     /* Row 2: Hours tracking */
@@ -2076,7 +2090,7 @@ function renderProject(projectId) {
     h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ember)"></div>Labor Spent $' + Math.round(spentDollar).toLocaleString() + '</div>';
     h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ocean)"></div>Labor Remaining $' + Math.round(estRemainDollar).toLocaleString() + '</div>';
     h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--sand)"></div>OOP $' + oop.toLocaleString() + '</div>';
-    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Profit $' + Math.round(profitDollar).toLocaleString() + '</div>';
+    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Reserve $' + Math.round(profitDollar).toLocaleString() + '</div>';
     h += '</div></div>';
     h += '</div>';
   } else {
@@ -3146,12 +3160,48 @@ function renderSettings() {
   }
   h += '</div>';
   h += '<div style="margin-top:20px;font-size:12px;color:var(--mid-gray)">Rates are saved locally in your browser and apply across all dashboard views when toggled to Revenue mode.</div>';
+
+  /* ── Team Member Rates ── */
+  if (sparkAuth.connected && FURNACE_TEAM_MEMBERS.length > 0) {
+    h += '<div class="section-title" style="margin-top:32px">Team Member Rates</div>';
+    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:16px">Internal cost rates used for margin calculations</p>';
+    h += '<div style="background:var(--white);border-radius:10px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06);overflow-x:auto">';
+    h += '<table class="phase-table" style="min-width:500px"><thead><tr>';
+    h += '<th>Name</th><th>Department</th><th style="text-align:right">Cost Rate ($/hr)</th><th style="text-align:right">Billable Rate ($/hr)</th>';
+    h += '</tr></thead><tbody>';
+    var tmSorted = FURNACE_TEAM_MEMBERS.slice().sort(function(a, b) {
+      var da = (a.department || 'ZZZ').toLowerCase(), db = (b.department || 'ZZZ').toLowerCase();
+      if (da < db) return -1; if (da > db) return 1;
+      var na = (a.name || '').toLowerCase(), nb = (b.name || '').toLowerCase();
+      return na < nb ? -1 : na > nb ? 1 : 0;
+    });
+    for (var ti = 0; ti < tmSorted.length; ti++) {
+      var tm = tmSorted[ti];
+      h += '<tr>';
+      h += '<td style="font-weight:600;font-size:13px">' + (tm.name || 'Unknown') + '</td>';
+      h += '<td style="font-size:12px;color:var(--mid-gray)">' + (tm.department || '—') + '</td>';
+      h += '<td style="text-align:right"><input type="number" class="rate-input" value="' + (tm.fully_burdened_rate || '') + '" placeholder="200" min="0" step="5" style="width:90px" onchange="updateTeamMemberRate(\'' + tm.id + '\', \'fully_burdened_rate\', this.value)"></td>';
+      h += '<td style="text-align:right"><input type="number" class="rate-input" value="' + (tm.billable_rate || '') + '" placeholder="200" min="0" step="5" style="width:90px" onchange="updateTeamMemberRate(\'' + tm.id + '\', \'billable_rate\', this.value)"></td>';
+      h += '</tr>';
+    }
+    h += '</tbody></table></div>';
+  }
+
   document.getElementById('mainContent').innerHTML = h;
 }
 
 function updateRate(clientId, val) {
   clientRates[clientId] = parseFloat(val) || 0;
   saveRates();
+}
+
+async function updateTeamMemberRate(tmId, field, value) {
+  var val = parseFloat(value) || 0;
+  await sparkFetch('team_members?id=eq.' + tmId, '', 'PATCH', {[field]: val});
+  /* Update local cache */
+  for (var i = 0; i < FURNACE_TEAM_MEMBERS.length; i++) {
+    if (FURNACE_TEAM_MEMBERS[i].id === tmId) FURNACE_TEAM_MEMBERS[i][field] = val;
+  }
 }
 
 /* ── SPARK BUDGET EDITOR STATE ── */
@@ -3725,7 +3775,7 @@ function sparkRenderSummary() {
   h += '<div class="spark-summary-item"><div class="ss-label">Total OOP</div><div class="ss-value">' + sparkFmt(totalOopWithMarkup) + '</div><div class="ss-sub">incl. ' + markupPct + '% markup</div></div>';
   h += '<div class="spark-summary-item"><div class="ss-label">Total Amount</div><div class="ss-value">' + sparkFmt(totalAmount) + '</div></div>';
   h += '<div class="spark-summary-item"><div class="ss-label">Client Price</div><div class="ss-value" style="color:var(--sand)">' + sparkFmt(clientPrice) + '</div></div>';
-  h += '<div class="spark-summary-item"><div class="ss-label">Profit</div><div class="ss-value" style="color:' + (profit >= 0 ? '#81C784' : 'var(--ember)') + '">' + sparkFmt(profit) + '</div><div class="ss-sub">' + margin.toFixed(1) + '% margin</div></div>';
+  h += '<div class="spark-summary-item"><div class="ss-label">Reserve</div><div class="ss-value" style="color:' + (profit >= 0 ? '#81C784' : 'var(--ember)') + '">' + sparkFmt(profit) + '</div><div class="ss-sub">' + margin.toFixed(1) + '% margin</div></div>';
   el.innerHTML = h;
 }
 
@@ -6458,6 +6508,9 @@ async function sparkFetchAll(table, query) {
 async function loadSupabaseData() {
   if (!sparkAuth.connected) return;
   try {
+    /* 0. Fetch active team members for rate lookups */
+    FURNACE_TEAM_MEMBERS = await sparkFetchAll('team_members', 'select=id,name,department,employment_type,fully_burdened_rate,billable_rate,is_active&is_active=eq.true&order=department.asc,name.asc') || [];
+
     /* 1. Fetch all visible budgets with project info */
     var budgets = await sparkFetchAll('budgets', 'select=id,name,status,client_price,total_amount,has_discount,discount_percentage,reserve_percentage,oop_markup_percentage,no_oop,project_id,projects(id,project_code,name)&visibility=eq.visible');
     if (!budgets || !budgets.length) { console.warn('No Supabase budgets found'); return; }
@@ -6499,6 +6552,25 @@ async function loadSupabaseData() {
       }
       var laborCost = laborHours * 200;
 
+      /* Compute internal labor cost using team member fully_burdened_rate */
+      var laborInternalCost = 0;
+      for (var k2 = 0; k2 < b.labor.length; k2++) {
+        var le2 = b.labor[k2];
+        var leHrs = (le2.phase1||0) + (le2.phase2||0) + (le2.phase3_1||0) + (le2.phase3_2||0) + (le2.phase4||0) + (le2.phase5||0);
+        var tmRate = 200; /* default */
+        if (le2.team_member_id) {
+          for (var ti = 0; ti < FURNACE_TEAM_MEMBERS.length; ti++) {
+            if (FURNACE_TEAM_MEMBERS[ti].id === le2.team_member_id) {
+              tmRate = FURNACE_TEAM_MEMBERS[ti].fully_burdened_rate || 200;
+              break;
+            }
+          }
+        } else if (le2.team_member && le2.team_member.fully_burdened_rate) {
+          tmRate = le2.team_member.fully_burdened_rate;
+        }
+        laborInternalCost += leHrs * tmRate;
+      }
+
       /* Compute OOP totals: planned, effective (cascade), and spent (paid only) */
       var oopPlanned = 0, oopEffective = 0, oopSpent = 0;
       for (var k = 0; k < b.oop.length; k++) {
@@ -6522,7 +6594,7 @@ async function loadSupabaseData() {
 
       b.laborHours = laborHours;
       b.laborTotal = laborCost;
-      b.laborCostInternal = laborCost;
+      b.laborCostInternal = laborInternalCost;
       b.oopTotal = oopPlanned;
       b.oopEffective = oopEffective;
       b.oopSpent = oopSpent;
