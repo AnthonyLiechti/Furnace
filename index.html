@@ -6134,14 +6134,8 @@ function renderAllocGrid() {
     return;
   }
 
-  var team = ALLOCATIONS.team || [];
-  /* Show assigned people first, then unassigned */
-  var assigned = getProjectPeople(allocProject, allocWeekOf);
-  var unassigned = [];
-  for (var i = 0; i < team.length; i++) {
-    if (assigned.indexOf(team[i]) < 0) unassigned.push(team[i]);
-  }
-  var people = assigned.concat(unassigned);
+  var team = (ALLOCATIONS.team || []).slice().sort(function(a, b) { return a.localeCompare(b); });
+  var people = team;
 
   var days, cols;
   if (allocViewMode === 'day') {
