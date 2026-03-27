@@ -3887,6 +3887,13 @@ function sparkRenderSummary() {
   el.innerHTML = h;
 }
 
+var sparkLaborSectionExpanded = { forge: true, freelancer: true };
+
+function sparkToggleLaborSection(key) {
+  sparkLaborSectionExpanded[key] = !sparkLaborSectionExpanded[key];
+  sparkRenderLaborContent();
+}
+
 function sparkRenderLaborContent() {
   var el = document.getElementById('sparkLaborContent');
   if (!el || !sparkCurrentData) return;
@@ -3894,77 +3901,121 @@ function sparkRenderLaborContent() {
   var labor = data.labor;
   var phaseKey = sparkPhaseTab;
 
-  /* Group by department */
-  var deptGroups = {};
-  for (var i = 0; i < SPARK_DEPT_ORDER.length; i++) deptGroups[SPARK_DEPT_ORDER[i]] = [];
-  var otherDept = [];
+  /* Split into Forge Team (Employee + Contractor) vs Freelancers/Other */
+  var forgeTeam = [];
+  var freelancers = [];
   for (var i = 0; i < labor.length; i++) {
-    var dept = labor[i].department || (labor[i].team_member && labor[i].team_member.department) || 'Other';
-    if (deptGroups[dept]) deptGroups[dept].push(labor[i]);
-    else otherDept.push(labor[i]);
+    var empType = labor[i].employment_type || (labor[i].team_member && labor[i].team_member.employment_type) || 'Employee';
+    if (empType === 'Freelancer') freelancers.push(labor[i]);
+    else forgeTeam.push(labor[i]);
   }
 
-  var h = '<table class="spark-labor-table">';
-  h += '<thead><tr><th>Name</th><th class="num">Rate</th>';
-  if (phaseKey === 'all') {
-    for (var p = 0; p < SPARK_PHASES.length; p++) {
-      h += '<th class="num">' + SPARK_PHASES[p].label + '</th>';
+  /* Helper: group entries by department */
+  function groupByDept(entries) {
+    var groups = {};
+    for (var i = 0; i < SPARK_DEPT_ORDER.length; i++) groups[SPARK_DEPT_ORDER[i]] = [];
+    var other = [];
+    for (var i = 0; i < entries.length; i++) {
+      var dept = entries[i].department || (entries[i].team_member && entries[i].team_member.department) || 'Other';
+      if (groups[dept]) groups[dept].push(entries[i]);
+      else other.push(entries[i]);
     }
-  } else {
-    h += '<th class="num">Hours</th>';
+    return { groups: groups, other: other };
   }
-  h += '<th class="num">Total Hrs</th><th class="num">Total $</th></tr></thead><tbody>';
 
-  var allDepts = SPARK_DEPT_ORDER.slice();
-  if (otherDept.length) allDepts.push('Other');
+  /* Helper: render a table for a set of entries */
+  function renderTeamTable(entries, sectionKey) {
+    var grouped = groupByDept(entries);
+    var allDepts = SPARK_DEPT_ORDER.slice();
+    if (grouped.other.length) allDepts.push('Other');
 
-  for (var d = 0; d < allDepts.length; d++) {
-    var deptName = allDepts[d];
-    var members = deptName === 'Other' ? otherDept : deptGroups[deptName];
-    if (!members || !members.length) continue;
-    var deptColor = SPARK_DEPT_COLORS[deptName] || 'var(--mid-gray)';
-
-    /* Department subtotals */
-    var deptHrs = 0, deptCost = 0;
-    for (var m = 0; m < members.length; m++) {
-      deptHrs += sparkEntryHours(members[m], 'all');
-      deptCost += sparkEntryTotal(members[m]);
+    var th = '<table class="spark-labor-table">';
+    th += '<thead><tr><th>Name</th><th class="num">Rate</th>';
+    if (phaseKey === 'all') {
+      for (var p = 0; p < SPARK_PHASES.length; p++) th += '<th class="num">' + SPARK_PHASES[p].label + '</th>';
+    } else {
+      th += '<th class="num">Hours</th>';
     }
+    th += '<th class="num">Total Hrs</th><th class="num">Total $</th></tr></thead><tbody>';
 
-    var colCount = phaseKey === 'all' ? SPARK_PHASES.length + 4 : 5;
-    h += '<tr class="spark-dept-row"><td colspan="' + colCount + '"><div class="spark-dept-label"><div class="spark-dept-bar" style="background:' + deptColor + '"></div>' + deptName + '<span style="font-weight:400;font-size:11px;color:var(--mid-gray);margin-left:8px">' + deptHrs.toFixed(1) + ' hrs / ' + sparkFmt(deptCost) + '</span></div></td></tr>';
+    for (var d = 0; d < allDepts.length; d++) {
+      var deptName = allDepts[d];
+      var members = deptName === 'Other' ? grouped.other : grouped.groups[deptName];
+      if (!members || !members.length) continue;
+      var deptColor = SPARK_DEPT_COLORS[deptName] || 'var(--mid-gray)';
 
-    for (var m = 0; m < members.length; m++) {
-      var entry = members[m];
-      var name = (entry.team_member && entry.team_member.name) || 'Unknown';
-      var rate = sparkGetRate(entry);
-      var totalHrs = sparkEntryHours(entry, 'all');
-      var totalCost = totalHrs * rate;
-      var empType = entry.employment_type || (entry.team_member && entry.team_member.employment_type) || '';
-      var isFreelancer = empType === 'Freelancer';
-
-      h += '<tr class="spark-person-row">';
-      h += '<td>' + name + (isFreelancer ? ' <span style="font-size:9px;color:var(--mid-gray)">(FL)</span>' : '') + '</td>';
-      h += '<td class="num">' + sparkFmtDec(rate) + '</td>';
-
-      if (phaseKey === 'all') {
-        for (var p = 0; p < SPARK_PHASES.length; p++) {
-          var pk = SPARK_PHASES[p].key;
-          var phVal = entry[pk] || 0;
-          h += '<td class="num"><input type="number" class="spark-input" value="' + phVal + '" min="0" step="0.5" onchange="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + pk + '\',this.value)" oninput="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + pk + '\',this.value)"></td>';
-        }
-      } else {
-        var phVal = entry[phaseKey] || 0;
-        h += '<td class="num"><input type="number" class="spark-input" value="' + phVal + '" min="0" step="0.5" onchange="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + phaseKey + '\',this.value)" oninput="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + phaseKey + '\',this.value)"></td>';
+      var deptHrs = 0, deptCost = 0;
+      for (var m = 0; m < members.length; m++) {
+        deptHrs += sparkEntryHours(members[m], 'all');
+        deptCost += sparkEntryTotal(members[m]);
       }
 
-      h += '<td class="num" style="font-weight:600">' + totalHrs.toFixed(1) + '</td>';
-      h += '<td class="num" style="font-weight:600">' + sparkFmt(totalCost) + '</td>';
-      h += '</tr>';
+      var colCount = phaseKey === 'all' ? SPARK_PHASES.length + 4 : 5;
+      th += '<tr class="spark-dept-row"><td colspan="' + colCount + '"><div class="spark-dept-label"><div class="spark-dept-bar" style="background:' + deptColor + '"></div>' + deptName + '<span style="font-weight:400;font-size:11px;color:var(--mid-gray);margin-left:8px">' + deptHrs.toFixed(1) + ' hrs / ' + sparkFmt(deptCost) + '</span></div></td></tr>';
+
+      for (var m = 0; m < members.length; m++) {
+        var entry = members[m];
+        var name = (entry.team_member && entry.team_member.name) || 'Unknown';
+        var rate = sparkGetRate(entry);
+        var totalHrs = sparkEntryHours(entry, 'all');
+        var totalCost = totalHrs * rate;
+        var empType = entry.employment_type || (entry.team_member && entry.team_member.employment_type) || '';
+        var tag = empType === 'Contractor' ? ' <span style="font-size:9px;color:var(--mid-gray)">(C)</span>' : '';
+
+        th += '<tr class="spark-person-row">';
+        th += '<td>' + name + tag + '</td>';
+        th += '<td class="num">' + sparkFmtDec(rate) + '</td>';
+
+        if (phaseKey === 'all') {
+          for (var p = 0; p < SPARK_PHASES.length; p++) {
+            var pk = SPARK_PHASES[p].key;
+            var phVal = entry[pk] || 0;
+            th += '<td class="num"><input type="number" class="spark-input" value="' + phVal + '" min="0" step="0.5" onchange="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + pk + '\',this.value)" oninput="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + pk + '\',this.value)"></td>';
+          }
+        } else {
+          var phVal = entry[phaseKey] || 0;
+          th += '<td class="num"><input type="number" class="spark-input" value="' + phVal + '" min="0" step="0.5" onchange="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + phaseKey + '\',this.value)" oninput="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + phaseKey + '\',this.value)"></td>';
+        }
+
+        th += '<td class="num" style="font-weight:600">' + totalHrs.toFixed(1) + '</td>';
+        th += '<td class="num" style="font-weight:600">' + sparkFmt(totalCost) + '</td>';
+        th += '</tr>';
+      }
     }
+    th += '</tbody></table>';
+    return th;
   }
 
-  h += '</tbody></table>';
+  /* Compute section totals */
+  var forgeHrs = 0, forgeCost = 0, flHrs = 0, flCost = 0;
+  for (var i = 0; i < forgeTeam.length; i++) { forgeHrs += sparkEntryHours(forgeTeam[i], 'all'); forgeCost += sparkEntryTotal(forgeTeam[i]); }
+  for (var i = 0; i < freelancers.length; i++) { flHrs += sparkEntryHours(freelancers[i], 'all'); flCost += sparkEntryTotal(freelancers[i]); }
+
+  var h = '';
+
+  /* Forge Team section */
+  var forgeExp = sparkLaborSectionExpanded.forge;
+  h += '<div onclick="sparkToggleLaborSection(\'forge\')" style="cursor:pointer;padding:10px 12px;background:var(--abyss);color:var(--white);display:flex;justify-content:space-between;align-items:center;border-radius:' + (forgeExp ? '8px 8px 0 0' : '8px') + ';margin-top:8px;user-select:none">';
+  h += '<div><span style="font-size:11px;margin-right:6px">' + (forgeExp ? '\u25BC' : '\u25B6') + '</span><span style="font-weight:700">Forge Team</span> <span style="font-size:11px;opacity:.6">' + forgeTeam.length + ' members \u00B7 ' + forgeHrs.toFixed(1) + ' hrs \u00B7 ' + sparkFmt(forgeCost) + '</span></div>';
+  h += '</div>';
+  if (forgeExp) {
+    h += '<div style="border:1px solid var(--canvas);border-top:none;border-radius:0 0 8px 8px;overflow:hidden">';
+    h += renderTeamTable(forgeTeam, 'forge');
+    h += '</div>';
+  }
+
+  /* Freelancers section */
+  if (freelancers.length > 0) {
+    var flExp = sparkLaborSectionExpanded.freelancer;
+    h += '<div onclick="sparkToggleLaborSection(\'freelancer\')" style="cursor:pointer;padding:10px 12px;background:#5B4A8A;color:var(--white);display:flex;justify-content:space-between;align-items:center;border-radius:' + (flExp ? '8px 8px 0 0' : '8px') + ';margin-top:12px;user-select:none">';
+    h += '<div><span style="font-size:11px;margin-right:6px">' + (flExp ? '\u25BC' : '\u25B6') + '</span><span style="font-weight:700">Freelancers & Contractors</span> <span style="font-size:11px;opacity:.6">' + freelancers.length + ' members \u00B7 ' + flHrs.toFixed(1) + ' hrs \u00B7 ' + sparkFmt(flCost) + '</span></div>';
+    h += '</div>';
+    if (flExp) {
+      h += '<div style="border:1px solid var(--canvas);border-top:none;border-radius:0 0 8px 8px;overflow:hidden">';
+      h += renderTeamTable(freelancers, 'freelancer');
+      h += '</div>';
+    }
+  }
 
   /* Add Team Member button */
   h += '<div style="padding:10px 0"><button onclick="sparkShowAddTeamMember()" style="padding:6px 16px;border-radius:6px;border:1px dashed var(--mid-gray);background:transparent;color:var(--mid-gray);cursor:pointer;font-size:12px;font-weight:600">+ Add Team Member</button></div>';
