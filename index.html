@@ -3165,27 +3165,49 @@ function renderSettings() {
   /* ── Team Member Rates ── */
   if (sparkAuth.connected && FURNACE_TEAM_MEMBERS.length > 0) {
     h += '<div class="section-title" style="margin-top:32px">Team Member Rates</div>';
-    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:16px">Internal cost rates used for margin calculations</p>';
-    h += '<div style="background:var(--white);border-radius:10px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06);overflow-x:auto">';
-    h += '<table class="phase-table" style="min-width:500px"><thead><tr>';
-    h += '<th>Name</th><th>Department</th><th style="text-align:right">Cost Rate ($/hr)</th><th style="text-align:right">Billable Rate ($/hr)</th>';
-    h += '</tr></thead><tbody>';
-    var tmSorted = FURNACE_TEAM_MEMBERS.slice().sort(function(a, b) {
-      var da = (a.department || 'ZZZ').toLowerCase(), db = (b.department || 'ZZZ').toLowerCase();
-      if (da < db) return -1; if (da > db) return 1;
-      var na = (a.name || '').toLowerCase(), nb = (b.name || '').toLowerCase();
-      return na < nb ? -1 : na > nb ? 1 : 0;
-    });
-    for (var ti = 0; ti < tmSorted.length; ti++) {
-      var tm = tmSorted[ti];
-      h += '<tr>';
-      h += '<td style="font-weight:600;font-size:13px">' + (tm.name || 'Unknown') + '</td>';
-      h += '<td style="font-size:12px;color:var(--mid-gray)">' + (tm.department || '—') + '</td>';
-      h += '<td style="text-align:right"><input type="number" class="rate-input" value="' + (tm.fully_burdened_rate || '') + '" placeholder="200" min="0" step="5" style="width:90px" onchange="updateTeamMemberRate(\'' + tm.id + '\', \'fully_burdened_rate\', this.value)"></td>';
-      h += '<td style="text-align:right"><input type="number" class="rate-input" value="' + (tm.billable_rate || '') + '" placeholder="200" min="0" step="5" style="width:90px" onchange="updateTeamMemberRate(\'' + tm.id + '\', \'billable_rate\', this.value)"></td>';
-      h += '</tr>';
+    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:16px">Internal cost rates used for margin calculations. Organized by employment type.</p>';
+
+    var tmSections = [
+      { key: 'Employee', label: 'In-House Team', icon: '👤', color: 'var(--ocean)', desc: 'Full-time employees — cost rate = fully burdened salary' },
+      { key: 'Freelancer', label: 'Freelancers', icon: '✏️', color: 'var(--honey)', desc: 'Freelance talent — billable rate = contracted rate' },
+      { key: 'Contractor', label: 'Contractors', icon: '🔧', color: '#9B8EC2', desc: 'External contractors — billable rate = contracted rate' }
+    ];
+
+    for (var si = 0; si < tmSections.length; si++) {
+      var sec = tmSections[si];
+      var members = FURNACE_TEAM_MEMBERS.filter(function(t) { return (t.employment_type || 'Employee') === sec.key && t.is_active; });
+      members.sort(function(a, b) {
+        var da = (a.department || 'ZZZ').toLowerCase(), db = (b.department || 'ZZZ').toLowerCase();
+        if (da < db) return -1; if (da > db) return 1;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+
+      h += '<div style="background:var(--white);border-radius:10px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06);overflow-x:auto;margin-bottom:16px">';
+      h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">';
+      h += '<span style="font-size:18px">' + sec.icon + '</span>';
+      h += '<div><div style="font-size:14px;font-weight:700;color:' + sec.color + '">' + sec.label + ' <span style="font-weight:400;font-size:12px;color:var(--mid-gray)">(' + members.length + ')</span></div>';
+      h += '<div style="font-size:11px;color:var(--mid-gray)">' + sec.desc + '</div></div>';
+      h += '</div>';
+
+      if (members.length === 0) {
+        h += '<div style="font-size:12px;color:var(--mid-gray);padding:8px 0">No active ' + sec.key.toLowerCase() + 's</div>';
+      } else {
+        h += '<table class="phase-table" style="min-width:500px"><thead><tr>';
+        h += '<th>Name</th><th>Department</th><th style="text-align:right">Cost Rate ($/hr)</th><th style="text-align:right">Billable Rate ($/hr)</th>';
+        h += '</tr></thead><tbody>';
+        for (var ti = 0; ti < members.length; ti++) {
+          var tm = members[ti];
+          h += '<tr>';
+          h += '<td style="font-weight:600;font-size:13px">' + (tm.name || 'Unknown') + '</td>';
+          h += '<td style="font-size:12px;color:var(--mid-gray)">' + (tm.department || '—') + '</td>';
+          h += '<td style="text-align:right"><input type="number" class="rate-input" value="' + (tm.fully_burdened_rate || '') + '" placeholder="0" min="0" step="5" style="width:90px" onchange="updateTeamMemberRate(\'' + tm.id + '\', \'fully_burdened_rate\', this.value)"></td>';
+          h += '<td style="text-align:right"><input type="number" class="rate-input" value="' + (tm.billable_rate || '') + '" placeholder="0" min="0" step="5" style="width:90px" onchange="updateTeamMemberRate(\'' + tm.id + '\', \'billable_rate\', this.value)"></td>';
+          h += '</tr>';
+        }
+        h += '</tbody></table>';
+      }
+      h += '</div>';
     }
-    h += '</tbody></table></div>';
   }
 
   document.getElementById('mainContent').innerHTML = h;
