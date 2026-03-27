@@ -6269,21 +6269,34 @@ function renderAllocGrid() {
       projTotals[al.project] += al.hoursPerDay;
     }
   }
+  /* Build project name → code lookup */
+  var projCodeLookup = {};
+  for (var ci = 0; ci < CLIENTS.length; ci++) {
+    for (var pi = 0; pi < CLIENTS[ci].projects.length; pi++) {
+      var _p = CLIENTS[ci].projects[pi];
+      projCodeLookup[_p.name] = _p.code;
+    }
+  }
+
   var projList = [];
-  for (var pn in projTotals) projList.push({ name: pn, hours: projTotals[pn] });
-  projList.sort(function(a, b) { return b.hours - a.hours; });
+  for (var pn in projTotals) projList.push({ name: pn, code: projCodeLookup[pn] || '', hours: projTotals[pn] });
+  projList.sort(function(a, b) { return a.code.localeCompare(b.code); });
 
   if (projList.length > 0) {
     var grandTotal = projList.reduce(function(s, p) { return s + p.hours; }, 0);
     h += '<div style="margin-top:16px;border-top:2px solid var(--canvas);padding-top:12px">';
     h += '<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);margin-bottom:8px">Weekly Project Hours Summary</div>';
-    h += '<div style="display:grid;grid-template-columns:1fr auto;gap:4px 16px;font-size:12px">';
+    h += '<div style="display:grid;grid-template-columns:auto 1fr auto;gap:4px 12px;font-size:12px">';
     for (var pi = 0; pi < projList.length; pi++) {
       var isActive = projList[pi].name === allocProject;
-      h += '<div style="padding:4px 8px;border-radius:4px;' + (isActive ? 'background:rgba(48,109,124,.1);font-weight:600;color:var(--ocean)' : 'color:var(--text)') + '">' + projList[pi].name + '</div>';
+      var activeStyle = isActive ? 'background:rgba(48,109,124,.1);font-weight:600;color:var(--ocean)' : 'color:var(--text)';
+      var codeStyle = isActive ? 'color:var(--ocean);font-weight:600' : 'color:var(--mid-gray)';
+      h += '<div style="padding:4px 8px;font-size:11px;font-variant-numeric:tabular-nums;' + codeStyle + '">' + projList[pi].code + '</div>';
+      h += '<div style="padding:4px 0;border-radius:4px;' + activeStyle + '">' + projList[pi].name + '</div>';
       h += '<div style="padding:4px 8px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600;' + (isActive ? 'color:var(--ocean)' : '') + '">' + projList[pi].hours.toFixed(1) + 'h</div>';
     }
-    h += '<div style="padding:4px 8px;border-top:1px solid var(--canvas);font-weight:700;color:var(--text)">Total</div>';
+    h += '<div style="padding:4px 8px;border-top:1px solid var(--canvas)"></div>';
+    h += '<div style="padding:4px 0;border-top:1px solid var(--canvas);font-weight:700;color:var(--text)">Total</div>';
     h += '<div style="padding:4px 8px;text-align:right;border-top:1px solid var(--canvas);font-weight:700;font-variant-numeric:tabular-nums">' + grandTotal.toFixed(1) + 'h</div>';
     h += '</div></div>';
   }
