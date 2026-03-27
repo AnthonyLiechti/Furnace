@@ -6375,7 +6375,7 @@ function renderCapacityPanel() {
   for (var i = 0; i < people.length; i++) {
     var p = people[i];
     var pct = maxCap > 0 ? (p.total / maxCap) * 100 : 0;
-    var colorClass = pct >= 100 ? 'cap-red' : pct >= 80 ? 'cap-yellow' : 'cap-green';
+    var colorClass = p.total >= 40 ? 'cap-red' : p.total >= 32 ? 'cap-yellow' : 'cap-green';
     var pc = PC[p.name] || '#9B9590';
 
     h += '<div class="cap-person">';
