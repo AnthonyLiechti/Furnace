@@ -3075,7 +3075,47 @@ function sparkBrowserLogout() {
 function sparkBrowserIsConnected() {
   var stored = localStorage.getItem('furnace_auth');
   if (!stored) return false;
-  try { return JSON.parse(stored).access_token ? true : false; } catch(e) { return false; }
+  try {
+    var auth = JSON.parse(stored);
+    if (!auth.access_token) return false;
+    /* Check if token is expired — try to refresh if so */
+    if (auth.expires_at && Date.now() >= auth.expires_at) {
+      sparkBrowserRefreshToken(); /* async, will update in background */
+    }
+    return true;
+  } catch(e) { return false; }
+}
+
+async function sparkBrowserRefreshToken() {
+  var stored = localStorage.getItem('furnace_auth');
+  if (!stored) return;
+  try {
+    var auth = JSON.parse(stored);
+    if (!auth.refresh_token) return;
+    var config = sparkConfig || { supabaseUrl: 'https://jnwdscddyqujjikesdpb.supabase.co', supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impud2RzY2RkeXF1amppa2VzZHBiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyODgxOTEsImV4cCI6MjA4OTg2NDE5MX0.EQueTlfX30ULmpLDF7ijSv0xR0_baAT2kPjYoK_RnpA' };
+    var resp = await fetch(config.supabaseUrl + '/auth/v1/token?grant_type=refresh_token', {
+      method: 'POST',
+      headers: { 'apikey': config.supabaseAnonKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: auth.refresh_token })
+    });
+    if (resp.ok) {
+      var data = await resp.json();
+      localStorage.setItem('furnace_auth', JSON.stringify({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        expires_at: Date.now() + (data.expires_in * 1000) - 60000,
+        user_email: auth.user_email
+      }));
+      console.log('Token refreshed successfully');
+    } else {
+      /* Refresh failed — clear auth so user logs in again */
+      localStorage.removeItem('furnace_auth');
+      sparkAuth.connected = false;
+      console.log('Token refresh failed — please log in again');
+    }
+  } catch(e) {
+    console.error('Token refresh error:', e);
+  }
 }
 
 function sparkBrowserEmail() {
