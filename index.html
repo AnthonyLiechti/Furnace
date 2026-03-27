@@ -4931,27 +4931,66 @@ function renderRTProjects(wk) {
   }
   h += '</div>';
 
-  /* Budget remaining per project */
-  var budgetProjs = projKeys.filter(function(pk) { return !!PROJECT_BUDGETS[pk]; });
-  if (budgetProjs.length > 0) {
-    budgetProjs.sort(function(a,b) { return (PROJECT_BUDGETS[a].remaining) - (PROJECT_BUDGETS[b].remaining); });
-    h += '<div class="rt-card"><h3>Hours Remaining by Project</h3>';
-    h += '<p style="font-size:11px;color:var(--mid-gray);margin:-6px 0 14px">Total budget minus hours spent to date — helps prevent over-allocation</p>';
-    for (var i = 0; i < budgetProjs.length; i++) {
-      var pk = budgetProjs[i], b = PROJECT_BUDGETS[pk];
-      var pct = b.budget > 0 ? Math.min((b.spent / b.budget) * 100, 100) : 100;
-      var overPct = b.spent > b.budget ? Math.min(((b.spent - b.budget) / b.budget) * 100, 60) : 0;
-      var isOver = b.remaining < 0;
-      var isLow = !isOver && b.remaining < b.budget * 0.15;
-      var barColor = isOver ? 'var(--ember)' : isLow ? 'var(--honey)' : 'var(--ocean)';
-      var overBarColor = 'rgba(211,47,47,0.35)';
-      var remColor = isOver ? 'var(--ember)' : isLow ? 'var(--honey)' : '#2E7D32';
-      var statusTag = isOver ? '<span style="font-size:9px;font-weight:700;color:var(--white);background:var(--ember);padding:1px 5px;border-radius:3px;margin-left:6px">OVER</span>' : isLow ? '<span style="font-size:9px;font-weight:700;color:var(--abyss);background:var(--honey);padding:1px 5px;border-radius:3px;margin-left:6px">LOW</span>' : '';
-      h += '<div style="margin-bottom:14px">';
-      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
-      h += '<div style="font-weight:600;font-size:13px">' + pk + statusTag + '</div>';
-      h += '<div style="font-size:12px;color:' + remColor + ';font-weight:700">' + (isOver ? '' : '+') + b.remaining.toFixed(1) + 'h remaining</div>';
-      h += '</div>';
+  /* Hours Remaining by Project — show ALL projects with allocations or actuals */
+  h += '<div class="rt-card"><h3>Hours Remaining by Project</h3>';
+  h += '<p style="font-size:11px;color:var(--mid-gray);margin:-6px 0 14px">All projects with predicted or actual hours — budget minus hours spent</p>';
+
+  /* Build combined list: projects with budget data + projects with week data */
+  var allProjSet = {};
+  for (var i = 0; i < projKeys.length; i++) {
+    var pk = projKeys[i], d = projAgg[pk];
+    if (d.predicted > 0 || d.actual > 0) {
+      allProjSet[pk] = { predicted: d.predicted, actual: d.actual, code: d.code || '' };
+    }
+  }
+  /* Also add any PROJECT_BUDGETS entries not already in the list */
+  for (var bk in PROJECT_BUDGETS) {
+    if (!allProjSet[bk]) {
+      allProjSet[bk] = { predicted: 0, actual: 0, code: PROJECT_CODES[bk] || '' };
+    }
+  }
+
+  var allProjKeys = Object.keys(allProjSet);
+  allProjKeys.sort(function(a, b) {
+    var ca = allProjSet[a].code || PROJECT_CODES[a] || 'zzz';
+    var cb = allProjSet[b].code || PROJECT_CODES[b] || 'zzz';
+    return ca.localeCompare(cb);
+  });
+
+  for (var i = 0; i < allProjKeys.length; i++) {
+    var pk = allProjKeys[i];
+    var info = allProjSet[pk];
+    var b = PROJECT_BUDGETS[pk];
+    var budget = b ? b.budget : 0;
+    var spent = b ? b.spent : 0;
+    var remaining = b ? b.remaining : 0;
+    var predicted = info.predicted || 0;
+    var actual = info.actual || 0;
+    var code = info.code || PROJECT_CODES[pk] || '';
+
+    var pct = budget > 0 ? Math.min((spent / budget) * 100, 100) : (spent > 0 ? 100 : 0);
+    var overPct = (budget > 0 && spent > budget) ? Math.min(((spent - budget) / budget) * 100, 60) : 0;
+    var isOver = budget > 0 && remaining < 0;
+    var isLow = budget > 0 && !isOver && remaining < budget * 0.15;
+    var noBudget = budget === 0;
+    var barColor = noBudget ? 'var(--mid-gray)' : isOver ? 'var(--ember)' : isLow ? 'var(--honey)' : 'var(--ocean)';
+    var overBarColor = 'rgba(211,47,47,0.35)';
+    var remColor = noBudget ? 'var(--mid-gray)' : isOver ? 'var(--ember)' : isLow ? 'var(--honey)' : '#2E7D32';
+    var statusTag = isOver ? '<span style="font-size:9px;font-weight:700;color:var(--white);background:var(--ember);padding:1px 5px;border-radius:3px;margin-left:6px">OVER</span>' : isLow ? '<span style="font-size:9px;font-weight:700;color:var(--abyss);background:var(--honey);padding:1px 5px;border-radius:3px;margin-left:6px">LOW</span>' : '';
+
+    h += '<div style="margin-bottom:14px">';
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
+    h += '<div style="font-weight:600;font-size:13px">';
+    if (code) h += '<span style="font-size:11px;color:var(--mid-gray);margin-right:6px">' + code + '</span>';
+    h += pk + statusTag + '</div>';
+    if (budget > 0) {
+      h += '<div style="font-size:12px;color:' + remColor + ';font-weight:700">' + (isOver ? '' : '+') + remaining.toFixed(1) + 'h remaining</div>';
+    } else if (predicted > 0 || actual > 0) {
+      h += '<div style="font-size:12px;color:var(--mid-gray)">Predicted: ' + predicted.toFixed(1) + 'h &middot; Actual: ' + actual.toFixed(1) + 'h</div>';
+    }
+    h += '</div>';
+
+    if (budget > 0) {
       h += '<div style="display:flex;align-items:center;gap:8px">';
       h += '<div style="flex:1;height:10px;background:var(--light-gray);border-radius:5px;overflow:visible;position:relative">';
       h += '<div style="height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:5px;position:absolute;top:0;left:0"></div>';
@@ -4959,34 +4998,17 @@ function renderRTProjects(wk) {
         h += '<div style="height:100%;width:' + overPct + '%;background:' + overBarColor + ';border-radius:0 5px 5px 0;position:absolute;top:0;left:' + pct + '%;border-left:2px solid var(--ember)"></div>';
       }
       h += '</div>';
-      h += '<div style="font-size:10px;color:var(--mid-gray);min-width:90px;text-align:right">' + b.spent.toFixed(1) + ' / ' + b.budget.toFixed(0) + 'h</div>';
+      h += '<div style="font-size:10px;color:var(--mid-gray);min-width:90px;text-align:right">' + spent.toFixed(1) + ' / ' + budget.toFixed(0) + 'h</div>';
       h += '</div>';
+    } else {
+      /* No budget — show a simple predicted vs actual bar */
+      var maxH = Math.max(predicted, actual, 1);
+      h += '<div style="display:flex;align-items:center;gap:4px;height:10px">';
+      if (predicted > 0) h += '<div style="height:6px;border-radius:3px;background:var(--canvas);width:' + (predicted/maxH*60) + '%"></div>';
+      if (actual > 0) h += '<div style="height:6px;border-radius:3px;background:var(--ocean);width:' + (actual/maxH*60) + '%"></div>';
       h += '</div>';
     }
     h += '</div>';
-  }
-
-  /* Per-project people breakdown */
-  h += '<div class="rt-card"><h3>Per-Project Team Breakdown</h3>';
-  for (var i = 0; i < projKeys.length; i++) {
-    var pk = projKeys[i], d = projAgg[pk];
-    var acc = rtCalcAccProject(d.predicted, d.actual);
-    h += '<div style="margin-bottom:18px;padding:12px 0;border-bottom:1px solid var(--light-gray)">';
-    h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><strong>' + pk + '</strong><span style="font-size:11px;color:var(--mid-gray)">' + d.predicted.toFixed(1) + 'h → ' + d.actual.toFixed(1) + 'h</span><span class="rt-acc ' + accClass(acc) + '" style="margin-left:auto">' + acc.toFixed(0) + '%</span></div>';
-    var pkeys = Object.keys(d.people).sort(function(a,b){ return Math.max(d.people[b].p,d.people[b].a) - Math.max(d.people[a].p,d.people[a].a); });
-    h += '<div style="display:grid;grid-template-columns:150px 60px 60px 60px 1fr;gap:6px;font-size:11px;padding-left:18px">';
-    for (var j = 0; j < pkeys.length; j++) {
-      var pn = pkeys[j], pv = d.people[pn];
-      var pdiff = pv.a - pv.p;
-      var pc = PC[pn] || '#9B9590';
-      h += '<div style="font-weight:500;display:flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:' + pc + ';display:inline-block"></span>' + pn + '</div>';
-      h += '<div style="text-align:right;color:var(--mid-gray)">' + pv.p.toFixed(1) + '</div>';
-      h += '<div style="text-align:right;font-weight:600">' + pv.a.toFixed(1) + '</div>';
-      h += '<div style="text-align:right;color:' + (pdiff >= 0 ? '#2E7D32' : 'var(--ember)') + '">' + (pdiff >= 0 ? '+' : '') + pdiff.toFixed(1) + '</div>';
-      var mh = Math.max(pv.p, pv.a); if (mh === 0) mh = 1;
-      h += '<div style="display:flex;gap:2px;align-items:center"><div style="height:6px;border-radius:3px;background:var(--canvas);width:' + (pv.p/mh*100) + '%"></div><div style="height:6px;border-radius:3px;background:' + pc + ';width:' + (pv.a/mh*100) + '%"></div></div>';
-    }
-    h += '</div></div>';
   }
   h += '</div>';
   return h;
