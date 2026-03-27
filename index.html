@@ -5076,6 +5076,7 @@ function computeResourceWeeks() {
 var allocViewMode = 'day'; /* 'day' or 'week' */
 var allocProjSearch = '';
 var allocEditingCell = null; /* {person, date} when inline editing */
+var allocExpandedPerson = {}; /* person name -> true/false for project breakdown toggle */
 
 function getNextMonday() {
   var d = new Date(); var day = d.getDay();
@@ -6187,7 +6188,11 @@ function renderAllocGrid() {
       for (var c = 0; c < days.length; c++) rowTotal += getAllocWeekTotal(allocProject, person, days[c]);
     }
 
-    h += '<div class="ag-row-hdr"><span class="ag-person-dot" style="background:' + pc + '"></span>' + person;
+    var _personExpanded = !!allocExpandedPerson[person];
+    var _personHasOtherProjects = getPersonDayTotal(person, days[0] || allocWeekOf) > 0;
+    h += '<div class="ag-row-hdr" style="cursor:pointer" onclick="allocTogglePersonExpand(\'' + person.replace(/'/g, "\\'") + '\',event)">';
+    h += '<span style="font-size:9px;margin-right:4px;opacity:.5">' + (_personExpanded ? '\u25BC' : '\u25B6') + '</span>';
+    h += '<span class="ag-person-dot" style="background:' + pc + '"></span>' + person;
     if (rowTotal > 0) h += '<span class="ag-person-total">' + rowTotal.toFixed(1) + 'h</span>';
     h += '</div>';
 
@@ -6252,6 +6257,27 @@ function renderAllocGrid() {
     var cap = ALLOCATIONS.weeklyCapacity || 40;
     var tColor = weekTotalAll > cap ? 'var(--ember)' : weekTotalAll >= cap * 0.8 ? 'var(--honey)' : 'var(--mid-gray)';
     h += '<div class="ag-col-hdr" style="font-size:11px;font-weight:700;color:' + tColor + ';border-bottom:1px solid var(--light-gray)">' + (weekTotalAll > 0 ? weekTotalAll.toFixed(1) : '') + '</div>';
+
+    /* Expanded: show all projects this person is allocated to */
+    if (_personExpanded) {
+      var personProjs = getPersonAllProjectsForWeek(person, allocWeekOf);
+      for (var pp = 0; pp < personProjs.length; pp++) {
+        var projInfo = personProjs[pp];
+        var isCurrentProj = projInfo.project === allocProject;
+        h += '<div class="ag-row-hdr" style="padding-left:28px;font-size:11px;color:' + (isCurrentProj ? 'var(--ocean)' : 'var(--mid-gray)') + ';font-weight:' + (isCurrentProj ? '600' : '400') + ';border-bottom:1px solid rgba(0,0,0,.03)">';
+        h += (isCurrentProj ? '\u25CF ' : '') + projInfo.project;
+        h += '<span style="float:right;font-size:10px;opacity:.6">' + projInfo.total.toFixed(1) + 'h</span>';
+        h += '</div>';
+        for (var c = 0; c < days.length; c++) {
+          var subVal = projInfo.days[days[c]] || 0;
+          h += '<div style="font-size:10px;text-align:center;padding:4px 0;color:' + (subVal > 0 ? (isCurrentProj ? 'var(--ocean)' : 'var(--abyss)') : 'transparent') + ';border-bottom:1px solid rgba(0,0,0,.03);font-weight:' + (isCurrentProj ? '600' : '400') + '">';
+          h += subVal > 0 ? subVal.toFixed(1) : '\u2014';
+          h += '</div>';
+        }
+        /* Sub-row total */
+        h += '<div style="font-size:10px;text-align:center;padding:4px 0;color:var(--mid-gray);border-bottom:1px solid rgba(0,0,0,.03);font-weight:600">' + projInfo.total.toFixed(1) + '</div>';
+      }
+    }
   }
 
   /* Add person row */
@@ -6310,6 +6336,34 @@ function renderAllocGrid() {
     var inp = document.getElementById('allocCellInput');
     if (inp) { inp.focus(); inp.select(); }
   }
+}
+
+function allocTogglePersonExpand(person, evt) {
+  evt.stopPropagation();
+  allocExpandedPerson[person] = !allocExpandedPerson[person];
+  renderAllocGrid();
+}
+
+function getPersonAllProjectsForWeek(person, weekOf) {
+  /* Returns [{project, days: {date: hours}}] for all projects this person has time on */
+  var wdays = getWeekDays(weekOf);
+  var projMap = {};
+  var allocs = ALLOCATIONS.allocations;
+  for (var i = 0; i < allocs.length; i++) {
+    var a = allocs[i];
+    if (a.person !== person) continue;
+    if (wdays.indexOf(a.date) < 0) continue;
+    if (!projMap[a.project]) projMap[a.project] = {};
+    projMap[a.project][a.date] = (projMap[a.project][a.date] || 0) + a.hoursPerDay;
+  }
+  var result = [];
+  for (var proj in projMap) {
+    var total = 0;
+    for (var d in projMap[proj]) total += projMap[proj][d];
+    result.push({ project: proj, days: projMap[proj], total: total });
+  }
+  result.sort(function(a, b) { return b.total - a.total; });
+  return result;
 }
 
 function allocStartEdit(person, dateISO) {
