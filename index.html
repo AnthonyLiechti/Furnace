@@ -6852,7 +6852,7 @@ async function loadSupabaseData() {
     /* 2. Fetch labor_budget_entries and oop_budget_entries for all budgets */
     var budgetIds = budgets.map(function(b) { return b.id; });
     var laborEntries = await sparkFetchAll('labor_budget_entries', 'select=id,budget_id,department,employment_type,phase1,phase2,phase3_1,phase3_2,phase4,phase5,rate_override,team_member_id,team_member:team_members(id,name,fully_burdened_rate)&budget_id=in.(' + budgetIds.join(',') + ')');
-    var oopEntries = await sparkFetchAll('oop_budget_entries', 'select=id,budget_id,line_item_name,count,rate,days,head_count,adjusted_count,adjusted_rate,adjusted_days,adjusted_head_count,actual_amount,paid,paid_date,is_active&budget_id=in.(' + budgetIds.join(',') + ')');
+    var oopEntries = await sparkFetchAll('oop_budget_entries', 'select=id,budget_id,line_item_name,count,rate,days,head_count,adjusted_count,adjusted_rate,adjusted_days,adjusted_head_count,actual_count,actual_rate,actual_days,actual_head_count,actual_amount,paid,paid_date,is_active&budget_id=in.(' + budgetIds.join(',') + ')');
 
     /* 3. Group entries by budget_id */
     var laborByBudget = {}, oopByBudget = {};
