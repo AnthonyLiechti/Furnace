@@ -3549,8 +3549,15 @@ function sparkOopItemTotal(item) {
 }
 
 function sparkOopItemEffective(item) {
-  /* Cascade: Actual → Adjusted → Planned */
+  /* Cascade: Actual Amount → Actual Fields → Adjusted → Planned */
   if (item.actual_amount != null) return item.actual_amount;
+  /* Individual actual fields override adjusted and planned */
+  if (item.actual_count != null || item.actual_rate != null) {
+    return (item.actual_count != null ? item.actual_count : (item.adjusted_count != null ? item.adjusted_count : (item.count||0)))
+         * (item.actual_rate != null ? item.actual_rate : (item.adjusted_rate != null ? item.adjusted_rate : (item.rate||0)))
+         * (item.actual_days != null ? item.actual_days : (item.adjusted_days != null ? item.adjusted_days : (item.days||1)))
+         * (item.actual_head_count != null ? item.actual_head_count : (item.adjusted_head_count != null ? item.adjusted_head_count : (item.head_count||1)));
+  }
   var adjCount = item.adjusted_count, adjRate = item.adjusted_rate, adjDays = item.adjusted_days, adjHead = item.adjusted_head_count;
   if (adjCount != null || adjRate != null) {
     return (adjCount != null ? adjCount : (item.count||0)) * (adjRate != null ? adjRate : (item.rate||0)) * (adjDays != null ? adjDays : (item.days||1)) * (adjHead != null ? adjHead : (item.head_count||1));
@@ -6783,10 +6790,15 @@ async function loadSupabaseData() {
         if (oe.is_active === false) continue;
         /* Planned: always from planned fields */
         oopPlanned += (oe.count || 0) * (oe.rate || 0) * (oe.days || 1) * (oe.head_count || 1);
-        /* Effective: cascade Actual → Adjusted → Planned */
+        /* Effective: cascade Actual Amount → Actual Fields → Adjusted → Planned */
         var effVal;
         if (oe.actual_amount != null) {
           effVal = oe.actual_amount;
+        } else if (oe.actual_count != null || oe.actual_rate != null) {
+          effVal = (oe.actual_count != null ? oe.actual_count : (oe.adjusted_count != null ? oe.adjusted_count : (oe.count||0)))
+                 * (oe.actual_rate != null ? oe.actual_rate : (oe.adjusted_rate != null ? oe.adjusted_rate : (oe.rate||0)))
+                 * (oe.actual_days != null ? oe.actual_days : (oe.adjusted_days != null ? oe.adjusted_days : (oe.days||1)))
+                 * (oe.actual_head_count != null ? oe.actual_head_count : (oe.adjusted_head_count != null ? oe.adjusted_head_count : (oe.head_count||1)));
         } else if (oe.adjusted_count != null || oe.adjusted_rate != null) {
           effVal = (oe.adjusted_count != null ? oe.adjusted_count : (oe.count||0)) * (oe.adjusted_rate != null ? oe.adjusted_rate : (oe.rate||0)) * (oe.adjusted_days != null ? oe.adjusted_days : (oe.days||1)) * (oe.adjusted_head_count != null ? oe.adjusted_head_count : (oe.head_count||1));
         } else {
