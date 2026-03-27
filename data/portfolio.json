@@ -1760,6 +1760,20 @@
             }
           ],
           "status": "finished"
+        },
+        {
+          "id": "provider-rtbs-harris",
+          "code": "320_46_01",
+          "name": "Provider RTBs Dr. Harris",
+          "status": "active",
+          "projectType": "billable",
+          "dataSource": "supabase",
+          "phases": [],
+          "dollarBudget": 0,
+          "totalBudget": 0,
+          "laborCost": 0,
+          "oopCost": 0,
+          "profit": 0
         }
       ],
       "status": "active"
