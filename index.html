@@ -623,7 +623,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.22.0 · <span style="color:rgba(255,255,255,.6);font-weight:600">Clear View</span> · Mar 28, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.23.0 · <span style="color:rgba(255,255,255,.6);font-weight:600">Safe Import</span> · Mar 28, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -2714,9 +2714,13 @@ async function importHandleFile(file) {
     else if (gl.indexOf('phase 4') >= 0) phaseKey = 'phase4';
     else if (gl.indexOf('phase 5') >= 0) phaseKey = 'phase5';
 
-    /* Dedup hash: person + board + date + start time + hours */
+    /* Parse start/end times */
     var startRaw = col(r, ['Start', 'Start Time']) || '';
     var startStr = startRaw instanceof Date ? startRaw.toISOString() : String(startRaw);
+    var endRaw = col(r, ['End', 'End Time']) || '';
+    var endStr = endRaw instanceof Date ? endRaw.toISOString() : String(endRaw);
+
+    /* Dedup hash: person + board + date + start time + hours — unique per time entry */
     var hash = person + '|' + board + '|' + workDate + '|' + startStr + '|' + hours;
 
     entries.push({
@@ -2724,6 +2728,7 @@ async function importHandleFile(file) {
       project_code: projCode, board_name: board.substring(0, 200),
       phase_group: group.substring(0, 200), phase_key: phaseKey,
       item_name: (item || '').substring(0, 200),
+      start_time: startStr || null, end_time: endStr || null,
       is_billable: !nb, is_bizdev: bd, is_timeoff: to,
       source: 'timetracker', _hash: hash
     });
@@ -2739,7 +2744,7 @@ async function importHandleFile(file) {
   /* Fetch existing entries from Supabase for this date range — direct query, not cache */
   prog.textContent = 'Fetching existing entries for ' + minDate + ' to ' + maxDate + '...';
   var existing = await sparkFetchAll('labor_actuals',
-    'select=person_name,board_name,work_date,hours&source=eq.timetracker' +
+    'select=person_name,board_name,work_date,hours,start_time&source=eq.timetracker' +
     '&work_date=gte.' + minDate + '&work_date=lte.' + maxDate +
     '&order=work_date.asc');
 
@@ -2749,7 +2754,7 @@ async function importHandleFile(file) {
   var simpleHashes = {};
   for (var i = 0; i < existing.length; i++) {
     var a = existing[i];
-    var sh = (a.person_name || '') + '|' + (a.board_name || '') + '|' + (a.work_date || '') + '|' + (a.hours || 0);
+    var sh = (a.person_name || '') + '|' + (a.board_name || '') + '|' + (a.work_date || '') + '|' + (a.start_time || '') + '|' + (a.hours || 0);
     simpleHashes[sh] = true;
   }
 
@@ -2758,7 +2763,7 @@ async function importHandleFile(file) {
   var dupes = 0;
   for (var i = 0; i < entries.length; i++) {
     var e = entries[i];
-    var simpleHash = e.person_name + '|' + e.board_name + '|' + e.work_date + '|' + e.hours;
+    var simpleHash = e.person_name + '|' + e.board_name + '|' + e.work_date + '|' + (e.start_time || '') + '|' + e.hours;
     if (simpleHashes[simpleHash]) {
       dupes++;
     } else {
