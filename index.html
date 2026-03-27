@@ -6235,8 +6235,8 @@ function renderAllocGrid() {
       if (allocViewMode === 'day' && !isEditing) {
         var dayTotal = getPersonDayTotal(person, cellKey);
         var capPct = Math.min(100, dayTotal / 8 * 100);
-        var capColor = dayTotal > 8 ? '#E53935' : dayTotal === 8 ? '#81C784' : dayTotal >= 7 ? 'var(--honey)' : 'rgba(48,109,124,.3)';
-        var capTextColor = dayTotal > 8 ? '#E53935' : dayTotal === 8 ? '#81C784' : 'var(--mid-gray)';
+        var capColor = dayTotal >= 8 ? '#E53935' : dayTotal >= 7 ? 'var(--ember)' : dayTotal >= 6 ? 'var(--honey)' : '#81C784';
+        var capTextColor = dayTotal >= 8 ? '#E53935' : dayTotal >= 7 ? 'var(--ember)' : dayTotal >= 6 ? 'var(--honey)' : '#81C784';
         h += '<div style="margin-top:2px;font-size:9px;color:var(--mid-gray);display:flex;align-items:center;gap:3px">';
         h += '<div style="flex:1;height:3px;border-radius:2px;background:rgba(0,0,0,.08)"><div style="height:100%;border-radius:2px;background:' + capColor + ';width:' + capPct.toFixed(0) + '%"></div></div>';
         h += '<span style="white-space:nowrap;color:' + capTextColor + '">' + dayTotal.toFixed(1) + '/8</span>';
