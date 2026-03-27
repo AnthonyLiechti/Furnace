@@ -6399,6 +6399,7 @@ function renderCapacityPanel() {
 /* ── NAVIGATION ── */
 function navigate(view) {
   currentView = view;
+  try { localStorage.setItem('furnace_view', view); } catch(e) {}
   if (view.indexOf('client:') === 0) {
     openClients[view.split(':')[1]] = true;
   } else if (view.indexOf('project:') === 0) {
@@ -6877,7 +6878,9 @@ async function loadData() {
       computeResourceWeeks();
     }
 
-    navigate('master');
+    var savedView = null;
+    try { savedView = localStorage.getItem('furnace_view'); } catch(e) {}
+    navigate(savedView || 'master');
   } catch(e) {
     console.error('loadData error:', e);
     /* Try to continue with empty data — Supabase may still work */
@@ -6908,7 +6911,9 @@ async function loadData() {
           }
           CLIENTS = Object.values(clientMap);
           enrichProjectsWithSupabase();
-          navigate('master');
+          var sv2 = null;
+          try { sv2 = localStorage.getItem('furnace_view'); } catch(e) {}
+          navigate(sv2 || 'master');
           return;
         } catch(se) { console.error('Supabase fallback failed:', se); }
       }
