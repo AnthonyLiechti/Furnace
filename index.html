@@ -2775,7 +2775,9 @@ async function importHandleFile(file) {
   prog.textContent = 'Found ' + newEntries.length + ' new entries (' + dupes + ' duplicates skipped). Importing...';
 
   if (newEntries.length === 0) {
-    statusEl.innerHTML = '<div style="background:#E8F5E9;border-radius:8px;padding:16px;margin-bottom:12px"><div style="font-weight:600;color:#2E7D32;margin-bottom:4px">&#10003; All caught up!</div><div style="font-size:12px;color:#2E7D32">All ' + entries.length + ' entries already exist in Supabase. No new data to import.</div></div>';
+    statusEl.innerHTML = '<div style="background:#E8F5E9;border-radius:8px;padding:16px;margin-bottom:12px"><div style="font-weight:600;color:#2E7D32;margin-bottom:4px">&#10003; All caught up!</div><div style="font-size:12px;color:#2E7D32;margin-bottom:8px">All ' + entries.length + ' entries already exist in Supabase. No new data to import.</div><button onclick="importExecute(true)" style="padding:6px 16px;border-radius:6px;border:none;background:#F57F17;color:white;cursor:pointer;font-size:12px;font-weight:600">&#x1F504; Replace All Data</button><div style="font-size:10px;color:var(--mid-gray);margin-top:4px">Use Replace All to refresh start/end times or fix data issues.</div></div>';
+    importTimeState.allParsed = entries;
+    importTimeState.status = 'preview';
     return;
   }
 
