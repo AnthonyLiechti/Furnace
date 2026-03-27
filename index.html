@@ -3549,18 +3549,21 @@ function sparkOopItemTotal(item) {
 }
 
 function sparkOopItemEffective(item) {
-  /* Cascade: Actual Amount → Actual Fields → Adjusted → Planned */
+  /* Cascade: Actual Amount → Actual Fields → Adjusted Fields → Planned */
   if (item.actual_amount != null) return item.actual_amount;
-  /* Individual actual fields override adjusted and planned */
-  if (item.actual_count != null || item.actual_rate != null) {
+  /* Any actual field triggers actual tier */
+  if (item.actual_count != null || item.actual_rate != null || item.actual_days != null || item.actual_head_count != null) {
     return (item.actual_count != null ? item.actual_count : (item.adjusted_count != null ? item.adjusted_count : (item.count||0)))
          * (item.actual_rate != null ? item.actual_rate : (item.adjusted_rate != null ? item.adjusted_rate : (item.rate||0)))
          * (item.actual_days != null ? item.actual_days : (item.adjusted_days != null ? item.adjusted_days : (item.days||1)))
          * (item.actual_head_count != null ? item.actual_head_count : (item.adjusted_head_count != null ? item.adjusted_head_count : (item.head_count||1)));
   }
-  var adjCount = item.adjusted_count, adjRate = item.adjusted_rate, adjDays = item.adjusted_days, adjHead = item.adjusted_head_count;
-  if (adjCount != null || adjRate != null) {
-    return (adjCount != null ? adjCount : (item.count||0)) * (adjRate != null ? adjRate : (item.rate||0)) * (adjDays != null ? adjDays : (item.days||1)) * (adjHead != null ? adjHead : (item.head_count||1));
+  /* Any adjusted field triggers adjusted tier */
+  if (item.adjusted_count != null || item.adjusted_rate != null || item.adjusted_days != null || item.adjusted_head_count != null) {
+    return (item.adjusted_count != null ? item.adjusted_count : (item.count||0))
+         * (item.adjusted_rate != null ? item.adjusted_rate : (item.rate||0))
+         * (item.adjusted_days != null ? item.adjusted_days : (item.days||1))
+         * (item.adjusted_head_count != null ? item.adjusted_head_count : (item.head_count||1));
   }
   return sparkOopItemTotal(item);
 }
@@ -3586,14 +3589,76 @@ async function sparkPatchLabor(entryId, phaseKey, value) {
   var body = {};
   body[phaseKey] = parseFloat(value) || 0;
   await sparkFetch('labor_budget_entries', 'id=eq.' + entryId, 'PATCH', body);
+  sparkRecomputeBudgetTotals();
   sparkHideSaving();
+}
+
+function sparkRecomputeBudgetTotals() {
+  /* Recompute SUPA_BUDGETS totals from sparkCurrentData and update the project financials */
+  if (!sparkCurrentData || !sparkCurrentData.budget) return;
+  var b = sparkCurrentData.budget;
+  var projCode = b.projects ? b.projects.project_code : null;
+  if (!projCode || !SUPA_BUDGETS || !SUPA_BUDGETS[projCode]) return;
+  var sb = SUPA_BUDGETS[projCode];
+
+  /* Recompute labor */
+  var laborHours = 0, laborCost = 0, laborInternal = 0;
+  for (var i = 0; i < sparkCurrentData.labor.length; i++) {
+    var l = sparkCurrentData.labor[i];
+    var hrs = (l.phase1||0) + (l.phase2||0) + (l.phase3_1||0) + (l.phase3_2||0) + (l.phase4||0) + (l.phase5||0);
+    laborHours += hrs;
+    laborCost += hrs * 200;
+    var tm = l.team_member || {};
+    var fbr = tm.fully_burdened_rate || 200;
+    laborInternal += hrs * fbr;
+  }
+  sb.laborHours = laborHours;
+  sb.laborTotal = laborCost;
+  sb.laborCostInternal = laborInternal;
+
+  /* Recompute OOP */
+  var oopPlanned = 0, oopEffective = 0, oopSpent = 0;
+  for (var i = 0; i < sparkCurrentData.oop.length; i++) {
+    var oe = sparkCurrentData.oop[i];
+    if (oe.is_active === false) continue;
+    oopPlanned += (oe.count||0) * (oe.rate||0) * (oe.days||1) * (oe.head_count||1);
+    var effVal = sparkOopItemEffective(oe);
+    oopEffective += effVal;
+    if (oe.paid) oopSpent += effVal;
+  }
+  sb.oopTotal = oopPlanned;
+  sb.oopEffective = oopEffective;
+  sb.oopSpent = oopSpent;
+
+  /* Update portfolio project data */
+  for (var ci = 0; ci < CLIENTS.length; ci++) {
+    for (var pi = 0; pi < CLIENTS[ci].projects.length; pi++) {
+      var p = CLIENTS[ci].projects[pi];
+      if (p.code === projCode) {
+        p.totalBudget = laborHours;
+        p.laborCost = laborCost;
+        p.oopCost = oopEffective;
+        var computedTotal = laborCost + oopEffective;
+        p.profit = (sb.client_price || 0) - computedTotal;
+      }
+    }
+  }
 }
 
 async function sparkPatchOop(entryId, field, value) {
   sparkShowSaving();
   var body = {};
-  body[field] = (field === 'notes' || field === 'line_item_name') ? (value || '') : (parseFloat(value) || 0);
+  if (field === 'notes' || field === 'line_item_name') {
+    body[field] = value || '';
+  } else if (field.indexOf('adjusted') === 0 || field.indexOf('actual') === 0) {
+    /* Adjusted/Actual fields: empty string → null (not 0) so cascade works */
+    body[field] = (value === '' || value === null || value === undefined) ? null : parseFloat(value);
+  } else {
+    body[field] = parseFloat(value) || 0;
+  }
   await sparkFetch('oop_budget_entries', 'id=eq.' + entryId, 'PATCH', body);
+  /* Recompute SUPA_BUDGETS totals */
+  sparkRecomputeBudgetTotals();
   sparkHideSaving();
 }
 
@@ -3619,7 +3684,13 @@ function sparkDebouncedPatchOop(entryId, field, value) {
   if (sparkCurrentData && sparkCurrentData.oop) {
     for (var i = 0; i < sparkCurrentData.oop.length; i++) {
       if (sparkCurrentData.oop[i].id === entryId) {
-        sparkCurrentData.oop[i][field] = (field === 'notes' || field === 'line_item_name') ? (value || '') : (parseFloat(value) || 0);
+        if (field === 'notes' || field === 'line_item_name') {
+          sparkCurrentData.oop[i][field] = value || '';
+        } else if (field.indexOf('adjusted') === 0 || field.indexOf('actual') === 0) {
+          sparkCurrentData.oop[i][field] = (value === '' || value === null || value === undefined) ? null : parseFloat(value);
+        } else {
+          sparkCurrentData.oop[i][field] = parseFloat(value) || 0;
+        }
         break;
       }
     }
@@ -6790,16 +6861,16 @@ async function loadSupabaseData() {
         if (oe.is_active === false) continue;
         /* Planned: always from planned fields */
         oopPlanned += (oe.count || 0) * (oe.rate || 0) * (oe.days || 1) * (oe.head_count || 1);
-        /* Effective: cascade Actual Amount → Actual Fields → Adjusted → Planned */
+        /* Effective: cascade Actual Amount → Actual Fields → Adjusted Fields → Planned */
         var effVal;
         if (oe.actual_amount != null) {
           effVal = oe.actual_amount;
-        } else if (oe.actual_count != null || oe.actual_rate != null) {
+        } else if (oe.actual_count != null || oe.actual_rate != null || oe.actual_days != null || oe.actual_head_count != null) {
           effVal = (oe.actual_count != null ? oe.actual_count : (oe.adjusted_count != null ? oe.adjusted_count : (oe.count||0)))
                  * (oe.actual_rate != null ? oe.actual_rate : (oe.adjusted_rate != null ? oe.adjusted_rate : (oe.rate||0)))
                  * (oe.actual_days != null ? oe.actual_days : (oe.adjusted_days != null ? oe.adjusted_days : (oe.days||1)))
                  * (oe.actual_head_count != null ? oe.actual_head_count : (oe.adjusted_head_count != null ? oe.adjusted_head_count : (oe.head_count||1)));
-        } else if (oe.adjusted_count != null || oe.adjusted_rate != null) {
+        } else if (oe.adjusted_count != null || oe.adjusted_rate != null || oe.adjusted_days != null || oe.adjusted_head_count != null) {
           effVal = (oe.adjusted_count != null ? oe.adjusted_count : (oe.count||0)) * (oe.adjusted_rate != null ? oe.adjusted_rate : (oe.rate||0)) * (oe.adjusted_days != null ? oe.adjusted_days : (oe.days||1)) * (oe.adjusted_head_count != null ? oe.adjusted_head_count : (oe.head_count||1));
         } else {
           effVal = (oe.count || 0) * (oe.rate || 0) * (oe.days || 1) * (oe.head_count || 1);
