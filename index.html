@@ -4758,6 +4758,7 @@ var rtTimeMode = 'week'; /* week | month */
 var rtExpandedProjects = {};
 var rtProjFilter = 'active'; /* active | all */
 var rtExpandedFinancials = {};
+var rtCollapsedClients = {};
 
 function rtGetCurrentIdx() {
   if (rtWeekIdx >= 0 && rtWeekIdx < RT_WEEKS.length) return rtWeekIdx;
@@ -5177,6 +5178,7 @@ function renderRTProjects(wk) {
   window.rtToggleProject = function(pk) { rtExpandedProjects[pk] = !rtExpandedProjects[pk]; renderResource(); };
   window.rtSetProjFilter = function(f) { rtProjFilter = f; renderResource(); };
   window.rtToggleFinancials = function(pk) { rtExpandedFinancials[pk] = !rtExpandedFinancials[pk]; renderResource(); };
+  window.rtToggleClient = function(cp) { rtCollapsedClients[cp] = !rtCollapsedClients[cp]; renderResource(); };
 
   /* ── Build HTML ── */
   var h = '';
@@ -5196,10 +5198,13 @@ function renderRTProjects(wk) {
     for (var j = 0; j < grp.length; j++) { grpPred += projAgg[grp[j]].predicted; grpAct += projAgg[grp[j]].actual; }
 
     /* Client group header */
-    h += '<div class="rtp-grp-hdr">';
-    h += '<div class="rtp-grp-label">' + clientLabel + '</div>';
+    var clientOpen = !rtCollapsedClients[cp];
+    h += '<div class="rtp-grp-hdr" style="cursor:pointer" onclick="rtToggleClient(\'' + cp + '\')">';
+    h += '<div style="display:flex;align-items:center;gap:10px"><span class="rtp-chev' + (clientOpen ? ' open' : '') + '" style="color:rgba(255,255,255,.5)">&#9654;</span><span class="rtp-grp-label">' + clientLabel + '</span></div>';
     h += '<div class="rtp-grp-sub">' + grp.length + ' project' + (grp.length !== 1 ? 's' : '') + ' &middot; ' + grpPred.toFixed(1) + 'h predicted &middot; ' + grpAct.toFixed(1) + 'h actual</div>';
     h += '</div>';
+
+    if (!clientOpen) continue;
 
     for (var j = 0; j < grp.length; j++) {
       var pk = grp[j], d = projAgg[pk];
