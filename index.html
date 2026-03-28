@@ -5069,6 +5069,13 @@ function renderRTProjects(wk) {
     d.supa = null;
     if (d.code && SUPA_BUDGETS && SUPA_BUDGETS[d.code]) {
       d.supa = SUPA_BUDGETS[d.code];
+      /* Use Supabase laborHours as budget if available */
+      if (d.supa.laborHours) d.budget = d.supa.laborHours;
+    }
+    /* Override spent with live Supabase actuals when available */
+    if (d.code && SUPA_ACTUALS && SUPA_ACTUALS[d.code] && SUPA_ACTUALS[d.code].totalHours > 0) {
+      d.spent = SUPA_ACTUALS[d.code].totalHours;
+      if (d.budget > 0) d.remaining = d.budget - d.spent;
     }
   }
 
@@ -5077,11 +5084,17 @@ function renderRTProjects(wk) {
     if (!projAgg[bk]) {
       var bud2 = PROJECT_BUDGETS[bk];
       var code2 = PROJECT_CODES[bk] || '';
+      var supa2 = (code2 && SUPA_BUDGETS && SUPA_BUDGETS[code2]) ? SUPA_BUDGETS[code2] : null;
+      var budget2 = (supa2 && supa2.laborHours) ? supa2.laborHours : bud2.budget;
+      var spent2 = bud2.spent;
+      /* Override spent with live Supabase actuals */
+      if (code2 && SUPA_ACTUALS && SUPA_ACTUALS[code2] && SUPA_ACTUALS[code2].totalHours > 0) {
+        spent2 = SUPA_ACTUALS[code2].totalHours;
+      }
       projAgg[bk] = {
         predicted:0, actual:0, people:{}, code:code2,
-        budget:bud2.budget, spent:bud2.spent, remaining:bud2.remaining,
-        acc:0, diff:0,
-        supa: (code2 && SUPA_BUDGETS && SUPA_BUDGETS[code2]) ? SUPA_BUDGETS[code2] : null
+        budget:budget2, spent:spent2, remaining:budget2 - spent2,
+        acc:0, diff:0, supa: supa2
       };
       projKeys.push(bk);
     }
