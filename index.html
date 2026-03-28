@@ -172,6 +172,52 @@ body { font-family: Arial, 'TT Hoves Pro', sans-serif; background: var(--light-g
 .rt-tab { padding:6px 16px; border-radius:16px; border:1px solid var(--canvas); background:var(--white); cursor:pointer; font-size:12px; font-weight:500; }
 .rt-tab.active { background:var(--abyss); color:var(--white); border-color:var(--abyss); }
 
+/* ── By Project Cards ── */
+.rtp-card { background:var(--white); border:1px solid var(--canvas); border-radius:10px; margin-bottom:10px; overflow:hidden; }
+.rtp-header { display:flex; align-items:center; gap:12px; padding:14px 18px; cursor:pointer; user-select:none; }
+.rtp-header:hover { background:rgba(0,0,0,.02); }
+.rtp-chev { font-size:10px; color:var(--mid-gray); transition:transform .2s; flex-shrink:0; width:16px; }
+.rtp-chev.open { transform:rotate(90deg); }
+.rtp-code { font-size:10px; color:var(--mid-gray); font-weight:500; min-width:80px; font-variant-numeric:tabular-nums; }
+.rtp-name { font-weight:600; font-size:13px; color:var(--abyss); flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rtp-pills { display:flex; gap:6px; align-items:center; flex-shrink:0; }
+.rtp-pill { font-size:9px; font-weight:700; padding:2px 7px; border-radius:4px; text-transform:uppercase; letter-spacing:.3px; }
+.rtp-pill.on-track { background:#E8F5E9; color:#2E7D32; }
+.rtp-pill.at-risk { background:#FFF8E1; color:#F57F17; }
+.rtp-pill.over { background:#FFEBEE; color:#C62828; }
+.rtp-pill.closeout { background:#E3F2FD; color:#1565C0; }
+.rtp-pill.proposed { background:#F3E5F5; color:#6A1B9A; }
+.rtp-mini { font-size:11px; color:var(--mid-gray); font-variant-numeric:tabular-nums; display:flex; gap:14px; flex-shrink:0; }
+.rtp-mini b { font-weight:600; color:var(--abyss); }
+.rtp-bar-sm { width:120px; height:6px; background:var(--light-gray); border-radius:3px; overflow:hidden; flex-shrink:0; }
+.rtp-bar-sm-fill { height:100%; border-radius:3px; }
+.rtp-body { padding:0 18px 18px; border-top:1px solid var(--light-gray); }
+.rtp-section { margin-top:16px; }
+.rtp-section-title { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.8px; color:var(--mid-gray); margin-bottom:10px; }
+.rtp-metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-bottom:16px; }
+.rtp-metric { background:var(--bg); border:1px solid var(--canvas); border-radius:8px; padding:12px 14px; text-align:center; }
+.rtp-metric .label { font-size:9px; text-transform:uppercase; letter-spacing:.8px; color:var(--mid-gray); margin-bottom:4px; }
+.rtp-metric .value { font-size:20px; font-weight:700; color:var(--abyss); font-variant-numeric:tabular-nums; }
+.rtp-metric .sub { font-size:10px; color:var(--mid-gray); margin-top:2px; }
+.rtp-team-row { display:grid; grid-template-columns:140px 70px 70px 70px 1fr; gap:8px; align-items:center; padding:6px 0; border-bottom:1px solid var(--light-gray); font-size:12px; }
+.rtp-team-row:last-child { border-bottom:none; }
+.rtp-team-row.hdr { font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:var(--mid-gray); font-weight:500; }
+.rtp-phase-row { display:flex; align-items:center; gap:10px; padding:5px 0; font-size:12px; }
+.rtp-phase-label { min-width:100px; font-weight:500; color:var(--mid-gray); }
+.rtp-phase-bar { flex:1; height:8px; background:var(--light-gray); border-radius:4px; overflow:hidden; }
+.rtp-phase-fill { height:100%; border-radius:4px; }
+.rtp-phase-val { min-width:50px; text-align:right; font-variant-numeric:tabular-nums; font-weight:600; font-size:11px; }
+.rtp-fin-toggle { font-size:11px; color:var(--ocean); cursor:pointer; font-weight:500; margin-top:12px; }
+.rtp-fin-toggle:hover { text-decoration:underline; }
+.rtp-fin-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-top:10px; }
+.rtp-grp-hdr { background:var(--abyss); padding:10px 14px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; margin-top:16px; }
+.rtp-grp-hdr:first-child { margin-top:0; }
+.rtp-grp-label { font-weight:700; font-size:12px; color:var(--white); letter-spacing:.3px; }
+.rtp-grp-sub { font-size:11px; color:var(--mid-gray); }
+.rtp-filter { display:flex; gap:6px; margin-bottom:16px; }
+.rtp-filter-btn { padding:5px 14px; border-radius:14px; border:1px solid var(--canvas); background:var(--white); cursor:pointer; font-size:11px; font-weight:500; }
+.rtp-filter-btn.active { background:var(--abyss); color:var(--white); border-color:var(--abyss); }
+
 /* Hour Type Breakdown */
 .hour-type-section { margin-bottom:28px; }
 .hour-type-cards { display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; margin-bottom:16px; }
@@ -520,6 +566,29 @@ html.dark .rt-name { color:var(--dm-text); }
 html.dark .rt-bar-wrap { background:var(--dm-surface2); }
 html.dark .rt-bar-pred { background:var(--dm-border); }
 html.dark .rt-week-label { color:var(--dm-text-muted); }
+
+/* ── DARK MODE: By Project Cards ── */
+html.dark .rtp-card { background:var(--dm-surface); border-color:var(--dm-border); }
+html.dark .rtp-header:hover { background:rgba(255,255,255,.03); }
+html.dark .rtp-name { color:var(--dm-text); }
+html.dark .rtp-code { color:var(--dm-text-muted); }
+html.dark .rtp-chev { color:var(--dm-text-muted); }
+html.dark .rtp-mini { color:var(--dm-text-muted); }
+html.dark .rtp-mini b { color:var(--dm-text); }
+html.dark .rtp-bar-sm { background:var(--dm-surface2); }
+html.dark .rtp-body { border-top-color:var(--dm-border); }
+html.dark .rtp-section-title { color:var(--dm-text-muted); }
+html.dark .rtp-metric { background:var(--dm-surface2); border-color:var(--dm-border); }
+html.dark .rtp-metric .value { color:var(--dm-text); }
+html.dark .rtp-metric .label { color:var(--dm-text-muted); }
+html.dark .rtp-metric .sub { color:var(--dm-text-muted); }
+html.dark .rtp-team-row { border-bottom-color:var(--dm-border); color:var(--dm-text); }
+html.dark .rtp-team-row.hdr { color:var(--dm-text-muted); }
+html.dark .rtp-phase-label { color:var(--dm-text-muted); }
+html.dark .rtp-phase-bar { background:var(--dm-surface2); }
+html.dark .rtp-grp-hdr { background:var(--abyss); }
+html.dark .rtp-filter-btn { background:var(--dm-surface2); border-color:var(--dm-border); color:var(--dm-text); }
+html.dark .rtp-filter-btn.active { background:var(--abyss); color:var(--white); border-color:var(--abyss); }
 
 /* ── DARK MODE: Hour Type Cards & Stacked Bar ── */
 html.dark .ht-card { background:var(--dm-surface); box-shadow:0 1px 4px rgba(0,0,0,.3); }
@@ -4686,6 +4755,9 @@ var rtShowLeadership = false;
 var rtSortBy = 'project';
 var rtWeekIdx = -1; /* -1 = latest week with actuals */
 var rtTimeMode = 'week'; /* week | month */
+var rtExpandedProjects = {};
+var rtProjFilter = 'active'; /* active | all */
+var rtExpandedFinancials = {};
 
 function rtGetCurrentIdx() {
   if (rtWeekIdx >= 0 && rtWeekIdx < RT_WEEKS.length) return rtWeekIdx;
@@ -4980,213 +5052,301 @@ function renderRTProjects(wk) {
       }
     }
   }
-  /* Enrich projAgg with code and remaining */
+
+  /* Enrich with code, budget, supabase data */
   var projKeys = Object.keys(projAgg);
   for (var i = 0; i < projKeys.length; i++) {
     var pk = projKeys[i];
-    projAgg[pk].code = PROJECT_CODES[pk] || '';
+    var d = projAgg[pk];
+    d.code = PROJECT_CODES[pk] || '';
     var bud = PROJECT_BUDGETS[pk];
-    projAgg[pk].remaining = bud ? bud.remaining : null;
-    projAgg[pk].acc = rtCalcAccProject(projAgg[pk].predicted, projAgg[pk].actual);
-    projAgg[pk].diff = projAgg[pk].actual - projAgg[pk].predicted;
-  }
-
-  /* Sort helpers — expose globally for onclick */
-  window.rtProjSort = function(field) { rtSortBy = (rtSortBy === field) ? field + '_asc' : field; renderResource(); };
-  var desc = rtSortBy.indexOf('_asc') === -1;
-  var sortField = rtSortBy.replace('_asc','');
-  function sIcon(f) { return sortField === f ? (desc ? ' &#9660;' : ' &#9650;') : ''; }
-  var hdrStyle = 'cursor:pointer;user-select:none';
-
-  if (sortField === 'project') {
-    projKeys.sort(function(a,b){ return desc ? (projAgg[b].code||'').localeCompare(projAgg[a].code||'') : (projAgg[a].code||'').localeCompare(projAgg[b].code||''); });
-  } else if (sortField === 'remaining') {
-    projKeys.sort(function(a,b){ var ra = projAgg[a].remaining === null ? -99999 : projAgg[a].remaining; var rb = projAgg[b].remaining === null ? -99999 : projAgg[b].remaining; return desc ? rb - ra : ra - rb; });
-  } else if (sortField === 'predicted') {
-    projKeys.sort(function(a,b){ return desc ? projAgg[b].predicted - projAgg[a].predicted : projAgg[a].predicted - projAgg[b].predicted; });
-  } else if (sortField === 'actual') {
-    projKeys.sort(function(a,b){ return desc ? projAgg[b].actual - projAgg[a].actual : projAgg[a].actual - projAgg[b].actual; });
-  } else if (sortField === 'diff') {
-    projKeys.sort(function(a,b){ return desc ? projAgg[b].diff - projAgg[a].diff : projAgg[a].diff - projAgg[b].diff; });
-  } else if (sortField === 'accuracy') {
-    projKeys.sort(function(a,b){ return desc ? projAgg[b].acc - projAgg[a].acc : projAgg[a].acc - projAgg[b].acc; });
-  } else {
-    /* Default: sort by project code ascending */
-    projKeys.sort(function(a,b){ return (projAgg[a].code||'zzz').localeCompare(projAgg[b].code||'zzz'); });
-  }
-
-  var maxHrs = 1;
-  for (var i = 0; i < projKeys.length; i++) { var m = Math.max(projAgg[projKeys[i]].predicted, projAgg[projKeys[i]].actual); if (m > maxHrs) maxHrs = m; }
-
-  /* Group projects by client code prefix and sort by project code within each group */
-  function getClientFromCode(code) {
-    if (!code) return '999_Unknown';
-    var prefix = code.replace(/[a-zA-Z]/, '').split('_')[0];
-    return prefix;
-  }
-  function getClientLabel(prefix) {
-    for (var ci = 0; ci < CLIENTS.length; ci++) { if (CLIENTS[ci].code === prefix) return CLIENTS[ci].code + ' ' + CLIENTS[ci].name; }
-    /* Check RT alias targets too */
-    if (prefix === '100') return '100 Forge';
-    return prefix;
-  }
-
-  /* Always sort by project code for grouping, then apply user sort within groups */
-  var grouped = {};
-  for (var i = 0; i < projKeys.length; i++) {
-    var pk = projKeys[i], d = projAgg[pk];
-    var code = d.code || '';
-    var clientPrefix = getClientFromCode(code);
-    if (!grouped[clientPrefix]) grouped[clientPrefix] = [];
-    grouped[clientPrefix].push(pk);
-  }
-
-  /* Sort client groups by prefix */
-  var clientPrefixes = Object.keys(grouped).sort();
-
-  /* Sort projects within each group by code */
-  for (var gi = 0; gi < clientPrefixes.length; gi++) {
-    var grp = grouped[clientPrefixes[gi]];
-    if (sortField === 'predicted') {
-      grp.sort(function(a,b){ return desc ? projAgg[b].predicted - projAgg[a].predicted : projAgg[a].predicted - projAgg[b].predicted; });
-    } else if (sortField === 'actual') {
-      grp.sort(function(a,b){ return desc ? projAgg[b].actual - projAgg[a].actual : projAgg[a].actual - projAgg[b].actual; });
-    } else if (sortField === 'diff') {
-      grp.sort(function(a,b){ return desc ? projAgg[b].diff - projAgg[a].diff : projAgg[a].diff - projAgg[b].diff; });
-    } else if (sortField === 'remaining') {
-      grp.sort(function(a,b){ var ra = projAgg[a].remaining === null ? -99999 : projAgg[a].remaining; var rb = projAgg[b].remaining === null ? -99999 : projAgg[b].remaining; return desc ? rb - ra : ra - rb; });
-    } else if (sortField === 'accuracy') {
-      grp.sort(function(a,b){ return desc ? projAgg[b].acc - projAgg[a].acc : projAgg[a].acc - projAgg[b].acc; });
-    } else {
-      /* Default: sort by project code ascending */
-      grp.sort(function(a,b){ return (projAgg[a].code||'zzz').localeCompare(projAgg[b].code||'zzz'); });
+    d.budget = bud ? bud.budget : 0;
+    d.spent = bud ? bud.spent : 0;
+    d.remaining = bud ? bud.remaining : null;
+    d.acc = rtCalcAccProject(d.predicted, d.actual);
+    d.diff = d.actual - d.predicted;
+    /* Look up Supabase budget data */
+    d.supa = null;
+    if (d.code && SUPA_BUDGETS && SUPA_BUDGETS[d.code]) {
+      d.supa = SUPA_BUDGETS[d.code];
     }
   }
 
-  var h = '<div class="rt-card"><h3>Project Accuracy</h3>';
-  h += '<div class="rt-row rt-hdr rt-proj">';
-  h += '<div style="' + hdrStyle + '" onclick="rtProjSort(\'project\')">Project' + sIcon('project') + '</div>';
-  h += '<div class="rt-num" style="' + hdrStyle + '" onclick="rtProjSort(\'remaining\')">Remaining' + sIcon('remaining') + '</div>';
-  h += '<div class="rt-num" style="' + hdrStyle + '" onclick="rtProjSort(\'predicted\')">Predicted' + sIcon('predicted') + '</div>';
-  h += '<div class="rt-num" style="' + hdrStyle + '" onclick="rtProjSort(\'actual\')">Actual' + sIcon('actual') + '</div>';
-  h += '<div class="rt-num" style="' + hdrStyle + '" onclick="rtProjSort(\'diff\')">Diff' + sIcon('diff') + '</div>';
-  h += '<div>Comparison</div>';
-  h += '<div class="rt-acc" style="' + hdrStyle + '" onclick="rtProjSort(\'accuracy\')">Accuracy' + sIcon('accuracy') + '</div>';
+  /* Also add any PROJECT_BUDGETS entries not in projAgg */
+  for (var bk in PROJECT_BUDGETS) {
+    if (!projAgg[bk]) {
+      var bud2 = PROJECT_BUDGETS[bk];
+      var code2 = PROJECT_CODES[bk] || '';
+      projAgg[bk] = {
+        predicted:0, actual:0, people:{}, code:code2,
+        budget:bud2.budget, spent:bud2.spent, remaining:bud2.remaining,
+        acc:0, diff:0,
+        supa: (code2 && SUPA_BUDGETS && SUPA_BUDGETS[code2]) ? SUPA_BUDGETS[code2] : null
+      };
+      projKeys.push(bk);
+    }
+  }
+
+  /* Filter */
+  if (rtProjFilter === 'active') {
+    projKeys = projKeys.filter(function(pk) {
+      var d = projAgg[pk];
+      return d.predicted > 0 || d.actual > 0;
+    });
+  }
+
+  /* Sort by project code */
+  projKeys.sort(function(a,b) { return (projAgg[a].code||'zzz').localeCompare(projAgg[b].code||'zzz'); });
+
+  /* Group by client prefix */
+  function getClientFromCode(code) {
+    if (!code) return '999_Unknown';
+    return code.replace(/[a-zA-Z]/, '').split('_')[0];
+  }
+  function getClientLabel(prefix) {
+    for (var ci = 0; ci < CLIENTS.length; ci++) { if (CLIENTS[ci].code === prefix) return CLIENTS[ci].code + ' ' + CLIENTS[ci].name; }
+    if (prefix === '100') return '100 Forge';
+    return prefix;
+  }
+  var grouped = {};
+  for (var i = 0; i < projKeys.length; i++) {
+    var pk = projKeys[i];
+    var cp = getClientFromCode(projAgg[pk].code);
+    if (!grouped[cp]) grouped[cp] = [];
+    grouped[cp].push(pk);
+  }
+  var clientPrefixes = Object.keys(grouped).sort();
+
+  /* Toggle helpers */
+  window.rtToggleProject = function(pk) { rtExpandedProjects[pk] = !rtExpandedProjects[pk]; renderResource(); };
+  window.rtSetProjFilter = function(f) { rtProjFilter = f; renderResource(); };
+  window.rtToggleFinancials = function(pk) { rtExpandedFinancials[pk] = !rtExpandedFinancials[pk]; renderResource(); };
+
+  /* ── Build HTML ── */
+  var h = '';
+
+  /* Filter toggle */
+  h += '<div class="rtp-filter">';
+  h += '<div class="rtp-filter-btn' + (rtProjFilter === 'active' ? ' active' : '') + '" onclick="rtSetProjFilter(\'active\')">Active This Week</div>';
+  h += '<div class="rtp-filter-btn' + (rtProjFilter === 'all' ? ' active' : '') + '" onclick="rtSetProjFilter(\'all\')">All Projects</div>';
+  h += '<span style="font-size:11px;color:var(--mid-gray);margin-left:8px;line-height:28px">' + projKeys.length + ' project' + (projKeys.length !== 1 ? 's' : '') + '</span>';
   h += '</div>';
 
   for (var gi = 0; gi < clientPrefixes.length; gi++) {
     var cp = clientPrefixes[gi];
     var grp = grouped[cp];
-    /* Client group header */
     var clientLabel = getClientLabel(cp);
     var grpPred = 0, grpAct = 0;
     for (var j = 0; j < grp.length; j++) { grpPred += projAgg[grp[j]].predicted; grpAct += projAgg[grp[j]].actual; }
-    h += '<div style="background:var(--abyss);padding:8px 12px;margin-top:' + (gi > 0 ? '12px' : '0') + ';border-radius:6px;display:flex;justify-content:space-between;align-items:center">';
-    h += '<div style="font-weight:700;font-size:12px;color:var(--white);letter-spacing:.3px">' + clientLabel + '</div>';
-    h += '<div style="font-size:11px;color:var(--mid-gray)">' + grp.length + ' project' + (grp.length !== 1 ? 's' : '') + ' &middot; ' + grpPred.toFixed(1) + 'h predicted &middot; ' + grpAct.toFixed(1) + 'h actual</div>';
+
+    /* Client group header */
+    h += '<div class="rtp-grp-hdr">';
+    h += '<div class="rtp-grp-label">' + clientLabel + '</div>';
+    h += '<div class="rtp-grp-sub">' + grp.length + ' project' + (grp.length !== 1 ? 's' : '') + ' &middot; ' + grpPred.toFixed(1) + 'h predicted &middot; ' + grpAct.toFixed(1) + 'h actual</div>';
     h += '</div>';
 
     for (var j = 0; j < grp.length; j++) {
       var pk = grp[j], d = projAgg[pk];
-      var predW = (d.predicted / maxHrs) * 100;
-      var actW = (d.actual / maxHrs) * 100;
-      var remHrs = d.remaining;
-      var remColor = remHrs === null ? 'var(--mid-gray)' : remHrs < 0 ? 'var(--ember)' : (PROJECT_BUDGETS[pk] && remHrs < PROJECT_BUDGETS[pk].budget * 0.15) ? 'var(--honey)' : '#2E7D32';
-      var remText = remHrs === null ? '—' : remHrs.toFixed(1);
-      var projCode = d.code || '';
-      h += '<div class="rt-row rt-proj">';
-      h += '<div class="rt-name">' + (projCode ? '<span style="font-size:10px;color:var(--mid-gray);font-weight:400;display:block;line-height:1.2">' + projCode + '</span>' : '') + pk + '</div>';
-      h += '<div class="rt-num" style="font-weight:600;color:' + remColor + '">' + remText + '</div>';
-      h += '<div class="rt-num" style="color:var(--mid-gray)">' + d.predicted.toFixed(1) + '</div>';
-      h += '<div class="rt-num" style="font-weight:600">' + d.actual.toFixed(1) + '</div>';
-      h += '<div class="rt-num" style="color:' + (d.diff >= 0 ? '#2E7D32' : 'var(--ember)') + '">' + (d.diff >= 0 ? '+' : '') + d.diff.toFixed(1) + '</div>';
-      h += '<div class="rt-bar-wrap"><div class="rt-bar-pred" style="width:' + predW + '%"></div><div class="rt-bar-act" style="width:' + actW + '%;background:var(--ocean)"></div></div>';
-      h += '<div class="rt-acc ' + accClass(d.acc) + '">' + d.acc.toFixed(0) + '%</div>';
+      var isExpanded = !!rtExpandedProjects[pk];
+      var sb = d.supa;
+
+      /* Status badge */
+      var statusClass = 'on-track', statusText = 'ON TRACK';
+      if (d.remaining !== null && d.remaining < 0) { statusClass = 'over'; statusText = 'OVER'; }
+      else if (d.remaining !== null && d.budget > 0 && d.remaining < d.budget * 0.15) { statusClass = 'at-risk'; statusText = 'AT RISK'; }
+      else if (sb && sb.status === 'closeout') { statusClass = 'closeout'; statusText = 'CLOSEOUT'; }
+      else if (sb && sb.status === 'proposed') { statusClass = 'proposed'; statusText = 'PROPOSED'; }
+      else if (d.budget === 0 && d.remaining === null) { statusClass = ''; statusText = ''; }
+
+      /* Mini progress bar */
+      var barPct = d.budget > 0 ? Math.min((d.spent / d.budget) * 100, 100) : 0;
+      var barColor = statusClass === 'over' ? 'var(--ember)' : statusClass === 'at-risk' ? 'var(--honey)' : 'var(--ocean)';
+
+      /* ── Card ── */
+      h += '<div class="rtp-card">';
+
+      /* ── Header (always visible) ── */
+      h += '<div class="rtp-header" onclick="rtToggleProject(\'' + pk.replace(/'/g, "\\'") + '\')">';
+      h += '<div class="rtp-chev' + (isExpanded ? ' open' : '') + '">&#9654;</div>';
+      h += '<div class="rtp-code">' + (d.code || '') + '</div>';
+      h += '<div class="rtp-name">' + pk + '</div>';
+      h += '<div class="rtp-pills">';
+      if (statusText) h += '<div class="rtp-pill ' + statusClass + '">' + statusText + '</div>';
       h += '</div>';
-    }
-  }
-  h += '</div>';
-
-  /* Hours Remaining by Project — show ALL projects with allocations or actuals */
-  h += '<div class="rt-card"><h3>Hours Remaining by Project</h3>';
-  h += '<p style="font-size:11px;color:var(--mid-gray);margin:-6px 0 14px">All projects with predicted or actual hours — budget minus hours spent</p>';
-
-  /* Build combined list: projects with budget data + projects with week data */
-  var allProjSet = {};
-  for (var i = 0; i < projKeys.length; i++) {
-    var pk = projKeys[i], d = projAgg[pk];
-    if (d.predicted > 0 || d.actual > 0) {
-      allProjSet[pk] = { predicted: d.predicted, actual: d.actual, code: d.code || '' };
-    }
-  }
-  /* Also add any PROJECT_BUDGETS entries not already in the list */
-  for (var bk in PROJECT_BUDGETS) {
-    if (!allProjSet[bk]) {
-      allProjSet[bk] = { predicted: 0, actual: 0, code: PROJECT_CODES[bk] || '' };
-    }
-  }
-
-  var allProjKeys = Object.keys(allProjSet);
-  allProjKeys.sort(function(a, b) {
-    var ca = allProjSet[a].code || PROJECT_CODES[a] || 'zzz';
-    var cb = allProjSet[b].code || PROJECT_CODES[b] || 'zzz';
-    return ca.localeCompare(cb);
-  });
-
-  for (var i = 0; i < allProjKeys.length; i++) {
-    var pk = allProjKeys[i];
-    var info = allProjSet[pk];
-    var b = PROJECT_BUDGETS[pk];
-    var budget = b ? b.budget : 0;
-    var spent = b ? b.spent : 0;
-    var remaining = b ? b.remaining : 0;
-    var predicted = info.predicted || 0;
-    var actual = info.actual || 0;
-    var code = info.code || PROJECT_CODES[pk] || '';
-
-    var pct = budget > 0 ? Math.min((spent / budget) * 100, 100) : (spent > 0 ? 100 : 0);
-    var overPct = (budget > 0 && spent > budget) ? Math.min(((spent - budget) / budget) * 100, 60) : 0;
-    var isOver = budget > 0 && remaining < 0;
-    var isLow = budget > 0 && !isOver && remaining < budget * 0.15;
-    var noBudget = budget === 0;
-    var barColor = noBudget ? 'var(--mid-gray)' : isOver ? 'var(--ember)' : isLow ? 'var(--honey)' : 'var(--ocean)';
-    var overBarColor = 'rgba(211,47,47,0.35)';
-    var remColor = noBudget ? 'var(--mid-gray)' : isOver ? 'var(--ember)' : isLow ? 'var(--honey)' : '#2E7D32';
-    var statusTag = isOver ? '<span style="font-size:9px;font-weight:700;color:var(--white);background:var(--ember);padding:1px 5px;border-radius:3px;margin-left:6px">OVER</span>' : isLow ? '<span style="font-size:9px;font-weight:700;color:var(--abyss);background:var(--honey);padding:1px 5px;border-radius:3px;margin-left:6px">LOW</span>' : '';
-
-    h += '<div style="margin-bottom:14px">';
-    h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
-    h += '<div style="font-weight:600;font-size:13px">';
-    if (code) h += '<span style="font-size:11px;color:var(--mid-gray);margin-right:6px">' + code + '</span>';
-    h += pk + statusTag + '</div>';
-    if (budget > 0) {
-      h += '<div style="font-size:12px;color:' + remColor + ';font-weight:700">' + (isOver ? '' : '+') + remaining.toFixed(1) + 'h remaining</div>';
-    } else if (predicted > 0 || actual > 0) {
-      h += '<div style="font-size:12px;color:var(--mid-gray)">Predicted: ' + predicted.toFixed(1) + 'h &middot; Actual: ' + actual.toFixed(1) + 'h</div>';
-    }
-    h += '</div>';
-
-    if (budget > 0) {
-      h += '<div style="display:flex;align-items:center;gap:8px">';
-      h += '<div style="flex:1;height:10px;background:var(--light-gray);border-radius:5px;overflow:visible;position:relative">';
-      h += '<div style="height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:5px;position:absolute;top:0;left:0"></div>';
-      if (overPct > 0) {
-        h += '<div style="height:100%;width:' + overPct + '%;background:' + overBarColor + ';border-radius:0 5px 5px 0;position:absolute;top:0;left:' + pct + '%;border-left:2px solid var(--ember)"></div>';
+      if (d.budget > 0) {
+        h += '<div class="rtp-bar-sm"><div class="rtp-bar-sm-fill" style="width:' + barPct + '%;background:' + barColor + '"></div></div>';
       }
-      h += '</div>';
-      h += '<div style="font-size:10px;color:var(--mid-gray);min-width:90px;text-align:right">' + spent.toFixed(1) + ' / ' + budget.toFixed(0) + 'h</div>';
-      h += '</div>';
-    } else {
-      /* No budget — show a simple predicted vs actual bar */
-      var maxH = Math.max(predicted, actual, 1);
-      h += '<div style="display:flex;align-items:center;gap:4px;height:10px">';
-      if (predicted > 0) h += '<div style="height:6px;border-radius:3px;background:var(--canvas);width:' + (predicted/maxH*60) + '%"></div>';
-      if (actual > 0) h += '<div style="height:6px;border-radius:3px;background:var(--ocean);width:' + (actual/maxH*60) + '%"></div>';
-      h += '</div>';
+      h += '<div class="rtp-mini">';
+      if (d.budget > 0) {
+        h += '<span>Budget <b>' + d.budget.toFixed(0) + 'h</b></span>';
+        h += '<span>Spent <b>' + d.spent.toFixed(1) + 'h</b></span>';
+        var remColor = d.remaining < 0 ? 'var(--ember)' : d.remaining < d.budget * 0.15 ? 'var(--honey)' : '#2E7D32';
+        h += '<span>Left <b style="color:' + remColor + '">' + d.remaining.toFixed(1) + 'h</b></span>';
+      }
+      if (d.predicted > 0 || d.actual > 0) {
+        h += '<span>Wk <b>' + d.predicted.toFixed(1) + '/' + d.actual.toFixed(1) + '</b></span>';
+      }
+      h += '</div></div>'; /* end header */
+
+      /* ── Expanded body ── */
+      if (isExpanded) {
+        h += '<div class="rtp-body">';
+
+        /* ── Key Metrics Row ── */
+        h += '<div class="rtp-metrics">';
+        if (d.budget > 0) {
+          var pctComplete = d.budget > 0 ? Math.round((d.spent / d.budget) * 100) : 0;
+          h += '<div class="rtp-metric"><div class="label">Budget</div><div class="value">' + d.budget.toFixed(0) + 'h</div></div>';
+          h += '<div class="rtp-metric"><div class="label">Spent</div><div class="value">' + d.spent.toFixed(1) + 'h</div><div class="sub">' + pctComplete + '% of budget</div></div>';
+          h += '<div class="rtp-metric"><div class="label">Remaining</div><div class="value" style="color:' + (d.remaining < 0 ? 'var(--ember)' : '#2E7D32') + '">' + d.remaining.toFixed(1) + 'h</div></div>';
+        }
+        h += '<div class="rtp-metric"><div class="label">This Week Predicted</div><div class="value">' + d.predicted.toFixed(1) + 'h</div></div>';
+        h += '<div class="rtp-metric"><div class="label">This Week Actual</div><div class="value">' + d.actual.toFixed(1) + 'h</div></div>';
+        var diffColor = d.diff === 0 ? 'var(--mid-gray)' : d.diff > 0 ? 'var(--ember)' : '#2E7D32';
+        h += '<div class="rtp-metric"><div class="label">Diff</div><div class="value" style="color:' + diffColor + '">' + (d.diff >= 0 ? '+' : '') + d.diff.toFixed(1) + 'h</div><div class="sub">Accuracy: ' + d.acc.toFixed(0) + '%</div></div>';
+        if (d.budget > 0 && d.actual > 0) {
+          var afterWeek = d.remaining - d.actual;
+          h += '<div class="rtp-metric"><div class="label">Left After This Week</div><div class="value" style="color:' + (afterWeek < 0 ? 'var(--ember)' : '#2E7D32') + '">' + afterWeek.toFixed(1) + 'h</div></div>';
+        }
+        h += '</div>';
+
+        /* ── Estimate vs Actual Bar ── */
+        h += '<div class="rtp-section"><div class="rtp-section-title">Estimate vs Actual (This Week)</div>';
+        var maxBar = Math.max(d.predicted, d.actual, 1);
+        h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">';
+        h += '<div style="min-width:65px;font-size:11px;color:var(--mid-gray)">Predicted</div>';
+        h += '<div style="flex:1;height:14px;background:var(--light-gray);border-radius:7px;overflow:hidden"><div style="height:100%;width:' + (d.predicted/maxBar*100) + '%;background:var(--canvas);border-radius:7px"></div></div>';
+        h += '<div style="min-width:40px;text-align:right;font-size:12px;font-weight:600;color:var(--mid-gray)">' + d.predicted.toFixed(1) + '</div>';
+        h += '</div>';
+        h += '<div style="display:flex;align-items:center;gap:10px">';
+        h += '<div style="min-width:65px;font-size:11px;color:var(--mid-gray)">Actual</div>';
+        h += '<div style="flex:1;height:14px;background:var(--light-gray);border-radius:7px;overflow:hidden"><div style="height:100%;width:' + (d.actual/maxBar*100) + '%;background:var(--ocean);border-radius:7px"></div></div>';
+        h += '<div style="min-width:40px;text-align:right;font-size:12px;font-weight:600">' + d.actual.toFixed(1) + '</div>';
+        h += '</div></div>';
+
+        /* ── Team Breakdown ── */
+        var teamNames = Object.keys(d.people);
+        if (teamNames.length > 0) {
+          teamNames.sort(function(a,b) { return (d.people[b].a || 0) - (d.people[a].a || 0); });
+          var teamMax = 1;
+          for (var t = 0; t < teamNames.length; t++) { var tm = Math.max(d.people[teamNames[t]].p||0, d.people[teamNames[t]].a||0); if (tm > teamMax) teamMax = tm; }
+          h += '<div class="rtp-section"><div class="rtp-section-title">Team Breakdown</div>';
+          h += '<div class="rtp-team-row hdr"><div>Person</div><div style="text-align:right">Predicted</div><div style="text-align:right">Actual</div><div style="text-align:right">Diff</div><div></div></div>';
+          for (var t = 0; t < teamNames.length; t++) {
+            var tn = teamNames[t], tp = d.people[tn];
+            var tDiff = (tp.a||0) - (tp.p||0);
+            var tDiffColor = tDiff === 0 ? 'var(--mid-gray)' : tDiff > 0 ? 'var(--ember)' : '#2E7D32';
+            h += '<div class="rtp-team-row">';
+            h += '<div style="font-weight:500">' + tn + '</div>';
+            h += '<div style="text-align:right;color:var(--mid-gray)">' + (tp.p||0).toFixed(1) + '</div>';
+            h += '<div style="text-align:right;font-weight:600">' + (tp.a||0).toFixed(1) + '</div>';
+            h += '<div style="text-align:right;color:' + tDiffColor + '">' + (tDiff >= 0 ? '+' : '') + tDiff.toFixed(1) + '</div>';
+            h += '<div><div style="height:8px;background:var(--light-gray);border-radius:4px;overflow:hidden"><div style="height:100%;width:' + ((tp.a||0)/teamMax*100) + '%;background:var(--ocean);border-radius:4px"></div></div></div>';
+            h += '</div>';
+          }
+          h += '</div>';
+        }
+
+        /* ── Budget Health ── */
+        if (d.budget > 0) {
+          h += '<div class="rtp-section"><div class="rtp-section-title">Budget Health</div>';
+          var budPct = Math.min((d.spent / d.budget) * 100, 100);
+          var budOverPct = d.spent > d.budget ? Math.min(((d.spent - d.budget) / d.budget) * 100, 50) : 0;
+          var budBarColor = d.remaining < 0 ? 'var(--ember)' : d.remaining < d.budget * 0.15 ? 'var(--honey)' : 'var(--ocean)';
+          h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">';
+          h += '<div style="flex:1;height:14px;background:var(--light-gray);border-radius:7px;overflow:visible;position:relative">';
+          h += '<div style="height:100%;width:' + budPct + '%;background:' + budBarColor + ';border-radius:7px;position:absolute;top:0;left:0"></div>';
+          if (budOverPct > 0) {
+            h += '<div style="height:100%;width:' + budOverPct + '%;background:rgba(211,47,47,0.3);border-radius:0 7px 7px 0;position:absolute;top:0;left:' + budPct + '%;border-left:2px solid var(--ember)"></div>';
+          }
+          h += '</div>';
+          h += '<div style="font-size:11px;color:var(--mid-gray);min-width:100px;text-align:right">' + d.spent.toFixed(1) + ' / ' + d.budget.toFixed(0) + 'h</div>';
+          h += '</div>';
+          /* Burn rate */
+          if (SUPA_ACTUALS_ALL && SUPA_ACTUALS_ALL.length > 0 && d.spent > 0) {
+            var projActuals = SUPA_ACTUALS_ALL.filter(function(a) { return a.project_name === pk || (d.code && a.project_code === d.code); });
+            if (projActuals.length > 0) {
+              var dates = projActuals.map(function(a) { return a.work_date; }).filter(Boolean).sort();
+              if (dates.length > 1) {
+                var first = new Date(dates[0]), last = new Date(dates[dates.length - 1]);
+                var weeks = Math.max(1, (last - first) / (7 * 86400000));
+                var burnRate = d.spent / weeks;
+                var weeksLeft = d.remaining > 0 ? (d.remaining / burnRate) : 0;
+                h += '<div style="display:flex;gap:24px;font-size:12px;color:var(--mid-gray)">';
+                h += '<span>Burn rate: <b style="color:var(--abyss)">' + burnRate.toFixed(1) + 'h/wk</b></span>';
+                if (d.remaining > 0) {
+                  h += '<span>Budget lasts: <b style="color:' + (weeksLeft < 2 ? 'var(--ember)' : '#2E7D32') + '">~' + weeksLeft.toFixed(1) + ' weeks</b></span>';
+                }
+                h += '</div>';
+              }
+            }
+          }
+          h += '</div>';
+        }
+
+        /* ── Phase Breakdown ── */
+        if (sb && sb.labor && sb.labor.length > 0) {
+          var phaseNames = ['Phase 1', 'Phase 2', 'Phase 3.1', 'Phase 3.2', 'Phase 4', 'Phase 5'];
+          var phaseKeys = ['phase1', 'phase2', 'phase3_1', 'phase3_2', 'phase4', 'phase5'];
+          var phaseHrs = [0,0,0,0,0,0];
+          for (var li = 0; li < sb.labor.length; li++) {
+            var le = sb.labor[li];
+            for (var pi = 0; pi < phaseKeys.length; pi++) {
+              phaseHrs[pi] += le[phaseKeys[pi]] || 0;
+            }
+          }
+          var maxPhase = 1;
+          for (var pi = 0; pi < phaseHrs.length; pi++) { if (phaseHrs[pi] > maxPhase) maxPhase = phaseHrs[pi]; }
+          var hasPhases = phaseHrs.some(function(v) { return v > 0; });
+          if (hasPhases) {
+            var phaseColors = ['#1565C0','#2E7D32','#F57F17','#E65100','var(--ocean)','#6A1B9A'];
+            h += '<div class="rtp-section"><div class="rtp-section-title">Phase Breakdown (Budgeted Hours)</div>';
+            for (var pi = 0; pi < phaseHrs.length; pi++) {
+              if (phaseHrs[pi] === 0) continue;
+              h += '<div class="rtp-phase-row">';
+              h += '<div class="rtp-phase-label">' + phaseNames[pi] + '</div>';
+              h += '<div class="rtp-phase-bar"><div class="rtp-phase-fill" style="width:' + (phaseHrs[pi]/maxPhase*100) + '%;background:' + phaseColors[pi] + '"></div></div>';
+              h += '<div class="rtp-phase-val">' + phaseHrs[pi].toFixed(1) + 'h</div>';
+              h += '</div>';
+            }
+            h += '</div>';
+          }
+        }
+
+        /* ── Financial Summary (collapsed sub-section) ── */
+        if (sb && (sb.client_price || sb.laborTotal || sb.oopTotal)) {
+          var finOpen = !!rtExpandedFinancials[pk];
+          h += '<div class="rtp-fin-toggle" onclick="event.stopPropagation();rtToggleFinancials(\'' + pk.replace(/'/g, "\\'") + '\')">' + (finOpen ? '&#9660;' : '&#9654;') + ' Financial Summary</div>';
+          if (finOpen) {
+            var clientPrice = sb.client_price || 0;
+            var laborCost = sb.laborTotal || 0;
+            var laborInternal = sb.laborCostInternal || laborCost;
+            var oopCost = sb.oopEffective || sb.oopTotal || 0;
+            var oopSpent = sb.oopSpent || 0;
+            var totalCost = laborCost + oopCost;
+            var profit = clientPrice - totalCost;
+            var margin = clientPrice > 0 ? (profit / clientPrice * 100) : 0;
+            h += '<div class="rtp-fin-grid">';
+            h += '<div class="rtp-metric"><div class="label">Client Price</div><div class="value">$' + Math.round(clientPrice).toLocaleString() + '</div></div>';
+            h += '<div class="rtp-metric"><div class="label">Labor Cost</div><div class="value">$' + Math.round(laborCost).toLocaleString() + '</div><div class="sub">' + (sb.laborHours || 0).toFixed(0) + ' hrs @ $200/hr</div></div>';
+            h += '<div class="rtp-metric"><div class="label">Internal Labor</div><div class="value">$' + Math.round(laborInternal).toLocaleString() + '</div><div class="sub">Fully burdened</div></div>';
+            h += '<div class="rtp-metric"><div class="label">OOP Budget</div><div class="value">$' + Math.round(oopCost).toLocaleString() + '</div></div>';
+            h += '<div class="rtp-metric"><div class="label">OOP Spent</div><div class="value" style="color:' + (oopSpent > oopCost ? 'var(--ember)' : 'var(--abyss)') + '">$' + Math.round(oopSpent).toLocaleString() + '</div></div>';
+            h += '<div class="rtp-metric"><div class="label">Profit</div><div class="value" style="color:' + (profit < 0 ? 'var(--ember)' : '#2E7D32') + '">$' + Math.round(profit).toLocaleString() + '</div><div class="sub">' + margin.toFixed(1) + '% margin</div></div>';
+            h += '</div>';
+          }
+        }
+
+        h += '</div>'; /* end rtp-body */
+      }
+      h += '</div>'; /* end rtp-card */
     }
-    h += '</div>';
   }
-  h += '</div>';
+
+  if (projKeys.length === 0) {
+    h += '<div class="rt-card" style="text-align:center;padding:40px;color:var(--mid-gray)">No projects with data for this ' + rtTimeMode + '.</div>';
+  }
+
   return h;
 }
 
