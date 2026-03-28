@@ -5111,20 +5111,63 @@ function renderRTProjects(wk) {
   /* Sort by project code */
   projKeys.sort(function(a,b) { return (projAgg[a].code||'zzz').localeCompare(projAgg[b].code||'zzz'); });
 
+  /* Detect non-billable / bizdev projects */
+  var NON_BILLABLE_NAMES = ['Non-Billable','Time Off','Private/Leadership','Private/Other','Private/Untracked',
+    'Internal Meetings and Skill Development','OS Current','EDO Personal Brand','General Accounts',
+    'General Accounts Board','Stryke (SEO tool)','Level 10 Beta','Forge Public Relations',
+    'Yardtopia Content Writer','Department Small Tasks','Account Depo','Post Depo','Leadership Meetings'];
+  var BIZDEV_NAMES = ['New Opportunities','Business Development','EHS'];
+
+  function isNonBillable(pk, d) {
+    if (NON_BILLABLE_NAMES.indexOf(pk) >= 0) return true;
+    if (d.code && (d.code === '100_00_00' || d.code.indexOf('100_') === 0)) return true;
+    if (d.supa && (d.supa.status === 'nonbillable')) return true;
+    return false;
+  }
+  function isBizDev(pk, d) {
+    if (BIZDEV_NAMES.indexOf(pk) >= 0) return true;
+    if (d.code && (d.code === '101_00_00' || d.code.indexOf('101_') === 0)) return true;
+    if (d.supa && d.supa.status === 'bizdev') return true;
+    return false;
+  }
+
   /* Group by client prefix */
   function getClientFromCode(code) {
     if (!code) return '999_Unknown';
     return code.replace(/[a-zA-Z]/, '').split('_')[0];
   }
   function getClientLabel(prefix) {
+    if (prefix === '100') return '100 Forge — Non-Billable';
+    if (prefix === '101') return '101 New Opportunities';
     for (var ci = 0; ci < CLIENTS.length; ci++) { if (CLIENTS[ci].code === prefix) return CLIENTS[ci].code + ' ' + CLIENTS[ci].name; }
-    if (prefix === '100') return '100 Forge';
     return prefix;
   }
   var grouped = {};
   for (var i = 0; i < projKeys.length; i++) {
-    var pk = projKeys[i];
-    var cp = getClientFromCode(projAgg[pk].code);
+    var pk = projKeys[i], d = projAgg[pk];
+    var cp;
+    if (isNonBillable(pk, d)) {
+      cp = '100';
+    } else if (isBizDev(pk, d)) {
+      cp = '101';
+    } else {
+      cp = getClientFromCode(d.code);
+      /* If still unknown but we have Supabase data, try to extract client from code */
+      if (cp === '999_Unknown' && RT_NAME_TO_CODE[pk]) {
+        var fallbackCode = RT_NAME_TO_CODE[pk];
+        d.code = fallbackCode;
+        cp = getClientFromCode(fallbackCode);
+        /* Also try to get SUPA_BUDGETS data with this code */
+        if (!d.supa && SUPA_BUDGETS && SUPA_BUDGETS[fallbackCode]) {
+          d.supa = SUPA_BUDGETS[fallbackCode];
+          if (d.supa.laborHours) d.budget = d.supa.laborHours;
+        }
+        if (SUPA_ACTUALS && SUPA_ACTUALS[fallbackCode] && SUPA_ACTUALS[fallbackCode].totalHours > 0) {
+          d.spent = SUPA_ACTUALS[fallbackCode].totalHours;
+          if (d.budget > 0) d.remaining = d.budget - d.spent;
+        }
+      }
+    }
     if (!grouped[cp]) grouped[cp] = [];
     grouped[cp].push(pk);
   }
@@ -5410,6 +5453,13 @@ function computeResourceWeeks() {
       }
       /* Apply aliases */
       if (RT_BUDGET_ALIASES[projName]) projName = RT_BUDGET_ALIASES[projName];
+
+      /* Remember name → code mapping from Supabase actuals */
+      if (a.project_code && !RT_NAME_TO_CODE[projName]) {
+        /* Normalize code through CODE_ALIASES if applicable */
+        var rawCode = a.project_code;
+        RT_NAME_TO_CODE[projName] = rawCode;
+      }
 
       wk.people[pn].actual += a.hours;
       if (!wk.people[pn].projects[projName]) wk.people[pn].projects[projName] = { p: 0, a: 0 };
@@ -6902,6 +6952,9 @@ var PROJECT_BUDGETS = {};
 var PROJECT_CODES = {};
 
 /* RT project name → portfolio project name overrides (fuzzy matches) */
+/* Map resolved project names (after alias) → project_code from Supabase actuals */
+var RT_NAME_TO_CODE = {};
+
 var RT_BUDGET_ALIASES = {
   'Forge Website': 'Forge Website 2.0',
   'Mobile App Onboarding Videos': 'Mobile App Onboarding',
@@ -7001,6 +7054,9 @@ function buildProjectBudgetLookup() {
       PROJECT_CODES[rtName] = portfolioCodes[rtName];
     } else if (RT_BUDGET_ALIASES[rtName] && portfolioCodes[RT_BUDGET_ALIASES[rtName]]) {
       PROJECT_CODES[rtName] = portfolioCodes[RT_BUDGET_ALIASES[rtName]];
+    } else if (RT_NAME_TO_CODE[rtName]) {
+      /* Fallback: use project_code from Supabase actuals data */
+      PROJECT_CODES[rtName] = RT_NAME_TO_CODE[rtName];
     }
   }
 }
