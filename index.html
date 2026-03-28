@@ -2690,6 +2690,11 @@ function renderImportTime() {
   h += '<input type="file" id="importFileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="importHandleFile(this.files[0])">';
   h += '</div>';
 
+  /* Maintenance */
+  h += '<div style="display:flex;gap:12px;margin-bottom:20px">';
+  h += '<button onclick="importDedup()" style="padding:8px 16px;border-radius:6px;border:1px solid var(--canvas);background:var(--white);cursor:pointer;font-size:12px;color:var(--mid-gray)">&#128270; Find &amp; Remove Duplicates</button>';
+  h += '</div>';
+
   /* Status area */
   h += '<div id="importStatus"></div>';
 
@@ -2819,11 +2824,24 @@ async function importHandleFile(file) {
 
   prog.textContent = 'Found ' + existing.length + ' existing entries in date range. Deduplicating...';
 
+  /* Normalize hash fields — timestamps/hours can differ in format between Supabase and XLSX */
+  function dedupHash(person, board, date, startTime, hours) {
+    /* Normalize start_time: strip fractional seconds, convert +00:00 to Z, handle nulls */
+    var st = '';
+    if (startTime) {
+      st = String(startTime).replace(/\.\d+/, '').replace(/\+00:?00$/, 'Z').replace(/\s/, 'T');
+      /* If no timezone, treat as-is */
+    }
+    /* Normalize hours: round to 2 decimals to avoid float precision drift */
+    var h = Math.round((parseFloat(hours) || 0) * 100) / 100;
+    return (person || '') + '|' + (board || '') + '|' + (date || '') + '|' + st + '|' + h;
+  }
+
   /* Build hash set from Supabase data */
   var simpleHashes = {};
   for (var i = 0; i < existing.length; i++) {
     var a = existing[i];
-    var sh = (a.person_name || '') + '|' + (a.board_name || '') + '|' + (a.work_date || '') + '|' + (a.start_time || '') + '|' + (a.hours || 0);
+    var sh = dedupHash(a.person_name, a.board_name, a.work_date, a.start_time, a.hours);
     simpleHashes[sh] = true;
   }
 
@@ -2832,7 +2850,7 @@ async function importHandleFile(file) {
   var dupes = 0;
   for (var i = 0; i < entries.length; i++) {
     var e = entries[i];
-    var simpleHash = e.person_name + '|' + e.board_name + '|' + e.work_date + '|' + (e.start_time || '') + '|' + e.hours;
+    var simpleHash = dedupHash(e.person_name, e.board_name, e.work_date, e.start_time, e.hours);
     if (simpleHashes[simpleHash]) {
       dupes++;
     } else {
@@ -2981,6 +2999,67 @@ async function importExecute(replaceAll) {
       });
     }
   }
+}
+
+/* ── DEDUPLICATE EXISTING LABOR ACTUALS ── */
+async function importDedup() {
+  if (!sparkAuth.connected) { alert('Connect to Furnace first.'); return; }
+  if (!confirm('This will scan ALL labor_actuals for duplicates and delete the extras.\n\nThis cannot be undone. Continue?')) return;
+
+  var statusEl = document.getElementById('importStatus');
+  if (statusEl) statusEl.innerHTML = '<div style="background:#E3F2FD;border-radius:8px;padding:16px;margin-bottom:12px"><div style="font-weight:600;color:#1565C0;margin-bottom:4px">&#9203; Scanning for duplicates...</div><div style="font-size:12px;color:#1565C0" id="dedupProgress">Fetching all entries...</div></div>';
+
+  var prog = document.getElementById('dedupProgress');
+
+  /* Fetch ALL labor_actuals with IDs */
+  var all = await sparkFetchAll('labor_actuals', 'select=id,person_name,board_name,work_date,hours,start_time&source=eq.timetracker&order=work_date.asc');
+  if (prog) prog.textContent = 'Fetched ' + all.length + ' entries. Finding duplicates...';
+
+  /* Group by dedup hash, keep first, mark rest for deletion */
+  var seen = {};
+  var toDelete = [];
+  for (var i = 0; i < all.length; i++) {
+    var a = all[i];
+    var st = '';
+    if (a.start_time) {
+      st = String(a.start_time).replace(/\.\d+/, '').replace(/\+00:?00$/, 'Z').replace(/\s/, 'T');
+    }
+    var h2 = Math.round((parseFloat(a.hours) || 0) * 100) / 100;
+    var hash = (a.person_name || '') + '|' + (a.board_name || '') + '|' + (a.work_date || '') + '|' + st + '|' + h2;
+    if (seen[hash]) {
+      toDelete.push(a.id);
+    } else {
+      seen[hash] = true;
+    }
+  }
+
+  if (toDelete.length === 0) {
+    if (statusEl) statusEl.innerHTML = '<div style="background:#E8F5E9;border-radius:8px;padding:16px;margin-bottom:12px"><div style="font-weight:600;color:#2E7D32">&#10003; No duplicates found!</div><div style="font-size:12px;color:#2E7D32">' + all.length + ' entries are all unique.</div></div>';
+    return;
+  }
+
+  if (prog) prog.textContent = 'Found ' + toDelete.length + ' duplicates. Deleting...';
+
+  /* Delete duplicates in batches */
+  var batchSize = 100;
+  var deleted = 0;
+  for (var i = 0; i < toDelete.length; i += batchSize) {
+    var batch = toDelete.slice(i, i + batchSize);
+    var ids = batch.join(',');
+    try {
+      await sparkFetch('labor_actuals?id=in.(' + ids + ')', '', 'DELETE');
+      deleted += batch.length;
+      if (prog) prog.textContent = 'Deleted ' + deleted + ' / ' + toDelete.length + ' duplicates...';
+    } catch(e) {
+      console.error('Dedup delete error:', e);
+    }
+  }
+
+  if (statusEl) statusEl.innerHTML = '<div style="background:#E8F5E9;border-radius:8px;padding:16px;margin-bottom:12px"><div style="font-weight:600;color:#2E7D32">&#10003; Deduplication Complete</div><div style="font-size:12px;color:#2E7D32">Removed ' + deleted + ' duplicate entries. ' + (all.length - deleted) + ' unique entries remain.</div></div>';
+
+  /* Reload data */
+  await loadSupabaseData();
+  enrichProjectsWithSupabase();
 }
 
 /* ── RENDER: COMPLETED ── */
