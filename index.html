@@ -5149,8 +5149,6 @@ function renderRTProjects(wk) {
     var cp;
     if (isNonBillable(pk, d)) {
       cp = '100';
-    } else if (isBizDev(pk, d)) {
-      cp = '101';
     } else {
       cp = getClientFromCode(d.code);
       /* If still unknown but we have Supabase data, try to extract client from code */
@@ -7040,6 +7038,16 @@ function buildProjectBudgetLookup() {
       }
     }
   }
+  /* Build reverse lookup: budget name / project name → project_code from SUPA_BUDGETS */
+  var supaNameToCode = {};
+  if (SUPA_BUDGETS) {
+    for (var sc in SUPA_BUDGETS) {
+      var sb = SUPA_BUDGETS[sc];
+      if (sb.name) supaNameToCode[sb.name] = sc;
+      if (sb.projects && sb.projects.name) supaNameToCode[sb.projects.name] = sc;
+    }
+  }
+
   /* Map RT project names to budget entries (exact + alias) */
   var allRTNames = {};
   for (var w = 0; w < RT_WEEKS.length; w++) {
@@ -7062,6 +7070,9 @@ function buildProjectBudgetLookup() {
     } else if (RT_NAME_TO_CODE[rtName]) {
       /* Fallback: use project_code from Supabase actuals data */
       PROJECT_CODES[rtName] = RT_NAME_TO_CODE[rtName];
+    } else if (supaNameToCode[rtName]) {
+      /* Fallback: match budget name from SUPA_BUDGETS */
+      PROJECT_CODES[rtName] = supaNameToCode[rtName];
     }
   }
 }
