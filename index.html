@@ -5230,7 +5230,8 @@ function renderRTProjects(wk) {
     /* Weighted accuracy for this client group */
     var grpAcc = calcWeightedAccuracy(grp);
     var grpAccInfo = accLabel(grpAcc);
-    var accBadge = (grpPred > 0 || grpAct > 0) ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;margin-left:10px;background:' + grpAccInfo.bg + ';color:' + grpAccInfo.color + '">' + grpAcc.toFixed(0) + '% ' + grpAccInfo.text + '</span>' : '';
+    var isNBGroup = (cp === '100' || cp === '101');
+    var accBadge = (!isNBGroup && (grpPred > 0 || grpAct > 0)) ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;margin-left:10px;background:' + grpAccInfo.bg + ';color:' + grpAccInfo.color + '">' + grpAcc.toFixed(0) + '% ' + grpAccInfo.text + '</span>' : '';
 
     /* Client group header */
     var clientOpen = !rtCollapsedClients[cp];
@@ -5246,9 +5247,13 @@ function renderRTProjects(wk) {
       var isExpanded = !!rtExpandedProjects[pk];
       var sb = d.supa;
 
+      /* Detect non-billable / bizdev — suppress budget markers */
+      var isNB = isNonBillable(pk, d) || isBizDev(pk, d);
+
       /* Status badge */
       var statusClass = 'on-track', statusText = 'ON TRACK';
-      if (d.remaining !== null && d.remaining < 0) { statusClass = 'over'; statusText = 'OVER'; }
+      if (isNB) { statusClass = ''; statusText = ''; }
+      else if (d.remaining !== null && d.remaining < 0) { statusClass = 'over'; statusText = 'OVER'; }
       else if (d.remaining !== null && d.budget > 0 && d.remaining < d.budget * 0.15) { statusClass = 'at-risk'; statusText = 'AT RISK'; }
       else if (sb && sb.status === 'closeout') { statusClass = 'closeout'; statusText = 'CLOSEOUT'; }
       else if (sb && sb.status === 'proposed') { statusClass = 'proposed'; statusText = 'PROPOSED'; }
@@ -5269,11 +5274,11 @@ function renderRTProjects(wk) {
       h += '<div class="rtp-pills">';
       if (statusText) h += '<div class="rtp-pill ' + statusClass + '">' + statusText + '</div>';
       h += '</div>';
-      if (d.budget > 0) {
+      if (d.budget > 0 && !isNB) {
         h += '<div class="rtp-bar-sm"><div class="rtp-bar-sm-fill" style="width:' + barPct + '%;background:' + barColor + '"></div></div>';
       }
       h += '<div class="rtp-mini">';
-      if (d.budget > 0) {
+      if (d.budget > 0 && !isNB) {
         h += '<span>Budget <b>' + d.budget.toFixed(0) + 'h</b></span>';
         h += '<span>Spent <b>' + d.spent.toFixed(1) + 'h</b></span>';
         var remColor = d.remaining < 0 ? 'var(--ember)' : d.remaining < d.budget * 0.15 ? 'var(--honey)' : '#2E7D32';
@@ -5290,7 +5295,7 @@ function renderRTProjects(wk) {
 
         /* ── Key Metrics Row ── */
         h += '<div class="rtp-metrics">';
-        if (d.budget > 0) {
+        if (d.budget > 0 && !isNB) {
           var pctComplete = d.budget > 0 ? Math.round((d.spent / d.budget) * 100) : 0;
           h += '<div class="rtp-metric"><div class="label">Budget</div><div class="value">' + d.budget.toFixed(0) + 'h</div></div>';
           h += '<div class="rtp-metric"><div class="label">Spent</div><div class="value">' + d.spent.toFixed(1) + 'h</div><div class="sub">' + pctComplete + '% of budget</div></div>';
@@ -5298,9 +5303,11 @@ function renderRTProjects(wk) {
         }
         h += '<div class="rtp-metric"><div class="label">This Week Predicted</div><div class="value">' + d.predicted.toFixed(1) + 'h</div></div>';
         h += '<div class="rtp-metric"><div class="label">This Week Actual</div><div class="value">' + d.actual.toFixed(1) + 'h</div></div>';
-        var diffColor = d.diff === 0 ? 'var(--mid-gray)' : d.diff > 0 ? 'var(--ember)' : '#2E7D32';
-        h += '<div class="rtp-metric"><div class="label">Diff</div><div class="value" style="color:' + diffColor + '">' + (d.diff >= 0 ? '+' : '') + d.diff.toFixed(1) + 'h</div><div class="sub">Accuracy: ' + d.acc.toFixed(0) + '%</div></div>';
-        if (d.budget > 0 && d.actual > 0) {
+        if (!isNB) {
+          var diffColor = d.diff === 0 ? 'var(--mid-gray)' : d.diff > 0 ? 'var(--ember)' : '#2E7D32';
+          h += '<div class="rtp-metric"><div class="label">Diff</div><div class="value" style="color:' + diffColor + '">' + (d.diff >= 0 ? '+' : '') + d.diff.toFixed(1) + 'h</div><div class="sub">Accuracy: ' + d.acc.toFixed(0) + '%</div></div>';
+        }
+        if (d.budget > 0 && d.actual > 0 && !isNB) {
           var afterWeek = d.remaining - d.actual;
           h += '<div class="rtp-metric"><div class="label">Left After This Week</div><div class="value" style="color:' + (afterWeek < 0 ? 'var(--ember)' : '#2E7D32') + '">' + afterWeek.toFixed(1) + 'h</div></div>';
         }
@@ -5344,7 +5351,7 @@ function renderRTProjects(wk) {
         }
 
         /* ── Budget Health ── */
-        if (d.budget > 0) {
+        if (d.budget > 0 && !isNB) {
           h += '<div class="rtp-section"><div class="rtp-section-title">Budget Health</div>';
           var budPct = Math.min((d.spent / d.budget) * 100, 100);
           var budOverPct = d.spent > d.budget ? Math.min(((d.spent - d.budget) / d.budget) * 100, 50) : 0;
@@ -5410,7 +5417,7 @@ function renderRTProjects(wk) {
         }
 
         /* ── Financial Summary (collapsed sub-section) ── */
-        if (sb && (sb.client_price || sb.laborTotal || sb.oopTotal)) {
+        if (sb && (sb.client_price || sb.laborTotal || sb.oopTotal) && !isNB) {
           var finOpen = !!rtExpandedFinancials[pk];
           h += '<div class="rtp-fin-toggle" onclick="event.stopPropagation();rtToggleFinancials(\'' + pk.replace(/'/g, "\\'") + '\')">' + (finOpen ? '&#9660;' : '&#9654;') + ' Financial Summary</div>';
           if (finOpen) {
