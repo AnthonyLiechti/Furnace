@@ -5188,6 +5188,38 @@ function renderRTProjects(wk) {
   h += '<span style="font-size:11px;color:var(--mid-gray);margin-left:8px;line-height:28px">' + projKeys.length + ' project' + (projKeys.length !== 1 ? 's' : '') + '</span>';
   h += '</div>';
 
+  /* Total team hours this week (for impact weighting) */
+  var totalTeamHrs = 0;
+  for (var i = 0; i < projKeys.length; i++) {
+    totalTeamHrs += Math.max(projAgg[projKeys[i]].predicted, projAgg[projKeys[i]].actual);
+  }
+  if (totalTeamHrs < 1) totalTeamHrs = 1;
+
+  /* Weighted accuracy helper:
+     accuracy = 1 - |actual - predicted| / max(predicted, actual, 0.5)
+     impact   = max(predicted, actual) / totalTeamHrs
+     score    = sum(accuracy * impact) / sum(impact)  */
+  function calcWeightedAccuracy(projects) {
+    var sumWeighted = 0, sumImpact = 0;
+    for (var i = 0; i < projects.length; i++) {
+      var d = projAgg[projects[i]];
+      var pred = d.predicted, act = d.actual;
+      var peak = Math.max(pred, act, 0.5);
+      var err = Math.abs(act - pred);
+      var acc = Math.max(0, 1 - (err / peak));
+      var impact = Math.max(pred, act) / totalTeamHrs;
+      sumWeighted += acc * impact;
+      sumImpact += impact;
+    }
+    return sumImpact > 0 ? (sumWeighted / sumImpact) * 100 : 0;
+  }
+  function accLabel(pct) {
+    if (pct >= 90) return {text:'Dialed In', color:'#2E7D32', bg:'#E8F5E9'};
+    if (pct >= 75) return {text:'Close', color:'#F57F17', bg:'#FFF8E1'};
+    if (pct >= 50) return {text:'Off', color:'#E65100', bg:'#FFF3E0'};
+    return {text:'Way Off', color:'#C62828', bg:'#FFEBEE'};
+  }
+
   for (var gi = 0; gi < clientPrefixes.length; gi++) {
     var cp = clientPrefixes[gi];
     var grp = grouped[cp];
@@ -5195,10 +5227,15 @@ function renderRTProjects(wk) {
     var grpPred = 0, grpAct = 0;
     for (var j = 0; j < grp.length; j++) { grpPred += projAgg[grp[j]].predicted; grpAct += projAgg[grp[j]].actual; }
 
+    /* Weighted accuracy for this client group */
+    var grpAcc = calcWeightedAccuracy(grp);
+    var grpAccInfo = accLabel(grpAcc);
+    var accBadge = (grpPred > 0 || grpAct > 0) ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;margin-left:10px;background:' + grpAccInfo.bg + ';color:' + grpAccInfo.color + '">' + grpAcc.toFixed(0) + '% ' + grpAccInfo.text + '</span>' : '';
+
     /* Client group header */
     var clientOpen = !rtCollapsedClients[cp];
     h += '<div class="rtp-grp-hdr" style="cursor:pointer" onclick="rtToggleClient(\'' + cp + '\')">';
-    h += '<div style="display:flex;align-items:center;gap:10px"><span class="rtp-chev' + (clientOpen ? ' open' : '') + '" style="color:rgba(255,255,255,.5)">&#9654;</span><span class="rtp-grp-label">' + clientLabel + '</span></div>';
+    h += '<div style="display:flex;align-items:center;gap:10px"><span class="rtp-chev' + (clientOpen ? ' open' : '') + '" style="color:rgba(255,255,255,.5)">&#9654;</span><span class="rtp-grp-label">' + clientLabel + '</span>' + accBadge + '</div>';
     h += '<div class="rtp-grp-sub">' + grp.length + ' project' + (grp.length !== 1 ? 's' : '') + ' &middot; ' + grpPred.toFixed(1) + 'h predicted &middot; ' + grpAct.toFixed(1) + 'h actual</div>';
     h += '</div>';
 
