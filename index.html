@@ -7055,6 +7055,9 @@ async function loadSupabaseData() {
 
     SUPA_LOADED = true;
     console.log('Supabase data loaded:', Object.keys(SUPA_BUDGETS).length, 'budgets,', SUPA_ACTUALS_ALL.length, 'actuals');
+    /* Update "Updated" timestamp to reflect fresh Supabase data */
+    var lu = document.getElementById('lastUpdated');
+    if (lu) lu.textContent = 'Updated ' + new Date().toLocaleDateString('en-US', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
   } catch (err) {
     console.error('Failed to load Supabase data:', err);
   }
