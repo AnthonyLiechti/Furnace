@@ -4089,12 +4089,12 @@ function sparkRenderLaborContent() {
   var labor = data.labor;
   var phaseKey = sparkPhaseTab;
 
-  /* Split into Forge Team (Employee + Contractor) vs Freelancers/Other */
+  /* Split into Forge Team (Employee) vs Freelancers & Contractors */
   var forgeTeam = [];
   var freelancers = [];
   for (var i = 0; i < labor.length; i++) {
     var empType = labor[i].employment_type || (labor[i].team_member && labor[i].team_member.employment_type) || 'Employee';
-    if (empType === 'Freelancer') freelancers.push(labor[i]);
+    if (empType === 'Freelancer' || empType === 'Contractor') freelancers.push(labor[i]);
     else forgeTeam.push(labor[i]);
   }
 
@@ -4251,7 +4251,7 @@ async function sparkShowAddTeamMember() {
   for (var i = 0; i < available.length; i++) {
     var m = available[i];
     var dept = m.department || 'Other';
-    var type = m.employment_type === 'Freelancer' ? ' (FL)' : '';
+    var type = m.employment_type === 'Freelancer' ? ' (FL)' : m.employment_type === 'Contractor' ? ' (C)' : '';
     h += '<label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;font-size:13px">';
     h += '<input type="checkbox" value="' + m.id + '" data-dept="' + dept + '" data-type="' + (m.employment_type || 'Employee') + '">';
     h += m.name + type + ' <span style="font-size:10px;color:var(--mid-gray)">' + dept + '</span>';
