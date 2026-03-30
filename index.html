@@ -7841,15 +7841,21 @@ function enrichProjectsWithSupabase() {
 
 /* ── BUILD CLIENTS FROM SUPABASE ── */
 async function buildClientsFromSupabase() {
-  var clients  = await sparkFetch('clients',  'select=id,name,client_number,color,client_status&order=client_number.asc') || [];
-  var projects = await sparkFetchAll('projects', 'select=*&order=project_code.asc') || [];
+  var clients  = await sparkFetch('clients', 'select=id,name,client_number,color,client_status&order=client_number.asc') || [];
+  var projects = await sparkFetchAll('projects',
+    'select=id,name,project_code,client_id,project_status,board_id,hour_type,project_type,' +
+    'snapshot_url,display_id,dollar_budget,labor_cost_snapshot,oop_cost_snapshot,' +
+    'phases_snapshot,has_budget_data&order=project_code.asc') || [];
 
-  /* Index clients by Supabase UUID */
-  var clientMapById = {};
+  console.log('[Furnace] buildClientsFromSupabase: ' + clients.length + ' clients, ' + projects.length + ' projects');
+
+  /* Index clients by Supabase UUID AND by client_number for fallback matching */
+  var clientMapById   = {};
+  var clientMapByCode = {};
   for (var i = 0; i < clients.length; i++) {
     var c = clients[i];
-    clientMapById[c.id] = {
-      id: c.client_number,         /* legacy slug = client_number code */
+    var entry = {
+      id: c.client_number,
       name: c.name,
       code: c.client_number,
       color: c.color || '#306D7C',
@@ -7857,17 +7863,26 @@ async function buildClientsFromSupabase() {
       projects: [],
       _supaId: c.id
     };
+    clientMapById[c.id]             = entry;
+    clientMapByCode[c.client_number] = entry;
   }
 
-  /* Build project list */
+  /* Build project list — try client_id first, fall back to project_code prefix */
+  var matched = 0, unmatched = 0;
   for (var j = 0; j < projects.length; j++) {
     var p = projects[j];
     var client = clientMapById[p.client_id];
-    if (!client) continue;
+    if (!client) {
+      /* Fallback: derive client number from first segment of project code e.g. "358_16_14" → "358" */
+      var prefix = (p.project_code || '').split('_')[0];
+      client = clientMapByCode[prefix];
+    }
+    if (!client) { unmatched++; continue; }
+    matched++;
 
     var sb = SUPA_BUDGETS[p.project_code];
-    var phases = [];
-    try { phases = p.phases_snapshot ? JSON.parse(p.phases_snapshot) : []; } catch(e) {}
+    /* phases_snapshot is JSONB — Supabase returns it already parsed, not as a string */
+    var phases = Array.isArray(p.phases_snapshot) ? p.phases_snapshot : (p.phases_snapshot || []);
 
     var proj = {
       id: p.display_id || p.project_code,
@@ -7894,6 +7909,8 @@ async function buildClientsFromSupabase() {
     }
     client.projects.push(proj);
   }
+
+  console.log('[Furnace] buildClientsFromSupabase result: ' + matched + ' matched, ' + unmatched + ' unmatched, ' + Object.keys(clientMapById).length + ' clients');
 
   CLIENTS = Object.values(clientMapById).sort(function(a, b) {
     return (a.code || '').localeCompare(b.code || '', undefined, { numeric: true });
