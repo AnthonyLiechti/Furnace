@@ -194,26 +194,29 @@ async function main() {
   console.log(`  ✅ Labor entries: ${stats.laborNew} new, ${stats.laborSkipped} skipped (name not matched)\n`);
 
   /* ── STEP 2: Allocations ── */
+  /* Deduplicate on person+project+date since the JSON IDs are text, not UUIDs */
   console.log('📅 Migrating allocations...');
-  const existingAllocs = await supaAll('allocations', 'select=id');
-  const allocIdSet = new Set(existingAllocs.map(a => a.id));
+  const existingAllocs = await supaAll('allocations', 'select=person,project,date');
+  const allocKeySet = new Set(existingAllocs.map(a => `${a.person}|${a.project}|${a.date}`));
 
-  const newAllocs = (allocFile.allocations || []).filter(a => !allocIdSet.has(a.id)).map(a => ({
-    id: a.id,
-    person: a.person,
-    project: a.project,
-    date: a.date,
-    hours_per_day: a.hoursPerDay,
-    week_of: a.weekOf,
-    total_hours: a.totalHours || a.hoursPerDay,
-    days: a.days || 1,
-    notes: a.notes || ''
-  }));
+  const newAllocs = (allocFile.allocations || [])
+    .filter(a => !allocKeySet.has(`${a.person}|${a.project}|${a.date}`))
+    .map(a => ({
+      /* Omit id — let Supabase generate a UUID */
+      person: a.person,
+      project: a.project,
+      date: a.date,
+      hours_per_day: a.hoursPerDay,
+      week_of: a.weekOf,
+      total_hours: a.totalHours || a.hoursPerDay,
+      days: a.days || 1,
+      notes: a.notes || ''
+    }));
 
   let allocsCreated = 0;
   for (let i = 0; i < newAllocs.length; i += 200) {
-    await supa('allocations', '', 'POST', newAllocs.slice(i, i + 200));
-    allocsCreated += Math.min(200, newAllocs.length - i);
+    const res = await supa('allocations', '', 'POST', newAllocs.slice(i, i + 200));
+    if (res !== null) allocsCreated += Math.min(200, newAllocs.length - i);
     await sleep(300);
   }
   console.log(`  ✅ Allocations: ${allocsCreated} new, ${existingAllocs.length} already existed\n`);
