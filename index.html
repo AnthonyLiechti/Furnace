@@ -7606,7 +7606,12 @@ async function loadSupabaseData() {
 
     /* 1. Fetch all visible budgets with project info */
     var budgets = await sparkFetchAll('budgets', 'select=id,name,status,client_price,total_amount,has_discount,discount_percentage,reserve_percentage,oop_markup_percentage,no_oop,project_id,projects(id,project_code,name)&visibility=eq.visible');
-    if (!budgets || !budgets.length) { console.warn('No Supabase budgets found'); return; }
+    if (!budgets || !budgets.length) {
+      /* Fallback: try without the projects join in case join is failing */
+      console.warn('[Furnace] budgets with join returned empty — trying without join');
+      budgets = await sparkFetchAll('budgets', 'select=id,name,status,client_price,total_amount,has_discount,discount_percentage,reserve_percentage,oop_markup_percentage,no_oop,project_id&visibility=eq.visible');
+      if (!budgets || !budgets.length) { console.warn('[Furnace] No Supabase budgets found — check Supabase RLS policies and table data'); SUPA_LOADED = false; return; }
+    }
 
     /* 2. Fetch labor_budget_entries, oop_budget_entries, and freelancer_budget_entries for all budgets */
     var budgetIds = budgets.map(function(b) { return b.id; });
@@ -7842,10 +7847,8 @@ function enrichProjectsWithSupabase() {
 /* ── BUILD CLIENTS FROM SUPABASE ── */
 async function buildClientsFromSupabase() {
   var clients  = await sparkFetch('clients', 'select=id,name,client_number,color,client_status&order=client_number.asc') || [];
-  var projects = await sparkFetchAll('projects',
-    'select=id,name,project_code,client_id,project_status,board_id,hour_type,project_type,' +
-    'snapshot_url,display_id,dollar_budget,labor_cost_snapshot,oop_cost_snapshot,' +
-    'phases_snapshot,has_budget_data&order=project_code.asc') || [];
+  /* select=* is safest — never errors on column names regardless of schema state */
+  var projects = await sparkFetchAll('projects', 'select=*&order=project_code.asc') || [];
 
   console.log('[Furnace] buildClientsFromSupabase: ' + clients.length + ' clients, ' + projects.length + ' projects');
 
@@ -7881,8 +7884,8 @@ async function buildClientsFromSupabase() {
     matched++;
 
     var sb = SUPA_BUDGETS[p.project_code];
-    /* phases_snapshot is JSONB — Supabase returns it already parsed, not as a string */
-    var phases = Array.isArray(p.phases_snapshot) ? p.phases_snapshot : (p.phases_snapshot || []);
+    /* phases_snapshot is JSONB — Supabase returns it already parsed as an object/array */
+    var phases = Array.isArray(p.phases_snapshot) ? p.phases_snapshot : [];
 
     var proj = {
       id: p.display_id || p.project_code,
