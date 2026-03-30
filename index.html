@@ -6306,20 +6306,9 @@ function oopGetProjectsWithEntries(mondayISO) {
   return names;
 }
 
-async function saveOopSchedule() {
-  if (window.furnaceAPI) await window.furnaceAPI.writeOopSchedule(OOP_SCHEDULE);
-}
+/* OOP schedule CRUD — all writes go directly to Supabase payment_schedule table */
 
-function oopDebouncedSave() {
-  if (oopSaveTimer) clearTimeout(oopSaveTimer);
-  oopSaveTimer = setTimeout(function() {
-    saveOopSchedule();
-    var el = document.getElementById('oopSaveStatus');
-    if (el) { el.textContent = 'Saved'; setTimeout(function() { if (el) el.textContent = ''; }, 1500); }
-  }, 400);
-}
-
-function oopAddEntry(projName, projCode, lineItemName, amount, dateISO, notes, supaOopId) {
+async function oopAddEntry(projName, projCode, lineItemName, amount, dateISO, notes, supaOopId) {
   var entry = {
     id: 'oop_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
     projectCode: projCode,
@@ -6332,39 +6321,62 @@ function oopAddEntry(projName, projCode, lineItemName, amount, dateISO, notes, s
     notes: notes || '',
     supaOopId: supaOopId || null
   };
+  /* Persist to Supabase */
+  await sparkFetch('payment_schedule', '', 'POST', {
+    id: entry.id,
+    project_code: projCode,
+    project_name: projName,
+    line_item_name: lineItemName,
+    amount: amount,
+    scheduled_date: dateISO,
+    week_of: entry.weekOf,
+    paid: false,
+    notes: notes || '',
+    supa_oop_id: supaOopId || null
+  });
   OOP_SCHEDULE.entries.push(entry);
-  oopDebouncedSave();
   return entry;
 }
 
-function oopUpdateEntry(id, updates) {
+async function oopUpdateEntry(id, updates) {
   var entries = OOP_SCHEDULE.entries || [];
   for (var i = 0; i < entries.length; i++) {
     if (entries[i].id === id) {
       for (var k in updates) { if (updates.hasOwnProperty(k)) entries[i][k] = updates[k]; }
-      oopDebouncedSave();
+      /* Build Supabase patch — map camelCase → snake_case */
+      var patch = {};
+      if (updates.amount     !== undefined) patch.amount          = updates.amount;
+      if (updates.date       !== undefined) patch.scheduled_date  = updates.date;
+      if (updates.weekOf     !== undefined) patch.week_of         = updates.weekOf;
+      if (updates.paid       !== undefined) patch.paid            = updates.paid;
+      if (updates.notes      !== undefined) patch.notes           = updates.notes;
+      if (updates.lineItemName !== undefined) patch.line_item_name = updates.lineItemName;
+      if (updates.supaOopId  !== undefined) patch.supa_oop_id     = updates.supaOopId;
+      if (Object.keys(patch).length > 0) {
+        await sparkFetch('payment_schedule?id=eq.' + id, '', 'PATCH', patch);
+      }
       return;
     }
   }
 }
 
-function oopDeleteEntry(id) {
+async function oopDeleteEntry(id) {
   var entries = OOP_SCHEDULE.entries || [];
   for (var i = 0; i < entries.length; i++) {
     if (entries[i].id === id) {
       entries.splice(i, 1);
-      oopDebouncedSave();
+      await sparkFetch('payment_schedule?id=eq.' + id, '', 'DELETE');
       return;
     }
   }
 }
 
-function oopTogglePaid(id) {
+async function oopTogglePaid(id) {
   var entries = OOP_SCHEDULE.entries || [];
   for (var i = 0; i < entries.length; i++) {
     if (entries[i].id === id) {
       entries[i].paid = !entries[i].paid;
-      oopDebouncedSave();
+      await sparkFetch('payment_schedule?id=eq.' + id, '', 'PATCH', { paid: entries[i].paid });
       renderOopGrid();
       return;
     }
@@ -7827,59 +7839,113 @@ function enrichProjectsWithSupabase() {
   }
 }
 
+/* ── BUILD CLIENTS FROM SUPABASE ── */
+async function buildClientsFromSupabase() {
+  var clients  = await sparkFetch('clients',  'select=id,name,client_number,color,client_status&order=client_number.asc') || [];
+  var projects = await sparkFetchAll('projects', 'select=*&order=project_code.asc') || [];
+
+  /* Index clients by Supabase UUID */
+  var clientMapById = {};
+  for (var i = 0; i < clients.length; i++) {
+    var c = clients[i];
+    clientMapById[c.id] = {
+      id: c.client_number,         /* legacy slug = client_number code */
+      name: c.name,
+      code: c.client_number,
+      color: c.color || '#306D7C',
+      status: c.client_status || 'active',
+      projects: [],
+      _supaId: c.id
+    };
+  }
+
+  /* Build project list */
+  for (var j = 0; j < projects.length; j++) {
+    var p = projects[j];
+    var client = clientMapById[p.client_id];
+    if (!client) continue;
+
+    var sb = SUPA_BUDGETS[p.project_code];
+    var phases = [];
+    try { phases = p.phases_snapshot ? JSON.parse(p.phases_snapshot) : []; } catch(e) {}
+
+    var proj = {
+      id: p.display_id || p.project_code,
+      name: p.name,
+      code: p.project_code,
+      status: p.project_status || 'active',
+      boardId: p.board_id,
+      hourType: p.hour_type || 'billable',
+      projectType: p.project_type || null,
+      snapshotUrl: p.snapshot_url || null,
+      hasBudgetData: p.has_budget_data || !!sb,
+      phases: phases,
+      dataSource: sb ? 'supabase' : (p.has_budget_data ? 'snapshot' : 'no_snapshot'),
+      dollarBudget: sb ? (sb.client_price || 0) : (p.dollar_budget || 0),
+      laborCost:    sb ? (sb.laborTotal   || 0) : (p.labor_cost_snapshot || 0),
+      oopCost:      sb ? (sb.oopEffective || sb.oopTotal || 0) : (p.oop_cost_snapshot || 0),
+      totalBudget:  sb ? (sb.laborHours   || 0) : 0,
+      _supabudget:  sb || null,
+      _supaId: p.id
+    };
+    if (sb) {
+      proj.profit = (sb.client_price || 0) - (sb.laborTotal || 0) - (sb.oopEffective || sb.oopTotal || 0);
+      proj.profitMargin = sb.client_price > 0 ? (proj.profit / sb.client_price * 100) : 0;
+    }
+    client.projects.push(proj);
+  }
+
+  CLIENTS = Object.values(clientMapById).sort(function(a, b) {
+    return (a.code || '').localeCompare(b.code || '', undefined, { numeric: true });
+  });
+}
+
 /* ── DATA LOADER ── */
 async function loadData() {
   try {
-    var resp = await fetch('data/portfolio.json');
-    var data = await resp.json();
-    CLIENTS = data.clients || [];
-    FLAGGED_NO_STRUCTURE = data.flaggedNoStructure || [];
-    FLAGGED_DATA_MISMATCH = data.flaggedDataMismatch || [];
-    PC = data.personColors || {};
-    RES = data.resourceAllocations || {};
-    RT_WEEKS = data.resourceTrackerWeeks || [];
-    RT_LEADERSHIP = data.leadershipFilter || [];
-    METADATA = data.metadata || {};
-    var lu = document.getElementById('lastUpdated');
-    if (lu && data.lastUpdated) {
-      lu.textContent = 'Updated ' + new Date(data.lastUpdated).toLocaleDateString('en-US', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
-    }
+    /* Always connected — load everything from Supabase */
+    await sparkCheckStatus();
+    await loadSupabaseData();
+
+    /* Build client/project list from Supabase */
+    await buildClientsFromSupabase();
+    enrichProjectsWithSupabase();
     buildProjectBudgetLookup();
 
-    /* Load allocation data — Electron via IPC, Web via static file fetch */
-    if (window.furnaceAPI) {
-      try {
-        var allocData = await window.furnaceAPI.readAllocations();
-        if (allocData) ALLOCATIONS = allocData;
-        var actualsData = await window.furnaceAPI.readActuals();
-        if (actualsData) ACTUALS = actualsData;
-        var oopData = await window.furnaceAPI.readOopSchedule();
-        if (oopData) OOP_SCHEDULE = oopData;
-      } catch(ae) {
-        console.warn('Could not load native allocations:', ae);
-      }
-    } else {
-      /* Web/Vercel: fetch static JSON files */
-      try {
-        var resp = await fetch('data/allocations.json');
-        if (resp.ok) ALLOCATIONS = await resp.json();
-      } catch(e) {}
-      try {
-        var resp2 = await fetch('data/oop-schedule.json');
-        if (resp2.ok) OOP_SCHEDULE = await resp2.json();
-      } catch(e) {}
-    }
+    /* Load allocations from Supabase */
+    var allocRows = await sparkFetchAll('allocations', 'select=*&order=date.asc') || [];
+    ALLOCATIONS = {
+      version: 2,
+      forecastProjects: [],
+      allocations: allocRows.map(function(a) {
+        return {
+          id: a.id, person: a.person, project: a.project, date: a.date,
+          hoursPerDay: a.hours_per_day, weekOf: a.week_of,
+          totalHours: a.total_hours || a.hours_per_day,
+          days: a.days || 1, notes: a.notes || ''
+        };
+      })
+    };
+    /* Build forecastProjects list from allocation data */
+    var fpSet = {};
+    for (var i = 0; i < ALLOCATIONS.allocations.length; i++) fpSet[ALLOCATIONS.allocations[i].project] = true;
+    ALLOCATIONS.forecastProjects = Object.keys(fpSet).sort();
 
-    /* Check Spark connection status */
-    await sparkCheckStatus();
+    /* Load OOP payment schedule from Supabase */
+    var schedRows = await sparkFetch('payment_schedule', 'select=*&order=scheduled_date.asc') || [];
+    OOP_SCHEDULE = {
+      version: 2,
+      entries: (schedRows || []).map(function(r) {
+        return {
+          id: r.id, projectCode: r.project_code, projectName: r.project_name,
+          lineItemName: r.line_item_name, amount: r.amount,
+          date: r.scheduled_date, weekOf: r.week_of,
+          paid: r.paid, notes: r.notes, supaOopId: r.supa_oop_id
+        };
+      })
+    };
 
-    /* Load Supabase data if connected */
-    if (sparkAuth.connected) {
-      await loadSupabaseData();
-      enrichProjectsWithSupabase();
-    }
-
-    /* Rebuild resource weeks AFTER both allocations AND Supabase actuals are loaded */
+    /* Compute resource weeks */
     if (ALLOCATIONS.allocations.length > 0 || SUPA_LOADED) {
       computeResourceWeeks();
     }
@@ -7889,42 +7955,7 @@ async function loadData() {
     navigate(savedView || 'master');
   } catch(e) {
     console.error('loadData error:', e);
-    /* Try to continue with empty data — Supabase may still work */
-    if (!CLIENTS || CLIENTS.length === 0) {
-      CLIENTS = [];
-      /* On web without portfolio.json, build minimal client list from Supabase */
-      await sparkCheckStatus();
-      if (sparkAuth.connected) {
-        try {
-          await loadSupabaseData();
-          /* Build CLIENTS from SUPA_BUDGETS */
-          var clientMap = {};
-          for (var code in SUPA_BUDGETS) {
-            var sb = SUPA_BUDGETS[code];
-            var proj = sb.projects || {};
-            var cl = proj.clients || {};
-            var cn = (cl.client_number || code.split('_')[0] || '???');
-            if (!clientMap[cn]) clientMap[cn] = { id: cn, code: cn, name: cl.name || cn, color: '#306D7C', projects: [] };
-            clientMap[cn].projects.push({
-              id: code, code: code, name: sb.name || code,
-              clientId: cn, clientName: clientMap[cn].name, clientCode: cn,
-              status: sb.status || 'active', projectType: 'billable',
-              dollarBudget: sb.client_price || 0, laborCost: sb.laborTotal || 0,
-              oopCost: sb.oopTotal || 0, profit: (sb.client_price || 0) - (sb.total_amount || 0),
-              totalBudget: sb.laborHours || 0, phases: [], hasBudgetData: true,
-              dataSource: 'supabase', _supabudget: sb
-            });
-          }
-          CLIENTS = Object.values(clientMap);
-          enrichProjectsWithSupabase();
-          var sv2 = null;
-          try { sv2 = localStorage.getItem('furnace_view'); } catch(e) {}
-          navigate(sv2 || 'master');
-          return;
-        } catch(se) { console.error('Supabase fallback failed:', se); }
-      }
-      document.getElementById('mainContent').innerHTML = '<div style="padding:60px 40px;text-align:center"><h2 style="color:var(--ember)">Unable to load data</h2><p style="color:var(--mid-gray);margin-top:12px">' + e.message + '</p><p style="color:var(--mid-gray);margin-top:16px;font-size:12px">Go to <a href="#" onclick="navigate(\'settings\');return false" style="color:var(--ocean)">Settings</a> and connect to Furnace.</p></div>';
-    }
+    document.getElementById('mainContent').innerHTML = '<div style="padding:60px 40px;text-align:center"><h2 style="color:var(--ember)">Unable to load data</h2><p style="color:var(--mid-gray);margin-top:12px">' + e.message + '</p></div>';
   }
 }
 
