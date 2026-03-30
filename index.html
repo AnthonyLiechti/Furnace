@@ -7938,10 +7938,14 @@ async function loadData() {
         };
       })
     };
-    /* Build forecastProjects list from allocation data */
-    var fpSet = {};
-    for (var i = 0; i < ALLOCATIONS.allocations.length; i++) fpSet[ALLOCATIONS.allocations[i].project] = true;
+    /* Build forecastProjects and team list from allocation data */
+    var fpSet = {}, teamSet = {};
+    for (var i = 0; i < ALLOCATIONS.allocations.length; i++) {
+      fpSet[ALLOCATIONS.allocations[i].project] = true;
+      teamSet[ALLOCATIONS.allocations[i].person] = true;
+    }
     ALLOCATIONS.forecastProjects = Object.keys(fpSet).sort();
+    ALLOCATIONS.team = Object.keys(teamSet).sort();
 
     /* Load OOP payment schedule from Supabase */
     var schedRows = await sparkFetch('payment_schedule', 'select=*&order=scheduled_date.asc') || [];
