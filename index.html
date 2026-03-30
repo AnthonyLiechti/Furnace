@@ -6062,13 +6062,8 @@ async function saveAllocationToSupabase(person, project, date, hours, weekOf) {
     }
   }
   if (!sparkConfig) return;
-  var token;
-  if (window.furnaceAPI && window.furnaceAPI.sparkGetToken) {
-    token = await window.furnaceAPI.sparkGetToken();
-  } else {
-    token = await sparkBrowserGetToken();
-  }
-  if (!token) return;
+  /* Use anon key directly — no user session required */
+  var token = sparkConfig.supabaseAnonKey;
   var headers = {
     'apikey': sparkConfig.supabaseAnonKey,
     'Authorization': 'Bearer ' + token,
@@ -7564,13 +7559,10 @@ async function sparkFetchAll(table, query) {
       };
     }
   }
-  var token;
-  if (window.furnaceAPI && window.furnaceAPI.sparkGetToken) {
-    token = await window.furnaceAPI.sparkGetToken();
-  } else {
-    token = await sparkBrowserGetToken();
-  }
-  if (!token || !sparkConfig) return [];
+  if (!sparkConfig) return [];
+
+  /* Use anon key directly — no user session required */
+  var token = sparkConfig.supabaseAnonKey;
 
   var all = [], page = 0, pageSize = 1000;
   var url = sparkConfig.supabaseUrl + '/rest/v1/' + table + '?' + query;
