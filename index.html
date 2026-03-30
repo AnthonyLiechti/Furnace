@@ -3674,6 +3674,33 @@ var SPARK_PHASES = [
   {key:'phase5', label:'P5'}
 ];
 
+/* Freelancer week columns — reuse phase slots, labeled as weeks */
+var SPARK_FL_WEEKS = [
+  {key:'phase1', label:'Wk 1'},
+  {key:'phase2', label:'Wk 2'},
+  {key:'phase3_1', label:'Wk 3'},
+  {key:'phase3_2', label:'Wk 4'},
+  {key:'phase4', label:'Wk 5'},
+  {key:'phase5', label:'Wk 6'}
+];
+
+function sparkGetFreelancerBillableRate(entry) {
+  if (entry.rate_override) return parseFloat(entry.rate_override) || 0;
+  if (entry.team_member && entry.team_member.billable_rate) return parseFloat(entry.team_member.billable_rate) || 0;
+  return 0;
+}
+
+function sparkGetFreelancerTotalCost(laborArr) {
+  var total = 0;
+  for (var i = 0; i < (laborArr || []).length; i++) {
+    var e = laborArr[i];
+    var empType = e.employment_type || (e.team_member && e.team_member.employment_type) || '';
+    if (empType !== 'Freelancer') continue;
+    total += sparkEntryHours(e, 'all') * sparkGetFreelancerBillableRate(e);
+  }
+  return total;
+}
+
 var SPARK_DEPT_COLORS = {
   'Executive/Admin': 'var(--ember)',
   'Account': 'var(--ocean)',
@@ -4048,11 +4075,18 @@ function sparkRenderSummary() {
   if (!el || !sparkCurrentData) return;
   var data = sparkCurrentData;
   var totalLaborHrs = 0, totalLaborCost = 0;
+  var totalFlHrs = 0, totalFlCost = 0;
   for (var i = 0; i < data.labor.length; i++) {
     var e = data.labor[i];
+    var eType = e.employment_type || (e.team_member && e.team_member.employment_type) || 'Employee';
     var hrs = sparkEntryHours(e, 'all');
-    totalLaborHrs += hrs;
-    totalLaborCost += hrs * sparkGetRate(e);
+    if (eType === 'Freelancer') {
+      totalFlHrs += hrs;
+      totalFlCost += hrs * sparkGetFreelancerBillableRate(e);
+    } else {
+      totalLaborHrs += hrs;
+      totalLaborCost += hrs * sparkGetRate(e);
+    }
   }
   var totalOop = 0;
   for (var i = 0; i < data.oop.length; i++) {
@@ -4060,15 +4094,16 @@ function sparkRenderSummary() {
   }
   var markupPct = sparkSettingVal(data.settings, 'markup', 'oop_markup_percentage', 20);
   var totalOopWithMarkup = totalOop * (1 + markupPct / 100);
-  var totalAmount = totalLaborCost + totalOopWithMarkup;
+  var totalAmount = totalLaborCost + totalFlCost + totalOopWithMarkup;
   var budget = data.budget;
   var clientPrice = budget.client_price || 0;
   var profit = clientPrice - totalAmount;
   var margin = clientPrice > 0 ? (profit / clientPrice * 100) : 0;
 
   var h = '';
-  h += '<div class="spark-summary-item"><div class="ss-label">Total Labor</div><div class="ss-value">' + sparkFmt(totalLaborCost) + '</div><div class="ss-sub">' + totalLaborHrs.toFixed(1) + ' hrs</div></div>';
-  h += '<div class="spark-summary-item"><div class="ss-label">Total OOP</div><div class="ss-value">' + sparkFmt(totalOopWithMarkup) + '</div><div class="ss-sub">incl. ' + markupPct + '% markup</div></div>';
+  h += '<div class="spark-summary-item"><div class="ss-label">Labor</div><div class="ss-value">' + sparkFmt(totalLaborCost) + '</div><div class="ss-sub">' + totalLaborHrs.toFixed(1) + ' hrs</div></div>';
+  h += '<div class="spark-summary-item"><div class="ss-label">Freelancers</div><div class="ss-value" style="color:#5B4A8A">' + sparkFmt(totalFlCost) + '</div><div class="ss-sub">' + totalFlHrs.toFixed(1) + ' hrs</div></div>';
+  h += '<div class="spark-summary-item"><div class="ss-label">OOP</div><div class="ss-value">' + sparkFmt(totalOopWithMarkup) + '</div><div class="ss-sub">incl. ' + markupPct + '% markup</div></div>';
   h += '<div class="spark-summary-item"><div class="ss-label">Total Amount</div><div class="ss-value">' + sparkFmt(totalAmount) + '</div></div>';
   h += '<div class="spark-summary-item"><div class="ss-label">Client Price</div><div class="ss-value" style="color:var(--sand)">' + sparkFmt(clientPrice) + '</div></div>';
   h += '<div class="spark-summary-item"><div class="ss-label">Reserve</div><div class="ss-value" style="color:' + (profit >= 0 ? '#81C784' : 'var(--ember)') + '">' + sparkFmt(profit) + '</div><div class="ss-sub">' + margin.toFixed(1) + '% margin</div></div>';
@@ -4089,13 +4124,11 @@ function sparkRenderLaborContent() {
   var labor = data.labor;
   var phaseKey = sparkPhaseTab;
 
-  /* Split into Forge Team (Employee) vs Freelancers & Contractors */
+  /* Only show Employees in Labor section — Freelancers have their own section below */
   var forgeTeam = [];
-  var freelancers = [];
   for (var i = 0; i < labor.length; i++) {
     var empType = labor[i].employment_type || (labor[i].team_member && labor[i].team_member.employment_type) || 'Employee';
-    if (empType === 'Freelancer' || empType === 'Contractor') freelancers.push(labor[i]);
-    else forgeTeam.push(labor[i]);
+    if (empType !== 'Freelancer') forgeTeam.push(labor[i]);
   }
 
   /* Helper: group entries by department */
@@ -4175,9 +4208,8 @@ function sparkRenderLaborContent() {
   }
 
   /* Compute section totals */
-  var forgeHrs = 0, forgeCost = 0, flHrs = 0, flCost = 0;
+  var forgeHrs = 0, forgeCost = 0;
   for (var i = 0; i < forgeTeam.length; i++) { forgeHrs += sparkEntryHours(forgeTeam[i], 'all'); forgeCost += sparkEntryTotal(forgeTeam[i]); }
-  for (var i = 0; i < freelancers.length; i++) { flHrs += sparkEntryHours(freelancers[i], 'all'); flCost += sparkEntryTotal(freelancers[i]); }
 
   var h = '';
 
@@ -4192,24 +4224,11 @@ function sparkRenderLaborContent() {
     h += '</div>';
   }
 
-  /* Freelancers section */
-  if (freelancers.length > 0) {
-    var flExp = sparkLaborSectionExpanded.freelancer;
-    h += '<div onclick="sparkToggleLaborSection(\'freelancer\')" style="cursor:pointer;padding:10px 12px;background:#5B4A8A;color:var(--white);display:flex;justify-content:space-between;align-items:center;border-radius:' + (flExp ? '8px 8px 0 0' : '8px') + ';margin-top:12px;user-select:none">';
-    h += '<div><span style="font-size:11px;margin-right:6px">' + (flExp ? '\u25BC' : '\u25B6') + '</span><span style="font-weight:700">Freelancers & Contractors</span> <span style="font-size:11px;opacity:.6">' + freelancers.length + ' members \u00B7 ' + flHrs.toFixed(1) + ' hrs \u00B7 ' + sparkFmt(flCost) + '</span></div>';
-    h += '</div>';
-    if (flExp) {
-      h += '<div style="border:1px solid var(--canvas);border-top:none;border-radius:0 0 8px 8px;overflow:hidden">';
-      h += renderTeamTable(freelancers, 'freelancer');
-      h += '</div>';
-    }
-  }
-
   /* Add Team Member button */
   h += '<div style="padding:10px 0"><button onclick="sparkShowAddTeamMember()" style="padding:6px 16px;border-radius:6px;border:1px dashed var(--mid-gray);background:transparent;color:var(--mid-gray);cursor:pointer;font-size:12px;font-weight:600">+ Add Team Member</button></div>';
 
-  /* If no labor entries at all, show a helpful message */
-  if (!labor.length) {
+  /* If no forge team entries, show a helpful message */
+  if (!forgeTeam.length) {
     h = '<div style="padding:20px;text-align:center;color:var(--mid-gray)">';
     h += '<div style="font-size:14px;margin-bottom:8px">No team members assigned yet</div>';
     h += '<div style="font-size:12px;margin-bottom:14px">Add team members to estimate labor hours by phase.</div>';
@@ -4221,11 +4240,11 @@ function sparkRenderLaborContent() {
 }
 
 async function sparkShowAddTeamMember() {
-  /* Fetch available team members from Supabase */
+  /* Fetch available team members from Supabase — exclude Freelancers (they have their own section) */
   var allMembers = await sparkFetch('team_members', 'select=id,name,department,employment_type,billable_rate&is_active=eq.true&order=name.asc');
   if (!allMembers || !allMembers.length) { alert('No team members found in Supabase.'); return; }
 
-  /* Filter out members already in this budget */
+  /* Filter out members already in this budget and exclude Freelancers */
   var existingIds = {};
   if (sparkCurrentData && sparkCurrentData.labor) {
     for (var i = 0; i < sparkCurrentData.labor.length; i++) {
@@ -4233,7 +4252,7 @@ async function sparkShowAddTeamMember() {
       if (tmId) existingIds[tmId] = true;
     }
   }
-  var available = allMembers.filter(function(m) { return !existingIds[m.id]; });
+  var available = allMembers.filter(function(m) { return !existingIds[m.id] && m.employment_type !== 'Freelancer'; });
 
   if (!available.length) { alert('All active team members are already assigned.'); return; }
 
@@ -4302,6 +4321,168 @@ async function sparkAddSelectedMembers() {
 
   /* Reload the full budget to get team_member joins */
   await sparkLoadBudget(budgetId);
+}
+
+/* ── Freelancers Section ── */
+
+function sparkRenderFreelancersContent() {
+  var el = document.getElementById('sparkFreelancersContent');
+  if (!el || !sparkCurrentData) return;
+  var data = sparkCurrentData;
+
+  /* Filter to Freelancers only */
+  var fls = data.labor.filter(function(e) {
+    var t = e.employment_type || (e.team_member && e.team_member.employment_type) || '';
+    return t === 'Freelancer';
+  });
+
+  if (!fls.length) {
+    el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--mid-gray)">' +
+      '<div style="font-size:14px;font-weight:600;margin-bottom:6px">No freelancers assigned</div>' +
+      '<div style="font-size:12px;margin-bottom:16px">Freelancer hours and cost are tracked separately from the Forge team.</div>' +
+      '<button onclick="sparkShowAddFreelancer()" style="padding:8px 20px;border-radius:6px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-size:13px;font-weight:600">+ Add Freelancer</button>' +
+      '</div>';
+    return;
+  }
+
+  var h = '<div style="overflow-x:auto">';
+  h += '<table class="spark-labor-table">';
+  h += '<thead><tr><th>Name</th><th class="num">$/hr</th>';
+  for (var w = 0; w < SPARK_FL_WEEKS.length; w++) h += '<th class="num">' + SPARK_FL_WEEKS[w].label + '</th>';
+  h += '<th class="num">Total Hrs</th><th class="num" style="color:#5B4A8A">Total Cost</th><th></th></tr></thead>';
+  h += '<tbody>';
+
+  var grandHrs = 0, grandCost = 0;
+  for (var i = 0; i < fls.length; i++) {
+    var entry = fls[i];
+    var name = (entry.team_member && entry.team_member.name) || 'Unknown';
+    var rate = sparkGetFreelancerBillableRate(entry);
+    var totalHrs = sparkEntryHours(entry, 'all');
+    var totalCost = totalHrs * rate;
+    grandHrs += totalHrs;
+    grandCost += totalCost;
+
+    h += '<tr class="spark-person-row">';
+    h += '<td style="font-weight:600">' + name + '</td>';
+    h += '<td class="num" style="color:var(--mid-gray)">' + sparkFmtDec(rate) + '</td>';
+    for (var w = 0; w < SPARK_FL_WEEKS.length; w++) {
+      var wk = SPARK_FL_WEEKS[w];
+      var wVal = entry[wk.key] || 0;
+      h += '<td class="num"><input type="number" class="spark-input" value="' + wVal + '" min="0" step="0.5" style="width:54px" ' +
+        'onchange="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + wk.key + '\',this.value)" ' +
+        'oninput="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + wk.key + '\',this.value)"></td>';
+    }
+    h += '<td class="num" style="font-weight:700">' + totalHrs.toFixed(1) + '</td>';
+    h += '<td class="num" style="font-weight:700;color:#5B4A8A">' + sparkFmt(totalCost) + '</td>';
+    h += '<td><button onclick="sparkRemoveFreelancer(\'' + entry.id + '\')" title="Remove" style="padding:2px 7px;border-radius:4px;border:1px solid var(--canvas);background:transparent;color:var(--mid-gray);cursor:pointer;font-size:11px">✕</button></td>';
+    h += '</tr>';
+  }
+
+  /* Total row */
+  var blankWeeks = '';
+  for (var w = 0; w < SPARK_FL_WEEKS.length; w++) blankWeeks += '<td></td>';
+  h += '<tr style="border-top:2px solid var(--canvas)">';
+  h += '<td style="font-weight:700;font-size:12px;text-transform:uppercase;opacity:.6">Total</td><td></td>' + blankWeeks;
+  h += '<td class="num" style="font-weight:700">' + grandHrs.toFixed(1) + ' hrs</td>';
+  h += '<td class="num" style="font-weight:700;color:#5B4A8A">' + sparkFmt(grandCost) + '</td>';
+  h += '<td></td></tr>';
+  h += '</tbody></table></div>';
+
+  h += '<div style="padding:8px 0 2px">' +
+    '<button onclick="sparkShowAddFreelancer()" style="padding:6px 16px;border-radius:6px;border:1px dashed #5B4A8A;background:transparent;color:#5B4A8A;cursor:pointer;font-size:12px;font-weight:600">+ Add Freelancer</button>' +
+    '</div>';
+
+  el.innerHTML = h;
+}
+
+async function sparkShowAddFreelancer() {
+  /* Fetch active Freelancers from team_members */
+  var allMembers = await sparkFetch('team_members', 'select=id,name,employment_type,billable_rate,fully_burdened_rate&is_active=eq.true&employment_type=eq.Freelancer&order=name.asc');
+  if (!allMembers || !allMembers.length) {
+    alert('No freelancers found in Settings. Add freelancers (employment type = Freelancer) in the Settings page first.');
+    return;
+  }
+
+  /* Filter out already-assigned */
+  var existingIds = {};
+  if (sparkCurrentData && sparkCurrentData.labor) {
+    for (var i = 0; i < sparkCurrentData.labor.length; i++) {
+      var tmId = sparkCurrentData.labor[i].team_member_id || (sparkCurrentData.labor[i].team_member && sparkCurrentData.labor[i].team_member.id);
+      if (tmId) existingIds[tmId] = true;
+    }
+  }
+  var available = allMembers.filter(function(m) { return !existingIds[m.id]; });
+
+  if (!available.length) {
+    alert('All active freelancers are already assigned to this project.');
+    return;
+  }
+
+  var overlay = document.createElement('div');
+  overlay.id = 'sparkAddFreelancerOverlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center';
+
+  var modal = document.createElement('div');
+  modal.style.cssText = 'background:var(--white);border-radius:12px;padding:24px;min-width:340px;max-width:440px;max-height:500px;overflow-y:auto';
+
+  var h = '<div style="font-size:16px;font-weight:700;margin-bottom:4px">Add Freelancer</div>';
+  h += '<div style="font-size:12px;color:var(--mid-gray);margin-bottom:16px">Rates are pulled from the Settings page. Hours are entered weekly.</div>';
+
+  for (var i = 0; i < available.length; i++) {
+    var m = available[i];
+    h += '<label style="display:flex;align-items:center;gap:10px;padding:10px 0;cursor:pointer;border-bottom:1px solid var(--canvas)">';
+    h += '<input type="checkbox" value="' + m.id + '" style="width:16px;height:16px">';
+    h += '<div style="flex:1">';
+    h += '<div style="font-size:13px;font-weight:600">' + m.name + '</div>';
+    h += '<div style="font-size:11px;color:var(--mid-gray);margin-top:2px">Billable: ' + sparkFmtDec(m.billable_rate || 0) + '/hr &nbsp;·&nbsp; Cost: ' + sparkFmtDec(m.fully_burdened_rate || 0) + '/hr</div>';
+    h += '</div></label>';
+  }
+
+  h += '<div style="display:flex;gap:8px;margin-top:18px">';
+  h += '<button onclick="sparkAddSelectedFreelancers()" style="flex:1;padding:9px 0;border-radius:6px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-size:13px;font-weight:600">Add Selected</button>';
+  h += '<button onclick="document.getElementById(\'sparkAddFreelancerOverlay\').remove()" style="padding:9px 16px;border-radius:6px;border:1px solid var(--canvas);background:transparent;cursor:pointer;font-size:13px;color:var(--mid-gray)">Cancel</button>';
+  h += '</div>';
+
+  modal.innerHTML = h;
+  overlay.appendChild(modal);
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+}
+
+async function sparkAddSelectedFreelancers() {
+  var overlay = document.getElementById('sparkAddFreelancerOverlay');
+  if (!overlay) return;
+  var checkboxes = overlay.querySelectorAll('input[type="checkbox"]:checked');
+  if (!checkboxes.length) { overlay.remove(); return; }
+
+  var budgetId = sparkCurrentData.budget.id;
+  sparkShowSaving();
+
+  for (var i = 0; i < checkboxes.length; i++) {
+    var tmId = checkboxes[i].value;
+    var result = await sparkFetch('labor_budget_entries', '', 'POST', {
+      budget_id: budgetId,
+      team_member_id: tmId,
+      employment_type: 'Freelancer',
+      phase1: 0, phase2: 0, phase3_1: 0, phase3_2: 0, phase4: 0, phase5: 0,
+      display_order: sparkCurrentData.labor.length + i
+    });
+    if (result && result.length) sparkCurrentData.labor.push(result[0]);
+  }
+
+  sparkHideSaving();
+  overlay.remove();
+  await sparkLoadBudget(budgetId);
+}
+
+async function sparkRemoveFreelancer(entryId) {
+  if (!confirm('Remove this freelancer from the project?')) return;
+  sparkShowSaving();
+  await sparkFetch('labor_budget_entries?id=eq.' + entryId, '', 'DELETE', null);
+  sparkHideSaving();
+  sparkCurrentData.labor = sparkCurrentData.labor.filter(function(e) { return e.id !== entryId; });
+  sparkRenderFreelancersContent();
+  sparkRenderSummary();
 }
 
 function sparkToggleOopSection(sectionId) {
@@ -4609,15 +4790,25 @@ function sparkRenderBudgetContent(embedded) {
   var tcv = clientPrice - discountAmt;
   var reserveAmt = tcv * (reservePct / 100);
 
-  /* Compute labor total + hours */
+  /* Compute labor total + hours — Employees only (not Freelancers) */
   var totalLaborCost = 0;  /* Client-facing @ $200/hr */
   var totalLaborInternal = 0;  /* Internal cost @ actual rates */
   var totalLaborHrs = 0;
+  /* Compute freelancer total separately */
+  var totalFreelancerCost = 0;
+  var totalFreelancerHrs = 0;
   for (var i = 0; i < data.labor.length; i++) {
-    var hrs = sparkEntryHours(data.labor[i], 'all');
-    totalLaborCost += hrs * sparkGetRate(data.labor[i]);
-    totalLaborInternal += hrs * sparkGetInternalRate(data.labor[i]);
-    totalLaborHrs += hrs;
+    var li = data.labor[i];
+    var liEmpType = li.employment_type || (li.team_member && li.team_member.employment_type) || 'Employee';
+    var hrs = sparkEntryHours(li, 'all');
+    if (liEmpType === 'Freelancer') {
+      totalFreelancerHrs += hrs;
+      totalFreelancerCost += hrs * sparkGetFreelancerBillableRate(li);
+    } else {
+      totalLaborCost += hrs * sparkGetRate(li);
+      totalLaborInternal += hrs * sparkGetInternalRate(li);
+      totalLaborHrs += hrs;
+    }
   }
   /* Compute OOP total */
   var totalOop = 0;
@@ -4626,7 +4817,7 @@ function sparkRenderBudgetContent(embedded) {
   }
   var markupPct = sparkSettingVal(settings, 'markup', 'oop_markup_percentage', 20);
   var totalOopWithMarkup = totalOop * (1 + markupPct / 100);
-  var totalAmount = totalLaborCost + totalOopWithMarkup;
+  var totalAmount = totalLaborCost + totalFreelancerCost + totalOopWithMarkup;
   var profit = clientPrice - totalAmount;
   var profitMargin = clientPrice > 0 ? (profit / clientPrice * 100) : 0;
 
@@ -4675,6 +4866,9 @@ function sparkRenderBudgetContent(embedded) {
       oh += '<div>';
       oh += '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;opacity:.5;margin-bottom:8px">ALLOCATION</div>';
       oh += '<div style="font-size:12px;margin-bottom:6px">Fee (Labor) <span style="float:right;font-weight:600">$' + Math.round(totalLaborCost).toLocaleString() + '</span></div>';
+      if (totalFreelancerCost > 0 || totalFreelancerHrs > 0) {
+        oh += '<div style="font-size:12px;margin-bottom:6px">Freelancers <span style="float:right;font-weight:600;color:#5B4A8A">$' + Math.round(totalFreelancerCost).toLocaleString() + '</span></div>';
+      }
       oh += '<div style="font-size:12px;margin-bottom:6px">Pass-Through (OOP) <span style="float:right;font-weight:600">$' + Math.round(totalOopWithMarkup).toLocaleString() + '</span></div>';
       oh += '</div>';
       oh += '</div>';
@@ -4707,6 +4901,7 @@ function sparkRenderBudgetContent(embedded) {
     }
     h += '<div class="spark-overview-item"><div class="so-label">TCV</div><div class="so-value">' + sparkFmt(tcv) + '</div></div>';
     h += '<div class="spark-overview-item"><div class="so-label">Fee (Labor)</div><div class="so-value" style="color:var(--ocean)">' + sparkFmt(totalLaborCost) + '</div></div>';
+    h += '<div class="spark-overview-item"><div class="so-label">Freelancers</div><div class="so-value" style="color:#5B4A8A">' + sparkFmt(totalFreelancerCost) + '</div></div>';
     h += '<div class="spark-overview-item"><div class="so-label">Pass-Through (OOP)</div><div class="so-value">' + sparkFmt(totalOopWithMarkup) + '</div></div>';
     h += '<div class="spark-overview-item"><div class="so-label">Reserve (' + reservePct + '%)</div><div class="so-value">' + sparkFmt(reserveAmt) + '</div></div>';
     h += '</div></div>';
@@ -4720,9 +4915,11 @@ function sparkRenderBudgetContent(embedded) {
   h += '<div class="section-title" style="margin-top:28px">Labor Fee</div>';
 
   if (isSmallProject) {
-    /* Simplified Small Projects view — lump sum budget + total hours */
+    /* Simplified Small Projects view — lump sum budget + total hours (employees only) */
     var totalHrs = 0;
     for (var li = 0; li < data.labor.length; li++) {
+      var liType = data.labor[li].employment_type || (data.labor[li].team_member && data.labor[li].team_member.employment_type) || 'Employee';
+      if (liType === 'Freelancer') continue;
       totalHrs += (data.labor[li].phase1||0) + (data.labor[li].phase2||0) + (data.labor[li].phase3_1||0) + (data.labor[li].phase3_2||0) + (data.labor[li].phase4||0) + (data.labor[li].phase5||0);
     }
     /* Auto-fill: if hours are 0 but budget exists, suggest budget/200 */
@@ -4756,6 +4953,10 @@ function sparkRenderBudgetContent(embedded) {
     h += '<div class="rt-card"><div id="sparkLaborContent"></div></div>';
   }
 
+  /* ── Freelancers Section ── */
+  h += '<div class="section-title" style="margin-top:28px;display:flex;align-items:center;gap:8px">Freelancers <span style="font-size:11px;font-weight:400;color:#5B4A8A;background:rgba(91,74,138,.12);padding:2px 8px;border-radius:10px">billed at individual rates</span></div>';
+  h += '<div class="rt-card"><div id="sparkFreelancersContent"></div></div>';
+
   /* ── OOP Section ── */
   /* OOP section with No OOP toggle */
   var noOopChecked = data.budget.no_oop === true;
@@ -4774,6 +4975,7 @@ function sparkRenderBudgetContent(embedded) {
 
   /* Render sub-sections */
   sparkRenderLaborContent();
+  sparkRenderFreelancersContent();
   sparkRenderOopContent();
   sparkRenderSummary();
 }
