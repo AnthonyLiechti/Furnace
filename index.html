@@ -8153,11 +8153,11 @@ async function loadSupabaseData() {
     FURNACE_TEAM_MEMBERS = await sparkFetchAll('team_members', 'select=id,name,department,employment_type,fully_burdened_rate,billable_rate,is_active&is_active=eq.true&order=department.asc,name.asc') || [];
 
     /* 1. Fetch all visible budgets with project info */
-    var budgets = await sparkFetchAll('budgets', 'select=id,name,status,client_price,total_amount,has_discount,discount_percentage,reserve_percentage,oop_markup_percentage,no_oop,project_id,projects(id,project_code,name)&visibility=eq.visible');
+    var budgets = await sparkFetchAll('budgets', 'select=id,name,status,client_price,total_amount,has_discount,discount_percentage,reserve_percentage,oop_markup_percentage,no_oop,no_freelancers,project_id,projects(id,project_code,name)&visibility=eq.visible');
     if (!budgets || !budgets.length) {
       /* Fallback: try without the projects join in case join is failing */
       console.warn('[Furnace] budgets with join returned empty — trying without join');
-      budgets = await sparkFetchAll('budgets', 'select=id,name,status,client_price,total_amount,has_discount,discount_percentage,reserve_percentage,oop_markup_percentage,no_oop,project_id&visibility=eq.visible');
+      budgets = await sparkFetchAll('budgets', 'select=id,name,status,client_price,total_amount,has_discount,discount_percentage,reserve_percentage,oop_markup_percentage,no_oop,no_freelancers,project_id&visibility=eq.visible');
       if (!budgets || !budgets.length) { console.warn('[Furnace] No Supabase budgets found — check Supabase RLS policies and table data'); SUPA_LOADED = false; return; }
     }
 
