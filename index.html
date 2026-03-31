@@ -4759,7 +4759,7 @@ function sparkRenderFreelancersContent() {
         /* Paid toggle */
         h += '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">';
         h += '<input type="checkbox" ' + (isPaid ? 'checked' : '') + ' onchange="sparkToggleFlPaid(\'' + eid + '\',this.checked)" style="cursor:pointer;width:15px;height:15px;accent-color:#81C784">';
-        if (isPaid) h += '<input type="date" class="spark-input" style="width:94px;font-size:9px;padding:1px 3px;text-align:center;color:#2E7D32;border-color:#C8E6C9" value="' + paidDate + '" onchange="sparkDebouncedPatchFl(\'' + eid + '\',\'paid_date\',this.value)">';
+        if (isPaid) h += '<input type="date" class="spark-input" style="width:94px;font-size:9px;padding:1px 3px;text-align:center;color:#2E7D32;border-color:#C8E6C9" value="' + paidDate + '" onblur="sparkDebouncedPatchFl(\'' + eid + '\',\'paid_date\',this.value)">';
         h += '</div>';
         /* Notes */
         h += '<div><input type="text" class="spark-input" value="' + (entry.notes || '').replace(/"/g,'&quot;') + '" placeholder="Notes" style="width:100%" onchange="sparkDebouncedPatchFl(\'' + eid + '\',\'notes\',this.value)"></div>';
@@ -5081,7 +5081,7 @@ function sparkRenderOopContent() {
             h += '<div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:2px">';
             h += '<input type="checkbox" ' + (isPaid ? 'checked' : '') + ' onchange="sparkTogglePaidWithDate(\'' + iid + '\',this.checked)" title="Mark as paid" style="cursor:pointer;width:15px;height:15px;accent-color:#81C784">';
             if (isPaid) {
-              h += '<input type="date" class="spark-input" style="width:90px;font-size:9px;padding:1px 3px;text-align:center;color:#2E7D32;border-color:#C8E6C9" value="' + paidDate + '" onchange="sparkDebouncedPatchOop(\'' + iid + '\',\'paid_date\',this.value)" title="Date paid">';
+              h += '<input type="date" class="spark-input" style="width:90px;font-size:9px;padding:1px 3px;text-align:center;color:#2E7D32;border-color:#C8E6C9" value="' + paidDate + '" onblur="sparkDebouncedPatchOop(\'' + iid + '\',\'paid_date\',this.value)" title="Date paid">';
             }
             h += '</div>';
             /* Notes + Delete */
@@ -5140,7 +5140,7 @@ function sparkRenderOopContent() {
             var paidDate = item.paid_date || '';
             h += '<div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:2px">';
             h += '<input type="checkbox" ' + (isPaid ? 'checked' : '') + ' onchange="sparkTogglePaidWithDate(\'' + iid + '\',this.checked)" title="Mark as paid" style="cursor:pointer;width:15px;height:15px;accent-color:#81C784">';
-            if (isPaid) h += '<input type="date" class="spark-input" style="width:90px;font-size:9px;padding:1px 3px;text-align:center;color:#2E7D32;border-color:#C8E6C9" value="' + paidDate + '" onchange="sparkDebouncedPatchOop(\'' + iid + '\',\'paid_date\',this.value)" title="Date paid">';
+            if (isPaid) h += '<input type="date" class="spark-input" style="width:90px;font-size:9px;padding:1px 3px;text-align:center;color:#2E7D32;border-color:#C8E6C9" value="' + paidDate + '" onblur="sparkDebouncedPatchOop(\'' + iid + '\',\'paid_date\',this.value)" title="Date paid">';
             h += '</div>';
             /* Notes + category assign dropdown + delete */
             h += '<div style="display:flex;align-items:center;gap:4px;grid-column:1/-1;padding:0 0 2px 0">';
