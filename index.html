@@ -2428,7 +2428,7 @@ function renderFlagged() {
   var h = '<h1 class="page-title">Needs Attention</h1>';
   h += '<p class="page-subtitle">Projects missing data or requiring team input</p>';
 
-  var all = allProjects();
+  var all = activeProjects();
 
   /* Categorize ALL projects by data completeness using Supabase data */
   var noBudget = [];      /* No Supabase budget at all */
