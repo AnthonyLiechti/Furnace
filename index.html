@@ -1723,14 +1723,13 @@ function renderClient(clientId) {
       /* Filter to this client's projects only */
       if (!_clientCodes[_code] && !_clientCodes[_a.project_code]) continue;
 
-      /* Fold non-billable */
+      /* Fold non-billable (only count from 2026-01-01 onward) */
       if (_code === '_NB' || _nbCodes[_code] || (_code.indexOf('100_') === 0)) {
-        _nonBill.hours += _a.hours;
-        _nonBill.entries++;
+        if (_a.work_date >= '2026-01-01') { _nonBill.hours += _a.hours; _nonBill.entries++; }
         continue;
       }
 
-      /* Check if bizdev */
+      /* Check if bizdev (only count from 2026-01-01 onward) */
       var _isBD = _a.is_bizdev;
       if (!_isBD) {
         /* Check portfolio for bizdev type */
@@ -1741,8 +1740,7 @@ function renderClient(clientId) {
         }
       }
       if (_isBD) {
-        _bizDev.hours += _a.hours;
-        _bizDev.entries++;
+        if (_a.work_date >= '2026-01-01') { _bizDev.hours += _a.hours; _bizDev.entries++; }
         continue;
       }
 
@@ -7736,6 +7734,8 @@ async function loadSupabaseData() {
       '100_07_09': '100_00_00',   /* YT Companion → Non-Billable */
     };
 
+    var NB_BD_CUTOFF = '2026-01-01'; /* Non-billable & bizdev hours only counted from this date onward */
+
     SUPA_ACTUALS = {};
     for (var i = 0; i < SUPA_ACTUALS_ALL.length; i++) {
       var a = SUPA_ACTUALS_ALL[i];
@@ -7744,6 +7744,9 @@ async function loadSupabaseData() {
       if (CODE_ALIASES[code]) code = CODE_ALIASES[code];
       a.project_code = code; /* update in place so downstream uses resolved code */
       if (!code) continue;
+      /* Skip non-billable and bizdev entries before the cutoff date */
+      var isNbOrBd = (code.indexOf('100_') === 0 || code.indexOf('101_') === 0 || a.is_bizdev || a.is_timeoff);
+      if (isNbOrBd && a.work_date < NB_BD_CUTOFF) continue;
       if (!SUPA_ACTUALS[code]) SUPA_ACTUALS[code] = { totalHours: 0, phases: {}, people: {}, byDate: {} };
       var sa = SUPA_ACTUALS[code];
       sa.totalHours += a.hours || 0;
