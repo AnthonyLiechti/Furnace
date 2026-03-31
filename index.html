@@ -8282,9 +8282,182 @@ async function sparkFetchAll(table, query) {
 }
 
 /* ── SUPABASE DATA LOADER ── */
+/* ══════════════════════════════════════════════════════════════
+   FURNACE CACHE — stale-while-revalidate via localStorage
+   On load: serve cached data instantly, then fetch fresh in background.
+   Cache keyed by version so schema changes auto-bust it.
+   ══════════════════════════════════════════════════════════════ */
+var FURNACE_CACHE_KEY = 'furnace_supa_v4';
+var FURNACE_CACHE_TTL = 10 * 60 * 1000; /* 10 min — treat as stale after this */
+
+function furnaceSaveCache(payload) {
+  try { localStorage.setItem(FURNACE_CACHE_KEY, JSON.stringify({ ts: Date.now(), d: payload })); } catch(e) {}
+}
+
+function furnaceLoadCache() {
+  try {
+    var raw = localStorage.getItem(FURNACE_CACHE_KEY);
+    if (!raw) return null;
+    var p = JSON.parse(raw);
+    if (!p || !p.d) return null;
+    return p; /* return even if stale — caller decides what to do with it */
+  } catch(e) { return null; }
+}
+
+function furnaceApplyCachePayload(payload) {
+  if (!payload) return;
+  FURNACE_TEAM_MEMBERS = payload.teamMembers || [];
+  SUPA_BUDGETS         = payload.supaBudgets || {};
+  SUPA_ACTUALS         = payload.supaActuals || {};
+  SUPA_ACTUALS_ALL     = payload.supaActualsAll || [];
+  SUPA_LOADED = true;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   GLOBAL REAL-TIME — subscribe to budget/labor/oop/fl changes
+   across ALL projects so the master portfolio view stays live.
+   ══════════════════════════════════════════════════════════════ */
+var _furnaceGlobalChannel = null;
+
+function furnaceSubscribeGlobalRealtime() {
+  if (!_furnaceAuthClient || _furnaceGlobalChannel) return;
+  _furnaceGlobalChannel = _furnaceAuthClient
+    .channel('furnace-global')
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'budgets' }, function(p) {
+      var rec = p.new;
+      if (!rec) return;
+      /* Find which projCode this budget belongs to */
+      var projCode = PROJ_CODE_MAP[rec.project_id];
+      if (!projCode || !SUPA_BUDGETS[projCode]) return;
+      /* Merge scalar budget fields (client_price, no_oop, etc.) */
+      var sb = SUPA_BUDGETS[projCode];
+      var keep = ['laborHours','laborTotal','laborCostInternal','oopTotal','oopEffective','oopSpent',
+                  'flTotal','flSpent','_flEntries','_oopEntries','labor','oop'];
+      for (var k in rec) { if (keep.indexOf(k) === -1) sb[k] = rec[k]; }
+      /* Re-render the project financials banner if it's visible */
+      if (CLIENTS) {
+        for (var ci = 0; ci < CLIENTS.length; ci++) {
+          for (var pi = 0; pi < CLIENTS[ci].projects.length; pi++) {
+            var proj = CLIENTS[ci].projects[pi];
+            if (proj.code === projCode) { renderProjFinancials(proj); break; }
+          }
+        }
+      }
+      /* If master/portfolio view is active, refresh the project card */
+      furnaceGlobalRefreshProjectCard(projCode);
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'labor_budget_entries' }, function(p) {
+      furnaceGlobalHandleEntryChange('labor', p);
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'oop_budget_entries' }, function(p) {
+      furnaceGlobalHandleEntryChange('oop', p);
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'freelancer_budget_entries' }, function(p) {
+      furnaceGlobalHandleEntryChange('fl', p);
+    })
+    .subscribe();
+}
+
+function furnaceGlobalHandleEntryChange(type, payload) {
+  var rec = payload.new || payload.old;
+  if (!rec || !rec.budget_id) return;
+  /* Find which projCode owns this budget */
+  var projCode = null;
+  for (var code in SUPA_BUDGETS) {
+    if (SUPA_BUDGETS[code].id === rec.budget_id) { projCode = code; break; }
+  }
+  if (!projCode) return;
+  var sb = SUPA_BUDGETS[projCode];
+
+  /* Update the relevant entry array on the cached budget object */
+  var arr = type === 'labor' ? sb.labor : type === 'oop' ? sb.oop : sb._flEntries;
+  if (!arr) return;
+  if (payload.eventType === 'DELETE') {
+    arr = arr.filter(function(e) { return e.id !== rec.id; });
+  } else {
+    var found = false;
+    for (var i = 0; i < arr.length; i++) {
+      if (arr[i].id === rec.id) { arr[i] = Object.assign({}, arr[i], rec); found = true; break; }
+    }
+    if (!found && payload.eventType === 'INSERT') arr.push(rec);
+  }
+  if (type === 'labor') sb.labor = arr;
+  else if (type === 'oop') sb.oop = arr;
+  else sb._flEntries = arr;
+
+  /* Recompute totals for this budget */
+  var laborHours = 0, laborCost = 0, laborInternal = 0;
+  for (var i = 0; i < (sb.labor || []).length; i++) {
+    var le = sb.labor[i];
+    var hrs = (le.phase1||0)+(le.phase2||0)+(le.phase3_1||0)+(le.phase3_2||0)+(le.phase4||0)+(le.phase5||0);
+    laborHours += hrs; laborCost += hrs * 200;
+    var fbr = (le.team_member && le.team_member.fully_burdened_rate) ? le.team_member.fully_burdened_rate : 200;
+    laborInternal += hrs * fbr;
+  }
+  sb.laborHours = laborHours; sb.laborTotal = laborCost; sb.laborCostInternal = laborInternal;
+  var oopEff = 0, oopSpent = 0;
+  for (var i = 0; i < (sb.oop || []).length; i++) {
+    var oe = sb.oop[i]; if (oe.is_active === false) continue;
+    var v = sparkOopItemEffective(oe); oopEff += v; if (oe.paid) oopSpent += v;
+  }
+  sb.oopEffective = oopEff; sb.oopSpent = oopSpent;
+  var flTot = 0, flSp = 0;
+  for (var i = 0; i < (sb._flEntries || []).length; i++) {
+    var cost = (sb._flEntries[i].hours||0)*(sb._flEntries[i].rate||0);
+    flTot += cost; if (sb._flEntries[i].paid) flSp += cost;
+  }
+  sb.flTotal = flTot; sb.flSpent = flSp;
+
+  /* Re-render project financials banner and portfolio card */
+  if (CLIENTS) {
+    for (var ci = 0; ci < CLIENTS.length; ci++) {
+      for (var pi = 0; pi < CLIENTS[ci].projects.length; pi++) {
+        var proj = CLIENTS[ci].projects[pi];
+        if (proj.code === projCode) {
+          proj.laborCost = laborCost; proj.oopCost = oopEff;
+          renderProjFinancials(proj);
+          break;
+        }
+      }
+    }
+  }
+  furnaceGlobalRefreshProjectCard(projCode);
+}
+
+function furnaceGlobalRefreshProjectCard(projCode) {
+  /* Re-render just the project row/card in whatever list view is currently active */
+  var cardEl = document.getElementById('projCard-' + projCode) || document.getElementById('proj-row-' + projCode);
+  if (!cardEl || !CLIENTS) return;
+  for (var ci = 0; ci < CLIENTS.length; ci++) {
+    for (var pi = 0; pi < CLIENTS[ci].projects.length; pi++) {
+      var proj = CLIENTS[ci].projects[pi];
+      if (proj.code === projCode) {
+        /* Flash the card briefly to signal a live update */
+        cardEl.style.transition = 'box-shadow .3s';
+        cardEl.style.boxShadow = '0 0 0 2px #81C784';
+        setTimeout(function() { cardEl.style.boxShadow = ''; }, 1200);
+        return;
+      }
+    }
+  }
+}
+
 async function loadSupabaseData() {
   if (!sparkAuth.connected) return;
   try {
+
+    /* ── CACHE: serve stale data instantly while fresh fetch runs in background ──
+       If we have cached data, apply it now so the rest of loadData can render
+       immediately using cached SUPA_BUDGETS/SUPA_ACTUALS. Then if cache is still
+       fresh, skip the heavy re-fetch entirely. If stale, continue to re-fetch and
+       the UI will silently update when the fresh data arrives. ── */
+    var cached = furnaceLoadCache();
+    var isStale = !cached || (Date.now() - cached.ts > FURNACE_CACHE_TTL);
+    if (cached) {
+      furnaceApplyCachePayload(cached.d);
+      furnaceSubscribeGlobalRealtime();
+      if (!isStale) return; /* cache is fresh — skip re-fetch, render will happen in loadData */
+    }
     /* 0. Fetch active team members for rate lookups */
     FURNACE_TEAM_MEMBERS = await sparkFetchAll('team_members', 'select=id,name,department,employment_type,fully_burdened_rate,billable_rate,is_active&is_active=eq.true&order=department.asc,name.asc') || [];
 
@@ -8504,9 +8677,22 @@ async function loadSupabaseData() {
 
     SUPA_LOADED = true;
     console.log('Supabase data loaded:', Object.keys(SUPA_BUDGETS).length, 'budgets,', SUPA_ACTUALS_ALL.length, 'actuals');
+
+    /* Save fresh data to cache for next load */
+    furnaceSaveCache({
+      teamMembers:    FURNACE_TEAM_MEMBERS,
+      supaBudgets:    SUPA_BUDGETS,
+      supaActuals:    SUPA_ACTUALS,
+      supaActualsAll: SUPA_ACTUALS_ALL
+    });
+
     /* Update "Updated" timestamp to reflect fresh Supabase data */
     var lu = document.getElementById('lastUpdated');
     if (lu) lu.textContent = 'Updated ' + new Date().toLocaleDateString('en-US', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
+
+    /* Start global real-time subscription (no-op if already subscribed) */
+    furnaceSubscribeGlobalRealtime();
+
   } catch (err) {
     console.error('Failed to load Supabase data:', err);
   }
