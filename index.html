@@ -1701,6 +1701,13 @@ function renderClient(clientId) {
   /* Non-billable codes */
   var _nbCodes = {'100_00_00':1,'100_10_01':1,'100_99_01':1,'100_99_02':1,'_NB':1};
 
+  /* Build set of project codes belonging to this client for filtering */
+  var _clientCodes = {};
+  for (var _ci2 = 0; _ci2 < c.projects.length; _ci2++) {
+    _clientCodes[c.projects[_ci2].code] = true;
+    /* Also index any alias targets that map to this client's codes */
+  }
+
   if (SUPA_ACTUALS_ALL && SUPA_ACTUALS_ALL.length > 0) {
     for (var ai = 0; ai < SUPA_ACTUALS_ALL.length; ai++) {
       var _a = SUPA_ACTUALS_ALL[ai];
@@ -1712,6 +1719,9 @@ function renderClient(clientId) {
       }
       var _code = _a.project_code || 'unknown';
       if (_aliases[_code]) _code = _aliases[_code];
+
+      /* Filter to this client's projects only */
+      if (!_clientCodes[_code] && !_clientCodes[_a.project_code]) continue;
 
       /* Fold non-billable */
       if (_code === '_NB' || _nbCodes[_code] || (_code.indexOf('100_') === 0)) {
