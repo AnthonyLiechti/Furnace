@@ -932,6 +932,7 @@ var METADATA = {};
 
 /* ── SUPABASE DATA (3 sources of truth) ── */
 var SUPA_BUDGETS = {};   // project_code -> {budget object with labor entries, oop entries}
+var PROJ_CODE_MAP = {};  // project_id (uuid) -> project_code, built during loadSupabaseData
 var SUPA_ACTUALS = {};   // project_code -> {totalHours, phases: {phase_key: hours}, people: {name: hours}, byDate: {date: hours}}
 var SUPA_ACTUALS_ALL = []; // raw labor_actuals array
 var SUPA_LOADED = false;
@@ -3843,6 +3844,7 @@ async function sparkPatchLabor(entryId, phaseKey, value) {
   body[phaseKey] = parseFloat(value) || 0;
   await sparkFetch('labor_budget_entries', 'id=eq.' + entryId, 'PATCH', body);
   sparkRecomputeBudgetTotals();
+  await syncProjectSnapshotColumns();
   sparkHideSaving();
 }
 
@@ -3850,7 +3852,7 @@ function sparkRecomputeBudgetTotals() {
   /* Recompute SUPA_BUDGETS totals from sparkCurrentData and update the project financials */
   if (!sparkCurrentData || !sparkCurrentData.budget) return;
   var b = sparkCurrentData.budget;
-  var projCode = b.projects ? b.projects.project_code : null;
+  var projCode = (b.projects && b.projects.project_code) ? b.projects.project_code : PROJ_CODE_MAP[b.project_id];
   if (!projCode || !SUPA_BUDGETS || !SUPA_BUDGETS[projCode]) return;
   var sb = SUPA_BUDGETS[projCode];
 
@@ -3898,6 +3900,23 @@ function sparkRecomputeBudgetTotals() {
   }
 }
 
+/* Sync the projects table snapshot columns so Furnace always reflects the latest budget */
+async function syncProjectSnapshotColumns() {
+  if (!sparkCurrentData || !sparkCurrentData.budget) return;
+  var b = sparkCurrentData.budget;
+  var projId = b.project_id;
+  if (!projId) return;
+  var projCode = (b.projects && b.projects.project_code) ? b.projects.project_code : PROJ_CODE_MAP[projId];
+  var sb = projCode && SUPA_BUDGETS ? SUPA_BUDGETS[projCode] : null;
+  var patch = {
+    dollar_budget: b.client_price || 0,
+    labor_cost_snapshot: sb ? (sb.laborTotal || 0) : 0,
+    oop_cost_snapshot: sb ? (sb.oopEffective || sb.oopTotal || 0) : 0,
+    has_budget_data: true
+  };
+  await sparkFetch('projects?id=eq.' + projId, '', 'PATCH', patch);
+}
+
 async function sparkPatchOop(entryId, field, value) {
   sparkShowSaving();
   var body = {};
@@ -3910,8 +3929,9 @@ async function sparkPatchOop(entryId, field, value) {
     body[field] = parseFloat(value) || 0;
   }
   await sparkFetch('oop_budget_entries', 'id=eq.' + entryId, 'PATCH', body);
-  /* Recompute SUPA_BUDGETS totals */
+  /* Recompute SUPA_BUDGETS totals, then sync projects snapshot columns */
   sparkRecomputeBudgetTotals();
+  await syncProjectSnapshotColumns();
   sparkHideSaving();
 }
 
@@ -4062,10 +4082,12 @@ async function sparkPatchBudgetField(field, value) {
   await sparkFetch('budgets?id=eq.' + budgetId, '', 'PATCH', patch);
   sparkCurrentData.budget[field] = value;
   /* Also update the global SUPA_BUDGETS cache so other pages (Needs Attention) see the change */
-  var projCode = sparkCurrentData.budget.projects ? sparkCurrentData.budget.projects.project_code : null;
+  var projCode = (sparkCurrentData.budget.projects && sparkCurrentData.budget.projects.project_code) ? sparkCurrentData.budget.projects.project_code : PROJ_CODE_MAP[sparkCurrentData.budget.project_id];
   if (projCode && SUPA_BUDGETS && SUPA_BUDGETS[projCode]) {
     SUPA_BUDGETS[projCode][field] = value;
   }
+  /* Auto-sync snapshot columns on the projects table */
+  await syncProjectSnapshotColumns();
   sparkHideSaving();
   /* Re-render to reflect changes */
   sparkRenderBudgetContent(true);
@@ -7613,6 +7635,14 @@ async function loadSupabaseData() {
       if (!budgets || !budgets.length) { console.warn('[Furnace] No Supabase budgets found — check Supabase RLS policies and table data'); SUPA_LOADED = false; return; }
     }
 
+    /* 1b. Build project_id → project_code lookup as fallback when join is null */
+    PROJ_CODE_MAP = {};
+    var projRows = await sparkFetchAll('projects', 'select=id,project_code') || [];
+    for (var i = 0; i < projRows.length; i++) {
+      if (projRows[i].project_code) PROJ_CODE_MAP[projRows[i].id] = projRows[i].project_code;
+    }
+    var projCodeMap = PROJ_CODE_MAP; // keep local alias for code below
+
     /* 2. Fetch labor_budget_entries, oop_budget_entries, and freelancer_budget_entries for all budgets */
     var budgetIds = budgets.map(function(b) { return b.id; });
     var laborEntries = await sparkFetchAll('labor_budget_entries', 'select=id,budget_id,department,employment_type,phase1,phase2,phase3_1,phase3_2,phase4,phase5,rate_override,team_member_id,team_member:team_members(id,name,fully_burdened_rate)&budget_id=in.(' + budgetIds.join(',') + ')');
@@ -7641,7 +7671,7 @@ async function loadSupabaseData() {
     SUPA_BUDGETS = {};
     for (var i = 0; i < budgets.length; i++) {
       var b = budgets[i];
-      var projCode = b.projects ? b.projects.project_code : null;
+      var projCode = (b.projects && b.projects.project_code) ? b.projects.project_code : projCodeMap[b.project_id];
       if (!projCode) continue;
 
       b.labor = laborByBudget[b.id] || [];
