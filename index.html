@@ -1935,9 +1935,10 @@ function renderProjFinancials(p) {
   var marginPctVal = tcvPrice > 0 ? ((tcvPrice - internalLaborCost - oopBudget - flBudget) / tcvPrice * 100).toFixed(1) : 0;
   var marginColor = parseFloat(marginPctVal) > 30 ? '#81C784' : parseFloat(marginPctVal) >= 15 ? 'var(--honey)' : '#C62828';
 
-  var effRate = saHrs > 0 ? (tcvPrice / saHrs) : 0;
-  var effRateDisplay = saHrs > 0 ? '$' + Math.round(effRate).toLocaleString() + '/hr' : '\u2014';
-  var effRateColor = effRate >= 200 ? '#81C784' : effRate > 0 ? 'var(--ember)' : 'var(--white)';
+  var laborBilled = sb.laborTotal || 0;
+  var effRate = internalLaborCost > 0 ? (laborBilled / internalLaborCost) : 0;
+  var effRateDisplay = internalLaborCost > 0 ? effRate.toFixed(2) + '\u00d7' : '\u2014';
+  var effRateColor = effRate >= 1.5 ? '#81C784' : effRate >= 1.2 ? 'var(--honey)' : effRate > 0 ? 'var(--ember)' : 'var(--white)';
 
   var agencyRate = 200;
   var laborSpent$ = saHrs * agencyRate;
@@ -1966,7 +1967,7 @@ function renderProjFinancials(p) {
   h += '<div class="snap-fin-item"><div class="sf-label">OOP Cost</div><div class="sf-value">' + (noOop ? '<span style="opacity:.4">—</span>' : '$' + Math.round(oopBudget).toLocaleString()) + '</div></div>';
   h += '<div class="snap-fin-item"><div class="sf-label">Reserve</div><div class="sf-value ' + (profitVal >= 0 ? 'sf-green' : '') + '">$' + Math.round(profitVal).toLocaleString() + '</div><div class="sf-sub">' + profitPctVal + '%</div></div>';
   h += '<div class="snap-fin-item"><div class="sf-label">Margin</div><div class="sf-value" style="color:' + marginColor + '">' + marginPctVal + '%</div><div class="sf-sub">Internal cost: $' + Math.round(internalLaborCost).toLocaleString() + '</div></div>';
-  h += '<div class="snap-fin-item"><div class="sf-label">Eff. Rate</div><div class="sf-value" style="color:' + effRateColor + '">' + effRateDisplay + '</div>' + (saHrs > 0 ? '<div class="sf-sub">vs $200 target</div>' : '<div class="sf-sub">No hours tracked</div>') + '</div>';
+  h += '<div class="snap-fin-item"><div class="sf-label">Eff. Rate</div><div class="sf-value" style="color:' + effRateColor + '">' + effRateDisplay + '</div>' + (internalLaborCost > 0 ? '<div class="sf-sub">Billed vs cost ($' + Math.round(internalLaborCost).toLocaleString() + ')</div>' : '<div class="sf-sub">No cost data</div>') + '</div>';
   h += '</div>';
 
   /* ── Progress bar ── */
@@ -3781,7 +3782,8 @@ async function sparkLoadBudgetForProject(projectCode) {
     sparkFetch('oop_sections', 'select=*&order=display_order.asc'),
     sparkFetch('oop_categories', 'select=*&order=display_order.asc'),
     sparkFetch('labor_actuals', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,department,employment_type)&order=work_date.desc'),
-    sparkFetch('agency_settings', 'select=*&order=category.asc,sort_order.asc')
+    sparkFetch('agency_settings', 'select=*&order=category.asc,sort_order.asc'),
+    sparkFetch('freelancer_budget_entries', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,billable_rate,fully_burdened_rate)&order=team_member_id.asc,display_order.asc')
   ]);
 
   sparkCurrentData = {
@@ -3791,7 +3793,8 @@ async function sparkLoadBudgetForProject(projectCode) {
     oopSections: results[3] || [],
     oopCategories: results[4] || [],
     actuals: results[5] || [],
-    settings: results[6] || []
+    settings: results[6] || [],
+    freelancerEntries: results[7] || []
   };
 
   sparkPhaseTab = 'all';
@@ -3922,6 +3925,7 @@ async function sparkPatchLabor(entryId, phaseKey, value) {
   body[phaseKey] = parseFloat(value) || 0;
   await sparkFetch('labor_budget_entries', 'id=eq.' + entryId, 'PATCH', body);
   sparkRecomputeBudgetTotals();
+  sparkRenderLaborContent();
   await syncProjectSnapshotColumns();
   sparkHideSaving();
 }
@@ -3963,7 +3967,7 @@ function sparkRecomputeBudgetTotals() {
   sb.oopEffective = oopEffective;
   sb.oopSpent = oopSpent;
 
-  /* Update portfolio project data */
+  /* Update portfolio project data and re-render the financials banner */
   for (var ci = 0; ci < CLIENTS.length; ci++) {
     for (var pi = 0; pi < CLIENTS[ci].projects.length; pi++) {
       var p = CLIENTS[ci].projects[pi];
@@ -3973,6 +3977,7 @@ function sparkRecomputeBudgetTotals() {
         p.oopCost = oopEffective;
         var computedTotal = laborCost + oopEffective;
         p.profit = (sb.client_price || 0) - computedTotal;
+        renderProjFinancials(p);
       }
     }
   }
@@ -4164,6 +4169,16 @@ async function sparkPatchBudgetField(field, value) {
   if (projCode && SUPA_BUDGETS && SUPA_BUDGETS[projCode]) {
     SUPA_BUDGETS[projCode][field] = value;
   }
+  /* Re-render project financials banner when a section toggle changes */
+  if ((field === 'no_oop' || field === 'no_freelancers') && projCode && CLIENTS) {
+    var _finP = null;
+    outerPF: for (var _ci = 0; _ci < CLIENTS.length; _ci++) {
+      for (var _pi = 0; _pi < CLIENTS[_ci].projects.length; _pi++) {
+        if (CLIENTS[_ci].projects[_pi].code === projCode) { _finP = CLIENTS[_ci].projects[_pi]; break outerPF; }
+      }
+    }
+    if (_finP) renderProjFinancials(_finP);
+  }
   /* Auto-sync snapshot columns on the projects table */
   await syncProjectSnapshotColumns();
   sparkHideSaving();
@@ -4233,6 +4248,72 @@ async function sparkAssignOopCategory(entryId, categoryId) {
   sparkRenderOopContent();
 }
 
+function syncProjFinancialsFromCurrent() {
+  if (!sparkCurrentData || !sparkCurrentData.budget) return;
+  var projCode = (sparkCurrentData.budget.projects && sparkCurrentData.budget.projects.project_code)
+    ? sparkCurrentData.budget.projects.project_code
+    : PROJ_CODE_MAP[sparkCurrentData.budget.project_id];
+  if (!projCode || !SUPA_BUDGETS || !SUPA_BUDGETS[projCode]) return;
+  var sb = SUPA_BUDGETS[projCode];
+
+  /* Recompute labor totals */
+  var laborHours = 0, laborCost = 0, laborInternal = 0;
+  for (var i = 0; i < sparkCurrentData.labor.length; i++) {
+    var le = sparkCurrentData.labor[i];
+    var hrs = sparkEntryHours(le, 'all');
+    laborHours += hrs;
+    laborCost  += hrs * 200;
+    var tmRate = 200;
+    if (le.team_member_id) {
+      for (var ti = 0; ti < FURNACE_TEAM_MEMBERS.length; ti++) {
+        if (FURNACE_TEAM_MEMBERS[ti].id === le.team_member_id) { tmRate = FURNACE_TEAM_MEMBERS[ti].fully_burdened_rate || 200; break; }
+      }
+    } else if (le.team_member && le.team_member.fully_burdened_rate) {
+      tmRate = le.team_member.fully_burdened_rate;
+    }
+    laborInternal += hrs * tmRate;
+  }
+  sb.laborHours        = laborHours;
+  sb.laborTotal        = laborCost;
+  sb.laborCostInternal = laborInternal;
+
+  /* Recompute freelancer totals */
+  var flTotal = 0, flSpent = 0;
+  var flEntries = sparkCurrentData.freelancerEntries || [];
+  for (var j = 0; j < flEntries.length; j++) {
+    var feCost = (flEntries[j].hours || 0) * (flEntries[j].rate || 0);
+    flTotal += feCost;
+    if (flEntries[j].paid) flSpent += feCost;
+  }
+  sb.flTotal    = flTotal;
+  sb.flSpent    = flSpent;
+  sb._flEntries = flEntries;
+
+  /* Recompute OOP totals */
+  var oopEffective = 0, oopSpent = 0;
+  for (var k = 0; k < sparkCurrentData.oop.length; k++) {
+    var oe = sparkCurrentData.oop[k];
+    if (oe.is_active === false) continue;
+    var effVal = sparkOopItemEffective(oe);
+    oopEffective += effVal;
+    if (oe.paid) oopSpent += effVal;
+  }
+  sb.oopEffective = oopEffective;
+  sb.oopSpent     = oopSpent;
+
+  /* Find the project and re-render the financials banner */
+  if (CLIENTS) {
+    outerSync: for (var ci = 0; ci < CLIENTS.length; ci++) {
+      for (var pi = 0; pi < CLIENTS[ci].projects.length; pi++) {
+        if (CLIENTS[ci].projects[pi].code === projCode) {
+          renderProjFinancials(CLIENTS[ci].projects[pi]);
+          break outerSync;
+        }
+      }
+    }
+  }
+}
+
 function sparkRenderSummary() {
   var el = document.getElementById('sparkSummaryBar');
   if (!el || !sparkCurrentData) return;
@@ -4270,6 +4351,7 @@ function sparkRenderSummary() {
   h += '<div class="spark-summary-item"><div class="ss-label">Client Price</div><div class="ss-value" style="color:var(--sand)">' + sparkFmt(clientPrice) + '</div></div>';
   h += '<div class="spark-summary-item"><div class="ss-label">Reserve</div><div class="ss-value" style="color:' + (profit >= 0 ? '#81C784' : 'var(--ember)') + '">' + sparkFmt(profit) + '</div><div class="ss-sub">' + margin.toFixed(1) + '% margin</div></div>';
   el.innerHTML = h;
+  syncProjFinancialsFromCurrent();
 }
 
 var sparkLaborSectionExpanded = { forge: true, freelancer: true };
@@ -5310,7 +5392,13 @@ function sparkRenderBudgetContent(embedded) {
   }
 
   /* ── Freelancers Section ── */
-  h += '<div class="section-title" style="margin-top:28px;display:flex;align-items:center;gap:8px">Freelancers <span style="font-size:11px;font-weight:400;color:#5B4A8A;background:rgba(91,74,138,.12);padding:2px 8px;border-radius:10px">billed at individual rates</span></div>';
+  var noFlChecked = data.budget.no_freelancers === true;
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:28px">';
+  h += '<div class="section-title" style="margin:0;display:flex;align-items:center;gap:8px">Freelancers <span style="font-size:11px;font-weight:400;color:#5B4A8A;background:rgba(91,74,138,.12);padding:2px 8px;border-radius:10px">billed at individual rates</span></div>';
+  h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--mid-gray)">';
+  h += '<span>No Freelancers</span>';
+  h += '<div style="position:relative;display:inline-block;width:36px;height:20px"><input type="checkbox" ' + (noFlChecked ? 'checked' : '') + ' onchange="sparkPatchBudgetField(\'no_freelancers\',this.checked)" style="opacity:0;width:0;height:0"><span style="position:absolute;top:0;left:0;right:0;bottom:0;background:' + (noFlChecked ? 'var(--ocean)' : 'rgba(0,0,0,.15)') + ';border-radius:10px;transition:.3s;cursor:pointer"></span><span style="position:absolute;left:' + (noFlChecked ? '18px' : '2px') + ';top:2px;width:16px;height:16px;background:white;border-radius:50%;transition:.3s;cursor:pointer"></span></div>';
+  h += '</label></div>';
   h += '<div class="rt-card"><div id="sparkFreelancersContent"></div></div>';
 
   /* ── OOP Section ── */
