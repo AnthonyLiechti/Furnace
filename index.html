@@ -1935,10 +1935,9 @@ function renderProjFinancials(p) {
   var marginPctVal = tcvPrice > 0 ? ((tcvPrice - internalLaborCost - oopBudget - flBudget) / tcvPrice * 100).toFixed(1) : 0;
   var marginColor = parseFloat(marginPctVal) > 30 ? '#81C784' : parseFloat(marginPctVal) >= 15 ? 'var(--honey)' : '#C62828';
 
-  var laborBilled = sb.laborTotal || 0;
-  var effRate = internalLaborCost > 0 ? (laborBilled / internalLaborCost) : 0;
-  var effRateDisplay = internalLaborCost > 0 ? effRate.toFixed(2) + '\u00d7' : '\u2014';
-  var effRateColor = effRate >= 1.5 ? '#81C784' : effRate >= 1.2 ? 'var(--honey)' : effRate > 0 ? 'var(--ember)' : 'var(--white)';
+  var effRate = saHrs > 0 ? (internalLaborCost / saHrs) : 0;
+  var effRateDisplay = saHrs > 0 ? '$' + Math.round(effRate).toLocaleString() + '/hr' : '\u2014';
+  var effRateColor = effRate > 0 && effRate <= 150 ? '#81C784' : effRate <= 175 ? 'var(--honey)' : effRate > 0 ? 'var(--ember)' : 'var(--white)';
 
   var agencyRate = 200;
   var laborSpent$ = saHrs * agencyRate;
@@ -1967,7 +1966,7 @@ function renderProjFinancials(p) {
   h += '<div class="snap-fin-item"><div class="sf-label">OOP Cost</div><div class="sf-value">' + (noOop ? '<span style="opacity:.4">—</span>' : '$' + Math.round(oopBudget).toLocaleString()) + '</div></div>';
   h += '<div class="snap-fin-item"><div class="sf-label">Reserve</div><div class="sf-value ' + (profitVal >= 0 ? 'sf-green' : '') + '">$' + Math.round(profitVal).toLocaleString() + '</div><div class="sf-sub">' + profitPctVal + '%</div></div>';
   h += '<div class="snap-fin-item"><div class="sf-label">Margin</div><div class="sf-value" style="color:' + marginColor + '">' + marginPctVal + '%</div><div class="sf-sub">Internal cost: $' + Math.round(internalLaborCost).toLocaleString() + '</div></div>';
-  h += '<div class="snap-fin-item"><div class="sf-label">Eff. Rate</div><div class="sf-value" style="color:' + effRateColor + '">' + effRateDisplay + '</div>' + (internalLaborCost > 0 ? '<div class="sf-sub">Billed vs cost ($' + Math.round(internalLaborCost).toLocaleString() + ')</div>' : '<div class="sf-sub">No cost data</div>') + '</div>';
+  h += '<div class="snap-fin-item"><div class="sf-label">Eff. Rate</div><div class="sf-value" style="color:' + effRateColor + '">' + effRateDisplay + '</div>' + (saHrs > 0 ? '<div class="sf-sub">vs $200 bill rate</div>' : '<div class="sf-sub">No hours tracked</div>') + '</div>';
   h += '</div>';
 
   /* ── Progress bar ── */
