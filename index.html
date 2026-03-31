@@ -1932,7 +1932,7 @@ function renderProjFinancials(p) {
   var profitPctVal = tcvPrice > 0 ? ((profitVal / tcvPrice) * 100).toFixed(1) : 0;
 
   var internalLaborCost = sb.laborCostInternal || sb.laborTotal || 0;
-  var marginPctVal = tcvPrice > 0 ? ((tcvPrice - internalLaborCost - oopBudget) / tcvPrice * 100).toFixed(1) : 0;
+  var marginPctVal = tcvPrice > 0 ? ((tcvPrice - internalLaborCost - oopBudget - flBudget) / tcvPrice * 100).toFixed(1) : 0;
   var marginColor = parseFloat(marginPctVal) > 30 ? '#81C784' : parseFloat(marginPctVal) >= 15 ? 'var(--honey)' : '#C62828';
 
   var effRate = saHrs > 0 ? (tcvPrice / saHrs) : 0;
@@ -1962,6 +1962,7 @@ function renderProjFinancials(p) {
   if (hasDisc) h += '<div class="sf-sub">Before discount: $' + Math.round(rawPrice).toLocaleString() + '</div>';
   h += '</div>';
   h += '<div class="snap-fin-item"><div class="sf-label">Labor Cost</div><div class="sf-value">$' + Math.round(sb.laborTotal || 0).toLocaleString() + '</div><div class="sf-sub">' + (sb.laborHours || 0).toFixed(0) + ' hrs @ $200/hr</div></div>';
+  h += '<div class="snap-fin-item"><div class="sf-label">Freelancer Cost</div><div class="sf-value" style="color:#CE93D8">' + (noFl ? '<span style="opacity:.4">—</span>' : '$' + Math.round(flBudget).toLocaleString()) + '</div>' + (!noFl && flBudget > 0 ? '<div class="sf-sub">' + (sb._flEntries || []).length + ' entries</div>' : '') + '</div>';
   h += '<div class="snap-fin-item"><div class="sf-label">OOP Cost</div><div class="sf-value">' + (noOop ? '<span style="opacity:.4">—</span>' : '$' + Math.round(oopBudget).toLocaleString()) + '</div></div>';
   h += '<div class="snap-fin-item"><div class="sf-label">Reserve</div><div class="sf-value ' + (profitVal >= 0 ? 'sf-green' : '') + '">$' + Math.round(profitVal).toLocaleString() + '</div><div class="sf-sub">' + profitPctVal + '%</div></div>';
   h += '<div class="snap-fin-item"><div class="sf-label">Margin</div><div class="sf-value" style="color:' + marginColor + '">' + marginPctVal + '%</div><div class="sf-sub">Internal cost: $' + Math.round(internalLaborCost).toLocaleString() + '</div></div>';
@@ -2004,22 +2005,6 @@ function renderProjFinancials(p) {
   h += '<div class="snap-fin-item"><div class="sf-label">Hours Remaining</div><div class="sf-value" style="color:' + (hrsRemaining < 0 ? 'var(--ember)' : 'var(--white)') + '">' + hrsRemaining.toFixed(1) + '</div></div>';
   h += '</div>';
 
-  /* ── OOP row — always shown, collapsible via toggle ── */
-  h += '<div style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">';
-  h += '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;opacity:.5;font-weight:600">Out-of-Pocket</div>';
-  h += toggleBtn('no_oop', noOop, 'No OOP');
-  h += '</div>';
-  if (noOop) {
-    h += '<div style="font-size:12px;color:var(--mid-gray);padding:8px 0;font-style:italic">Marked as no out-of-pocket costs for this project.</div>';
-  } else {
-    h += '<div class="snap-financials">';
-    h += '<div class="snap-fin-item"><div class="sf-label">OOP Budget</div><div class="sf-value">$' + Math.round(oopBudget).toLocaleString() + '</div></div>';
-    h += '<div class="snap-fin-item"><div class="sf-label">OOP Spent</div><div class="sf-value" style="color:#F57F17">$' + Math.round(oopSpent).toLocaleString() + '</div><div class="sf-sub">' + pct(oopSpent, oopBudget) + '% of budget</div></div>';
-    h += '<div class="snap-fin-item"><div class="sf-label">OOP Predicted</div><div class="sf-value">' + (oopPredicted > 0 ? '$' + Math.round(oopPredicted).toLocaleString() : '\u2014') + '</div><div class="sf-sub">From OOP planner</div></div>';
-    h += '<div class="snap-fin-item"><div class="sf-label">OOP Remaining</div><div class="sf-value" style="color:' + (oopRemaining < 0 ? 'var(--ember)' : 'var(--white)') + '">$' + Math.round(oopRemaining).toLocaleString() + '</div></div>';
-    h += '</div>';
-  }
-
   /* ── Freelancer row — always shown, collapsible via toggle ── */
   h += '<div style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">';
   h += '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;opacity:.5;font-weight:600">Freelancers</div>';
@@ -2037,6 +2022,22 @@ function renderProjFinancials(p) {
     h += '</div>';
   } else {
     h += '<div style="font-size:12px;color:var(--mid-gray);padding:8px 0;font-style:italic">No freelancer entries yet — add them in the Budget Snapshot below.</div>';
+  }
+
+  /* ── OOP row — always shown, collapsible via toggle ── */
+  h += '<div style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">';
+  h += '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;opacity:.5;font-weight:600">Out-of-Pocket</div>';
+  h += toggleBtn('no_oop', noOop, 'No OOP');
+  h += '</div>';
+  if (noOop) {
+    h += '<div style="font-size:12px;color:var(--mid-gray);padding:8px 0;font-style:italic">Marked as no out-of-pocket costs for this project.</div>';
+  } else {
+    h += '<div class="snap-financials">';
+    h += '<div class="snap-fin-item"><div class="sf-label">OOP Budget</div><div class="sf-value">$' + Math.round(oopBudget).toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">OOP Spent</div><div class="sf-value" style="color:#F57F17">$' + Math.round(oopSpent).toLocaleString() + '</div><div class="sf-sub">' + pct(oopSpent, oopBudget) + '% of budget</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">OOP Predicted</div><div class="sf-value">' + (oopPredicted > 0 ? '$' + Math.round(oopPredicted).toLocaleString() : '\u2014') + '</div><div class="sf-sub">From OOP planner</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">OOP Remaining</div><div class="sf-value" style="color:' + (oopRemaining < 0 ? 'var(--ember)' : 'var(--white)') + '">$' + Math.round(oopRemaining).toLocaleString() + '</div></div>';
+    h += '</div>';
   }
 
   h += '</div>'; /* end snapshot-banner */
