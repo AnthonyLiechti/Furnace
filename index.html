@@ -3811,6 +3811,123 @@ async function sparkLoadBudgetForProject(projectCode) {
 
   /* Render the budget content into the project page (snapshotSection stays collapsed by default) */
   sparkRenderBudgetContent(true);
+
+  /* Subscribe to real-time changes for this budget so collaborators see live updates */
+  sparkSubscribeRealtime(sparkCurrentData.budget.id);
+}
+
+/* ── REAL-TIME COLLABORATION ── */
+var _sparkRealtimeChannel = null;
+var _sparkRealtimeBudgetId = null;
+
+function sparkSubscribeRealtime(budgetId) {
+  if (!budgetId || !_furnaceAuthClient) return;
+  /* Unsubscribe from any previous budget channel */
+  if (_sparkRealtimeChannel) {
+    _furnaceAuthClient.removeChannel(_sparkRealtimeChannel);
+    _sparkRealtimeChannel = null;
+  }
+  _sparkRealtimeBudgetId = budgetId;
+
+  _sparkRealtimeChannel = _furnaceAuthClient
+    .channel('budget-live-' + budgetId)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'labor_budget_entries',       filter: 'budget_id=eq.' + budgetId }, function(payload) { sparkHandleRealtimeChange('labor', payload); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'oop_budget_entries',         filter: 'budget_id=eq.' + budgetId }, function(payload) { sparkHandleRealtimeChange('oop', payload); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'freelancer_budget_entries',  filter: 'budget_id=eq.' + budgetId }, function(payload) { sparkHandleRealtimeChange('fl', payload); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'budgets',                   filter: 'id=eq.' + budgetId },        function(payload) { sparkHandleRealtimeChange('budget', payload); })
+    .subscribe(function(status) {
+      var dot = document.getElementById('sparkLiveDot');
+      if (dot) dot.style.display = status === 'SUBSCRIBED' ? 'inline-block' : 'none';
+    });
+}
+
+function sparkHandleRealtimeChange(type, payload) {
+  if (!sparkCurrentData) return;
+  var rec = payload.new || payload.old;
+  if (!rec) return;
+
+  /* Skip if this entry has a pending local save — our own change, already applied */
+  var pendingKey = type + '-' + rec.id + '-';
+  for (var k in sparkSaveTimers) {
+    if (k.indexOf(rec.id) !== -1) return;
+  }
+
+  /* Show a brief "live update" flash */
+  sparkFlashLiveUpdate();
+
+  if (type === 'labor') {
+    if (payload.eventType === 'DELETE') {
+      sparkCurrentData.labor = sparkCurrentData.labor.filter(function(e) { return e.id !== rec.id; });
+    } else {
+      var found = false;
+      for (var i = 0; i < sparkCurrentData.labor.length; i++) {
+        if (sparkCurrentData.labor[i].id === rec.id) {
+          /* Preserve the joined team_member object, merge scalar fields */
+          var tm = sparkCurrentData.labor[i].team_member;
+          sparkCurrentData.labor[i] = rec;
+          sparkCurrentData.labor[i].team_member = tm;
+          found = true; break;
+        }
+      }
+      if (!found && payload.eventType === 'INSERT') sparkCurrentData.labor.push(rec);
+    }
+    sparkRenderLaborContent();
+    sparkRenderSummary();
+
+  } else if (type === 'oop') {
+    if (payload.eventType === 'DELETE') {
+      sparkCurrentData.oop = sparkCurrentData.oop.filter(function(e) { return e.id !== rec.id; });
+    } else {
+      var found = false;
+      for (var i = 0; i < sparkCurrentData.oop.length; i++) {
+        if (sparkCurrentData.oop[i].id === rec.id) {
+          var sec = sparkCurrentData.oop[i].section;
+          var cat = sparkCurrentData.oop[i].category;
+          sparkCurrentData.oop[i] = rec;
+          sparkCurrentData.oop[i].section = sec;
+          sparkCurrentData.oop[i].category = cat;
+          found = true; break;
+        }
+      }
+      if (!found && payload.eventType === 'INSERT') sparkCurrentData.oop.push(rec);
+    }
+    sparkRenderOopContent();
+    sparkRenderSummary();
+
+  } else if (type === 'fl') {
+    if (payload.eventType === 'DELETE') {
+      sparkCurrentData.freelancerEntries = (sparkCurrentData.freelancerEntries || []).filter(function(e) { return e.id !== rec.id; });
+    } else {
+      var found = false;
+      var fes = sparkCurrentData.freelancerEntries || [];
+      for (var i = 0; i < fes.length; i++) {
+        if (fes[i].id === rec.id) {
+          var tm2 = fes[i].team_member;
+          fes[i] = rec;
+          fes[i].team_member = tm2;
+          found = true; break;
+        }
+      }
+      if (!found && payload.eventType === 'INSERT') fes.push(rec);
+      sparkCurrentData.freelancerEntries = fes;
+    }
+    sparkRenderFreelancersContent();
+    sparkRenderSummary();
+
+  } else if (type === 'budget') {
+    /* Client price, toggles, etc. changed */
+    Object.assign(sparkCurrentData.budget, rec);
+    sparkRenderBudgetContent(true);
+  }
+}
+
+var _sparkLiveFlashTimer = null;
+function sparkFlashLiveUpdate() {
+  var dot = document.getElementById('sparkLiveDot');
+  if (!dot) return;
+  dot.style.background = '#81C784';
+  if (_sparkLiveFlashTimer) clearTimeout(_sparkLiveFlashTimer);
+  _sparkLiveFlashTimer = setTimeout(function() { dot.style.background = 'rgba(129,199,132,.5)'; }, 1200);
 }
 
 var SPARK_PHASES = [
@@ -5287,7 +5404,7 @@ function sparkRenderBudgetContent(embedded) {
       var curStatus = budget.status || 'active';
       oh += '<div class="snapshot-banner" style="margin-bottom:16px">';
       oh += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">';
-      oh += '<div style="font-size:16px;font-weight:700">PROJECT OVERVIEW <span style="font-size:13px;font-weight:400;opacity:.5">#' + (budget.estimate_number || '\u2014') + '</span></div>';
+      oh += '<div style="font-size:16px;font-weight:700;display:flex;align-items:center;gap:10px">PROJECT OVERVIEW <span style="font-size:13px;font-weight:400;opacity:.5">#' + (budget.estimate_number || '\u2014') + '</span><span id="sparkLiveDot" title="Live updates active" style="display:none;width:8px;height:8px;border-radius:50%;background:rgba(129,199,132,.5);transition:background .4s"></span></div>';
       oh += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
       var statusOpts = [
         {label:'Non-Billable', val:'nonbillable', color:'var(--mid-gray)'},
