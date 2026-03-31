@@ -1937,7 +1937,12 @@ function renderProject(projectId) {
     var hasDisc = sb.has_discount || false;
     var discAmt = hasDisc ? rawPrice * 0.035 : 0;
     var tcvPrice = rawPrice - discAmt;
-    var computedCosts = (sb.laborTotal || 0) + (sb.oopEffective || sb.oopTotal || 0);
+    /* Freelancer metrics */
+    var flBudget = sb.flTotal || 0;
+    var flSpent = sb.flSpent || 0;
+    var flRemaining = flBudget - flSpent;
+
+    var computedCosts = (sb.laborTotal || 0) + (sb.oopEffective || sb.oopTotal || 0) + flBudget;
     var profitVal = tcvPrice - computedCosts;
     var profitPctVal = tcvPrice > 0 ? ((profitVal / tcvPrice) * 100).toFixed(1) : 0;
 
@@ -1952,7 +1957,7 @@ function renderProject(projectId) {
     var laborSpent$ = saHrs * agencyRate;
     var laborRemaining$ = Math.max(0, hrsRemaining) * agencyRate;
     var barTotal = tcvPrice > 0 ? tcvPrice : 1;
-    var profitBar$ = Math.max(0, tcvPrice - laborSpent$ - laborRemaining$ - oopSpent - Math.max(0, oopRemaining));
+    var profitBar$ = Math.max(0, tcvPrice - laborSpent$ - laborRemaining$ - oopSpent - Math.max(0, oopRemaining) - flBudget);
 
     /* Margin % = (TCV - Internal Labor Cost - OOP Effective) / TCV */
     var internalLaborCost = sb.laborCostInternal || sb.laborTotal || 0;
@@ -1983,13 +1988,17 @@ function renderProject(projectId) {
     var pLaborRem = Math.min(100 - pLaborSpent, laborRemaining$ / barTotal * 100);
     var pOopSpent = Math.min(100 - pLaborSpent - pLaborRem, oopSpent / barTotal * 100);
     var pOopRem = Math.min(100 - pLaborSpent - pLaborRem - pOopSpent, Math.max(0, oopRemaining) / barTotal * 100);
-    var pProfit = Math.max(0, 100 - pLaborSpent - pLaborRem - pOopSpent - pOopRem);
+    var pFlSpent = Math.min(100 - pLaborSpent - pLaborRem - pOopSpent - pOopRem, flSpent / barTotal * 100);
+    var pFlRem = Math.min(100 - pLaborSpent - pLaborRem - pOopSpent - pOopRem - pFlSpent, Math.max(0, flRemaining) / barTotal * 100);
+    var pProfit = Math.max(0, 100 - pLaborSpent - pLaborRem - pOopSpent - pOopRem - pFlSpent - pFlRem);
     h += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1)">';
     h += '<div class="lob-bar">';
     if (pLaborSpent > 0) h += '<div class="lob-seg" style="width:' + pLaborSpent.toFixed(1) + '%;background:var(--ember)">' + (pLaborSpent >= 8 ? '$' + Math.round(laborSpent$).toLocaleString() : '') + '</div>';
     if (pLaborRem > 0.5) h += '<div class="lob-seg" style="width:' + pLaborRem.toFixed(1) + '%;background:var(--ocean)">' + (pLaborRem >= 8 ? '$' + Math.round(laborRemaining$).toLocaleString() : '') + '</div>';
     if (pOopSpent > 0) h += '<div class="lob-seg" style="width:' + pOopSpent.toFixed(1) + '%;background:#F57F17">' + (pOopSpent >= 8 ? '$' + Math.round(oopSpent).toLocaleString() : '') + '</div>';
     if (pOopRem > 0.5) h += '<div class="lob-seg" style="width:' + pOopRem.toFixed(1) + '%;background:#FFE0B2;color:var(--abyss)">' + (pOopRem >= 8 ? '$' + Math.round(Math.max(0, oopRemaining)).toLocaleString() : '') + '</div>';
+    if (pFlSpent > 0) h += '<div class="lob-seg" style="width:' + pFlSpent.toFixed(1) + '%;background:#7B1FA2">' + (pFlSpent >= 8 ? '$' + Math.round(flSpent).toLocaleString() : '') + '</div>';
+    if (pFlRem > 0.5) h += '<div class="lob-seg" style="width:' + pFlRem.toFixed(1) + '%;background:#E1BEE7;color:var(--abyss)">' + (pFlRem >= 8 ? '$' + Math.round(Math.max(0, flRemaining)).toLocaleString() : '') + '</div>';
     if (pProfit > 0.5) h += '<div class="lob-seg" style="width:' + pProfit.toFixed(1) + '%;background:#81C784">' + (pProfit >= 8 ? '$' + Math.round(profitBar$).toLocaleString() : '') + '</div>';
     h += '</div>';
     h += '<div class="lob-legend">';
@@ -1997,6 +2006,8 @@ function renderProject(projectId) {
     h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ocean)"></div>Labor Remaining</div>';
     h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#F57F17"></div>OOP Spent</div>';
     h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#FFE0B2"></div>OOP Remaining</div>';
+    if (flBudget > 0) h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#7B1FA2"></div>FL Paid</div>';
+    if (flBudget > 0) h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#E1BEE7"></div>FL Unpaid</div>';
     h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Reserve</div>';
     h += '</div></div>';
 
@@ -2014,7 +2025,20 @@ function renderProject(projectId) {
     h += '<div class="snap-fin-item"><div class="sf-label">OOP Spent</div><div class="sf-value" style="color:#F57F17">$' + Math.round(oopSpent).toLocaleString() + '</div><div class="sf-sub">' + pct(oopSpent, oopBudget) + '% of budget</div></div>';
     h += '<div class="snap-fin-item"><div class="sf-label">OOP Predicted</div><div class="sf-value">' + (oopPredicted > 0 ? '$' + Math.round(oopPredicted).toLocaleString() : '\u2014') + '</div><div class="sf-sub">From OOP planner</div></div>';
     h += '<div class="snap-fin-item"><div class="sf-label">OOP Remaining</div><div class="sf-value" style="color:' + (oopRemaining < 0 ? 'var(--ember)' : 'var(--white)') + '">$' + Math.round(oopRemaining).toLocaleString() + '</div></div>';
-    h += '</div></div>';
+    h += '</div>';
+
+    /* ── Freelancer Row ── only show if there are freelancer entries */
+    if (flBudget > 0) {
+      var flUnpaid = flBudget - flSpent;
+      h += '<div class="snap-financials" style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1)">';
+      h += '<div class="snap-fin-item"><div class="sf-label">FL Budgeted</div><div class="sf-value" style="color:#CE93D8">$' + Math.round(flBudget).toLocaleString() + '</div><div class="sf-sub">' + (sb._flEntries || []).length + ' entries</div></div>';
+      h += '<div class="snap-fin-item"><div class="sf-label">FL Paid</div><div class="sf-value" style="color:#81C784">$' + Math.round(flSpent).toLocaleString() + '</div><div class="sf-sub">' + pct(flSpent, flBudget) + '% of budget</div></div>';
+      h += '<div class="snap-fin-item"><div class="sf-label">FL Unpaid</div><div class="sf-value" style="color:' + (flUnpaid > 0 ? '#CE93D8' : 'var(--white)') + '">$' + Math.round(flUnpaid).toLocaleString() + '</div><div class="sf-sub">Pending payment</div></div>';
+      h += '<div class="snap-fin-item"><div class="sf-label">FL Remaining</div><div class="sf-value" style="color:' + (flRemaining < 0 ? 'var(--ember)' : 'var(--white)') + '">$' + Math.round(flRemaining).toLocaleString() + '</div></div>';
+      h += '</div>';
+    }
+
+    h += '</div>';
   }
 
   var isBizDev = p.projectType === 'bizdev';
@@ -6329,11 +6353,18 @@ function renderAllocations() {
   h += '<div class="alloc-tab-bar">';
   h += '<button class="alloc-tab-btn' + (allocResourceTab === 'hours' ? ' active' : '') + '" onclick="allocResourceTab=\'hours\';renderAllocations()">Hours</button>';
   h += '<button class="alloc-tab-btn' + (allocResourceTab === 'oop' ? ' active' : '') + '" onclick="allocResourceTab=\'oop\';renderAllocations()">Out-of-Pocket</button>';
+  h += '<button class="alloc-tab-btn' + (allocResourceTab === 'freelancers' ? ' active' : '') + '" onclick="allocResourceTab=\'freelancers\';renderAllocations()">Freelancers</button>';
   h += '</div>';
 
   if (allocResourceTab === 'oop') {
     mc.innerHTML = h;
     renderOopPlanner();
+    return;
+  }
+
+  if (allocResourceTab === 'freelancers') {
+    mc.innerHTML = h;
+    renderFreelancerPlanner();
     return;
   }
 
@@ -7146,6 +7177,259 @@ function renderOopFooter() {
   el.innerHTML = h;
 }
 
+/* ══════════════════════════════════════════════
+   FREELANCER PLANNER
+   ══════════════════════════════════════════════ */
+var flProjFilter = null;   /* null = all projects; string = project code */
+var flProjSearch = '';
+var flPersonFilter = null; /* null = all freelancers; string = team_member_id */
+
+function renderFreelancerPlanner() {
+  var mc = document.getElementById('mainContent');
+  var h = mc.innerHTML; /* keep tab bar */
+
+  h += '<div class="oop-planner-layout">';
+
+  /* ── Project sidebar ── */
+  h += '<div class="alloc-proj-sidebar">';
+  h += '<div class="aps-header">Projects</div>';
+  h += '<input class="aps-search" type="text" placeholder="Search projects..." value="' + (flProjSearch || '') + '" oninput="flProjSearch=this.value;renderFlProjList()" id="flProjSearchInput">';
+  h += '<div id="flProjListInner"></div>';
+  h += '</div>';
+
+  /* ── Main area ── */
+  h += '<div class="oop-planner-grid-area">';
+  h += '<div class="oop-planner-toolbar">';
+  h += '<span style="font-size:13px;font-weight:600;color:var(--mid-gray)">' + (flProjFilter ? 'Showing: ' + flProjFilter : 'All Projects') + '</span>';
+  h += '<span id="flSaveStatus" class="alloc-save-status" style="margin-left:12px"></span>';
+  h += '</div>';
+  h += '<div class="oop-planner-scroll" id="flGridScroll"></div>';
+  h += '<div class="oop-footer" id="flFooter"></div>';
+  h += '</div>';
+
+  h += '</div>'; /* end oop-planner-layout */
+
+  mc.innerHTML = h;
+  renderFlProjList();
+  renderFlGrid();
+}
+
+function renderFlProjList() {
+  var el = document.getElementById('flProjListInner');
+  if (!el) return;
+  var search = (flProjSearch || '').toLowerCase();
+  var h = '';
+
+  /* "All Projects" option */
+  var allAmt = 0;
+  if (SUPA_BUDGETS) { for (var c in SUPA_BUDGETS) { allAmt += SUPA_BUDGETS[c].flTotal || 0; } }
+  h += '<div class="aps-item' + (!flProjFilter ? ' active' : '') + '" onclick="flProjFilter=null;renderFlProjList();renderFlGrid()" style="font-weight:700">';
+  h += 'All Projects <span style="float:right;font-size:11px;color:var(--mid-gray)">$' + Math.round(allAmt).toLocaleString() + '</span>';
+  h += '</div>';
+
+  if (!SUPA_BUDGETS || !CLIENTS) return;
+  var lastClient = '';
+  for (var ci = 0; ci < CLIENTS.length; ci++) {
+    var client = CLIENTS[ci];
+    for (var pi = 0; pi < client.projects.length; pi++) {
+      var p = client.projects[pi];
+      var sb = SUPA_BUDGETS[p.code];
+      if (!sb || !sb._flEntries || !sb._flEntries.length) continue;
+      if (search && p.name.toLowerCase().indexOf(search) < 0 && p.code.toLowerCase().indexOf(search) < 0) continue;
+      if (client.name !== lastClient) {
+        h += '<div class="aps-client">' + p.code.split('_')[0] + ' ' + client.name + '</div>';
+        lastClient = client.name;
+      }
+      var flAmt = sb.flTotal || 0;
+      var flUnpaidCnt = (sb._flEntries || []).filter(function(e) { return !e.paid && (e.hours || 0) > 0; }).length;
+      h += '<div class="aps-item' + (flProjFilter === p.code ? ' active' : '') + '" onclick="flProjFilter=\'' + p.code + '\';renderFlProjList();renderFlGrid()">';
+      h += '<div style="font-size:11px;font-weight:600">' + p.code + '</div>';
+      h += '<div style="font-size:11px;color:var(--mid-gray);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + p.name + '</div>';
+      h += '<div style="font-size:11px;margin-top:2px;display:flex;justify-content:space-between">';
+      h += '<span>$' + Math.round(flAmt).toLocaleString() + '</span>';
+      if (flUnpaidCnt > 0) h += '<span style="color:#CE93D8;font-weight:700">' + flUnpaidCnt + ' unpaid</span>';
+      h += '</div>';
+      h += '</div>';
+    }
+  }
+  el.innerHTML = h;
+}
+
+function renderFlGrid() {
+  var el = document.getElementById('flGridScroll');
+  if (!el) return;
+  if (!SUPA_BUDGETS) { el.innerHTML = '<div style="padding:20px;color:var(--mid-gray)">No budget data loaded.</div>'; return; }
+
+  /* Collect entries for selected project(s) */
+  var projectEntries = []; /* [{projCode, projName, entries: [...]}] */
+  var codes = flProjFilter ? [flProjFilter] : Object.keys(SUPA_BUDGETS);
+  for (var ci = 0; ci < codes.length; ci++) {
+    var code = codes[ci];
+    var sb = SUPA_BUDGETS[code];
+    if (!sb || !sb._flEntries || !sb._flEntries.length) continue;
+    /* Find project name */
+    var pName = code;
+    if (CLIENTS) {
+      outerFl: for (var x = 0; x < CLIENTS.length; x++) {
+        for (var y = 0; y < CLIENTS[x].projects.length; y++) {
+          if (CLIENTS[x].projects[y].code === code) { pName = CLIENTS[x].projects[y].name; break outerFl; }
+        }
+      }
+    }
+    projectEntries.push({ projCode: code, projName: pName, entries: sb._flEntries, sb: sb });
+  }
+
+  if (!projectEntries.length) {
+    el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--mid-gray)"><div style="font-size:14px;font-weight:600">No freelancer entries found</div><div style="font-size:12px;margin-top:6px">Add freelancers to a project budget to see them here.</div></div>';
+    renderFlFooter();
+    return;
+  }
+
+  var h = '';
+  /* Render each project block */
+  for (var pi = 0; pi < projectEntries.length; pi++) {
+    var pe = projectEntries[pi];
+    var projTotal = pe.sb.flTotal || 0;
+    var projPaid = pe.sb.flSpent || 0;
+    var projUnpaid = projTotal - projPaid;
+
+    h += '<div style="background:var(--white);border-radius:10px;margin-bottom:16px;overflow:hidden;border:1px solid var(--canvas)">';
+    /* Project header */
+    h += '<div style="padding:12px 16px;background:rgba(91,74,138,.08);border-bottom:1px solid rgba(91,74,138,.15);display:flex;justify-content:space-between;align-items:center">';
+    h += '<div>';
+    h += '<div style="font-size:12px;font-weight:700;color:#5B4A8A">' + pe.projCode + '</div>';
+    h += '<div style="font-size:13px;font-weight:600">' + pe.projName + '</div>';
+    h += '</div>';
+    h += '<div style="display:flex;gap:20px;text-align:right">';
+    h += '<div><div style="font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray)">Budget</div><div style="font-weight:700;color:#CE93D8">$' + Math.round(projTotal).toLocaleString() + '</div></div>';
+    h += '<div><div style="font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray)">Paid</div><div style="font-weight:700;color:#81C784">$' + Math.round(projPaid).toLocaleString() + '</div></div>';
+    h += '<div><div style="font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray)">Unpaid</div><div style="font-weight:700;color:' + (projUnpaid > 0 ? '#CE93D8' : 'var(--mid-gray)') + '">$' + Math.round(projUnpaid).toLocaleString() + '</div></div>';
+    h += '</div>';
+    h += '</div>';
+
+    /* Group entries by freelancer */
+    var freelancers = {}, flOrder = [];
+    for (var ei = 0; ei < pe.entries.length; ei++) {
+      var e = pe.entries[ei];
+      var tid = e.team_member_id;
+      if (!freelancers[tid]) { freelancers[tid] = { name: e._name || 'Unknown', entries: [] }; flOrder.push(tid); }
+      freelancers[tid].entries.push(e);
+    }
+
+    for (var fi = 0; fi < flOrder.length; fi++) {
+      var tid = flOrder[fi];
+      var fl = freelancers[tid];
+      var flHrs = 0, flCost = 0, flUnpaidCnt = 0;
+      for (var ei = 0; ei < fl.entries.length; ei++) {
+        var hrs = fl.entries[ei].hours || 0;
+        flHrs += hrs;
+        flCost += hrs * (fl.entries[ei].rate || 0);
+        if (!fl.entries[ei].paid && hrs > 0) flUnpaidCnt++;
+      }
+
+      /* Freelancer header */
+      h += '<div style="padding:8px 16px;background:rgba(91,74,138,.04);border-bottom:1px solid rgba(91,74,138,.08);display:flex;justify-content:space-between;align-items:center">';
+      h += '<div style="display:flex;align-items:center;gap:10px">';
+      h += '<div style="width:28px;height:28px;border-radius:50%;background:#5B4A8A;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">' + fl.name.charAt(0) + '</div>';
+      h += '<div><div style="font-weight:600;font-size:13px">' + fl.name + '</div>';
+      h += '<div style="font-size:11px;color:var(--mid-gray)">' + flHrs.toFixed(1) + ' hrs · $' + Math.round(flCost).toLocaleString() + '</div></div>';
+      h += '</div>';
+      if (flUnpaidCnt > 0) h += '<span style="background:rgba(206,147,216,.2);color:#7B1FA2;font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px">' + flUnpaidCnt + ' unpaid</span>';
+      h += '</div>';
+
+      /* Entry rows */
+      h += '<div style="display:grid;grid-template-columns:1fr 70px 65px 80px 120px 1fr;gap:4px;padding:5px 16px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);border-bottom:1px solid rgba(91,74,138,.08)">';
+      h += '<div>Week</div><div style="text-align:right">Hours</div><div style="text-align:right">$/hr</div><div style="text-align:right">Total</div><div style="text-align:center">Paid</div><div>Notes</div>';
+      h += '</div>';
+
+      for (var ei = 0; ei < fl.entries.length; ei++) {
+        var entry = fl.entries[ei];
+        var eid = entry.id;
+        var eHrs = entry.hours || 0;
+        var eRate = entry.rate || 0;
+        var eTotal = eHrs * eRate;
+        var isPaid = entry.paid || false;
+        var paidDate = entry.paid_date || '';
+        var rowBg = isPaid ? 'rgba(129,199,132,.05)' : (eHrs > 0 ? 'rgba(206,147,216,.04)' : '');
+
+        h += '<div style="display:grid;grid-template-columns:1fr 70px 65px 80px 120px 1fr;gap:4px;padding:6px 16px;align-items:center;border-bottom:1px solid rgba(91,74,138,.06);background:' + rowBg + '">';
+        h += '<div style="font-size:12px;font-weight:500">' + (entry.week_label || '—') + '</div>';
+        h += '<div style="text-align:right;font-size:12px">' + (eHrs > 0 ? eHrs.toFixed(1) : '—') + '</div>';
+        h += '<div style="text-align:right;font-size:11px;color:var(--mid-gray)">$' + eRate.toLocaleString() + '</div>';
+        h += '<div style="text-align:right;font-weight:600;color:#5B4A8A;font-size:12px">' + (eTotal > 0 ? '$' + Math.round(eTotal).toLocaleString() : '—') + '</div>';
+        /* Paid toggle */
+        h += '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">';
+        h += '<input type="checkbox" ' + (isPaid ? 'checked' : '') + ' onchange="flTogglePaidGlobal(\'' + eid + '\',this.checked,\'' + pe.projCode + '\')" style="cursor:pointer;width:15px;height:15px;accent-color:#81C784">';
+        if (isPaid && paidDate) h += '<div style="font-size:9px;color:#2E7D32">' + paidDate + '</div>';
+        else if (isPaid) h += '<input type="date" class="spark-input" style="width:100px;font-size:9px;padding:1px 3px;text-align:center;color:#2E7D32;border-color:#C8E6C9" value="' + paidDate + '" onchange="flPatchGlobal(\'' + eid + '\',\'paid_date\',this.value,\'' + pe.projCode + '\')" title="Date paid">';
+        h += '</div>';
+        h += '<div style="font-size:11px;color:var(--mid-gray)">' + (entry.notes || '') + '</div>';
+        h += '</div>';
+      }
+    }
+
+    h += '</div>';
+  }
+
+  el.innerHTML = h;
+  renderFlFooter();
+}
+
+function renderFlFooter() {
+  var el = document.getElementById('flFooter');
+  if (!el) return;
+  if (!SUPA_BUDGETS) return;
+  var totalBudget = 0, totalPaid = 0, totalEntries = 0;
+  var codes = flProjFilter ? [flProjFilter] : Object.keys(SUPA_BUDGETS);
+  for (var i = 0; i < codes.length; i++) {
+    var sb = SUPA_BUDGETS[codes[i]];
+    if (!sb || !sb._flEntries) continue;
+    totalBudget += sb.flTotal || 0;
+    totalPaid += sb.flSpent || 0;
+    totalEntries += sb._flEntries.length;
+  }
+  var h = '<div><span class="oop-stat-label">Total Entries</span> <span class="oop-stat">' + totalEntries + '</span></div>';
+  h += '<div><span class="oop-stat-label">Unpaid</span> <span class="oop-stat" style="color:#CE93D8">$' + Math.round(totalBudget - totalPaid).toLocaleString() + '</span></div>';
+  h += '<div><span class="oop-stat-label">Paid</span> <span class="oop-stat" style="color:#2E7D32">$' + Math.round(totalPaid).toLocaleString() + '</span></div>';
+  h += '<div><span class="oop-stat-label">Grand Total</span> <span class="oop-stat">$' + Math.round(totalBudget).toLocaleString() + '</span></div>';
+  el.innerHTML = h;
+}
+
+async function flTogglePaidGlobal(entryId, isChecked, projCode) {
+  var today = new Date().toISOString().slice(0, 10);
+  var patch = { paid: isChecked, paid_date: isChecked ? today : null };
+  var statusEl = document.getElementById('flSaveStatus');
+  if (statusEl) statusEl.textContent = 'Saving…';
+  await sparkFetch('freelancer_budget_entries?id=eq.' + entryId, '', 'PATCH', patch);
+  /* Update local cache */
+  if (SUPA_BUDGETS && SUPA_BUDGETS[projCode] && SUPA_BUDGETS[projCode]._flEntries) {
+    var entries = SUPA_BUDGETS[projCode]._flEntries;
+    var flSpentNew = 0;
+    for (var i = 0; i < entries.length; i++) {
+      if (entries[i].id === entryId) {
+        entries[i].paid = isChecked;
+        entries[i].paid_date = isChecked ? today : null;
+      }
+      if (entries[i].paid) flSpentNew += (entries[i].hours || 0) * (entries[i].rate || 0);
+    }
+    SUPA_BUDGETS[projCode].flSpent = flSpentNew;
+  }
+  if (statusEl) { statusEl.textContent = 'Saved'; setTimeout(function() { if (statusEl) statusEl.textContent = ''; }, 2000); }
+  renderFlGrid();
+}
+
+async function flPatchGlobal(entryId, field, value, projCode) {
+  await sparkFetch('freelancer_budget_entries?id=eq.' + entryId, '', 'PATCH', { [field]: value || null });
+  if (SUPA_BUDGETS && SUPA_BUDGETS[projCode] && SUPA_BUDGETS[projCode]._flEntries) {
+    for (var i = 0; i < SUPA_BUDGETS[projCode]._flEntries.length; i++) {
+      if (SUPA_BUDGETS[projCode]._flEntries[i].id === entryId) {
+        SUPA_BUDGETS[projCode]._flEntries[i][field] = value || null;
+        break;
+      }
+    }
+  }
+}
+
 function renderAllocProjList() {
   var el = document.getElementById('allocProjListInner');
   if (!el) return;
@@ -7778,6 +8062,27 @@ async function loadSupabaseData() {
       b.labor = laborByBudget[b.id] || [];
       b.oop = oopByBudget[b.id] || [];
       b._flEntries = flByBudget[b.id] || [];
+
+      /* Enrich freelancer entries with team member name for planner */
+      for (var k = 0; k < b._flEntries.length; k++) {
+        var fe = b._flEntries[k];
+        if (!fe._name) {
+          for (var ti = 0; ti < FURNACE_TEAM_MEMBERS.length; ti++) {
+            if (FURNACE_TEAM_MEMBERS[ti].id === fe.team_member_id) { fe._name = FURNACE_TEAM_MEMBERS[ti].name; break; }
+          }
+          if (!fe._name) fe._name = 'Unknown';
+        }
+      }
+
+      /* Compute freelancer totals */
+      var flTot = 0, flSpent = 0;
+      for (var k = 0; k < b._flEntries.length; k++) {
+        var feCost = (b._flEntries[k].hours || 0) * (b._flEntries[k].rate || 0);
+        flTot += feCost;
+        if (b._flEntries[k].paid) flSpent += feCost;
+      }
+      b.flTotal = flTot;
+      b.flSpent = flSpent;
 
       /* Compute labor totals — flat $200/hr agency rate for everything */
       var laborHours = 0;
