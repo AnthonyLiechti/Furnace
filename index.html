@@ -700,6 +700,10 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
     <div class="dt-switch"><div class="dt-knob"></div></div>
     <span>Dark Mode</span>
   </div>
+  <div id="furnaceSidebarUser" style="padding:10px 16px 14px;border-top:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.4)">
+    <span id="furnaceSidebarUserName"></span>
+    <button onclick="furnaceLogout()" style="background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer" onmouseenter="this.style.color='var(--sand)';this.style.borderColor='var(--sand)'" onmouseleave="this.style.color='rgba(255,255,255,.4)';this.style.borderColor='rgba(255,255,255,.15)'">Sign out</button>
+  </div>
 </div>
 
 <div class="main">
@@ -8559,14 +8563,107 @@ async function loadData() {
     var savedView = null;
     try { savedView = localStorage.getItem('furnace_view'); } catch(e) {}
     navigate(savedView || 'master');
+    /* Show logged-in user in sidebar */
+    try {
+      var _sess = JSON.parse(localStorage.getItem(FURNACE_SESSION_KEY) || '{}');
+      var _nameEl = document.getElementById('furnaceSidebarUserName');
+      if (_nameEl && _sess.name) _nameEl.textContent = _sess.name;
+    } catch(e) {}
   } catch(e) {
     console.error('loadData error:', e);
     document.getElementById('mainContent').innerHTML = '<div style="padding:60px 40px;text-align:center"><h2 style="color:var(--ember)">Unable to load data</h2><p style="color:var(--mid-gray);margin-top:12px">' + e.message + '</p></div>';
   }
 }
 
+/* ══════════════════════════════════════════════════════════════
+   FURNACE AUTH — simple credential gate for the Vercel deployment
+   Credentials are hashed (username + password + salt → btoa).
+   To add/change users, update FURNACE_ACCOUNTS below.
+   ══════════════════════════════════════════════════════════════ */
+var FURNACE_AUTH_SALT = 'frgMd2026xK9';
+var FURNACE_SESSION_KEY = 'furnace_session_v1';
+
+/* Accounts: { displayName, token }
+   Token = btoa(salt + ':' + username + ':' + password) */
+var FURNACE_ACCOUNTS = {
+  'anthony':  { display: 'Anthony',    token: btoa(FURNACE_AUTH_SALT + ':anthony:Furnace2026!') },
+  'forge':    { display: 'Forge Team', token: btoa(FURNACE_AUTH_SALT + ':forge:Spark2026!') }
+};
+
+function furnaceCheckAuth() {
+  try {
+    var stored = localStorage.getItem(FURNACE_SESSION_KEY);
+    if (!stored) return false;
+    var parsed = JSON.parse(stored);
+    var acct = FURNACE_ACCOUNTS[parsed.user];
+    return acct && acct.token === parsed.token;
+  } catch(e) { return false; }
+}
+
+function furnaceLogin(username, password) {
+  var u = (username || '').toLowerCase().trim();
+  var acct = FURNACE_ACCOUNTS[u];
+  if (!acct) return false;
+  var expected = btoa(FURNACE_AUTH_SALT + ':' + u + ':' + password);
+  if (expected !== acct.token) return false;
+  try { localStorage.setItem(FURNACE_SESSION_KEY, JSON.stringify({ user: u, token: acct.token, name: acct.display })); } catch(e) {}
+  return true;
+}
+
+function furnaceLogout() {
+  try { localStorage.removeItem(FURNACE_SESSION_KEY); } catch(e) {}
+  location.reload();
+}
+
+function furnaceShowLogin() {
+  /* Hide main app */
+  document.querySelector('.sidebar').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'none';
+
+  var el = document.getElementById('furnaceLoginOverlay');
+  if (el) { el.style.display = 'flex'; return; }
+
+  var overlay = document.createElement('div');
+  overlay.id = 'furnaceLoginOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:var(--abyss);display:flex;align-items:center;justify-content:center;z-index:9999;font-family:Arial,sans-serif';
+  overlay.innerHTML = [
+    '<div style="width:360px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:40px 36px;text-align:center">',
+      '<div style="font-size:22px;font-weight:700;letter-spacing:2px;color:var(--sand);margin-bottom:4px">FURNACE</div>',
+      '<div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:32px;letter-spacing:.5px">Forge Portfolio Tracker</div>',
+      '<div id="furnaceLoginErr" style="display:none;background:rgba(206,115,56,.18);border:1px solid rgba(206,115,56,.4);color:var(--honey);font-size:12px;padding:8px 12px;border-radius:6px;margin-bottom:16px">Incorrect username or password.</div>',
+      '<input id="furnaceUser" type="text" placeholder="Username" autocomplete="username" style="width:100%;padding:10px 14px;border-radius:7px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:var(--white);font-size:14px;margin-bottom:10px;outline:none" />',
+      '<input id="furnacePass" type="password" placeholder="Password" autocomplete="current-password" style="width:100%;padding:10px 14px;border-radius:7px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:var(--white);font-size:14px;margin-bottom:20px;outline:none" />',
+      '<button onclick="furnaceAttemptLogin()" style="width:100%;padding:11px;border-radius:7px;border:none;background:var(--ocean);color:var(--white);font-size:14px;font-weight:600;cursor:pointer;letter-spacing:.5px">Sign In</button>',
+    '</div>'
+  ].join('');
+  document.body.appendChild(overlay);
+
+  /* Allow Enter key to submit */
+  overlay.addEventListener('keydown', function(e) { if (e.key === 'Enter') furnaceAttemptLogin(); });
+  setTimeout(function() { var u = document.getElementById('furnaceUser'); if (u) u.focus(); }, 50);
+}
+
+function furnaceAttemptLogin() {
+  var u = document.getElementById('furnaceUser');
+  var p = document.getElementById('furnacePass');
+  var err = document.getElementById('furnaceLoginErr');
+  if (furnaceLogin(u.value, p.value)) {
+    document.getElementById('furnaceLoginOverlay').style.display = 'none';
+    document.querySelector('.sidebar').style.display = '';
+    document.getElementById('mainContent').style.display = '';
+    loadData();
+  } else {
+    if (err) err.style.display = 'block';
+    if (p) { p.value = ''; p.focus(); }
+  }
+}
+
 /* ── INIT ── */
-loadData();
+if (furnaceCheckAuth()) {
+  loadData();
+} else {
+  furnaceShowLogin();
+}
 </script>
 </body>
 </html>
