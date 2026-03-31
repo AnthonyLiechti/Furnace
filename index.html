@@ -1896,6 +1896,174 @@ function renderClient(clientId) {
   document.getElementById('mainContent').innerHTML = h;
 }
 
+/* ══════════════════════════════════════════════
+   PROJECT FINANCIALS BANNER
+   ══════════════════════════════════════════════ */
+function renderProjFinancials(p) {
+  var el = document.getElementById('projFin-' + p.code);
+  if (!el || !p._supabudget) return;
+  var sb = p._supabudget;
+
+  var saHrs = SUPA_ACTUALS[p.code] ? SUPA_ACTUALS[p.code].totalHours : 0;
+  var allocHrs = 0;
+  var nativeAllocs = getAllocationsForProject(p.id);
+  for (var ai = 0; ai < nativeAllocs.length; ai++) allocHrs += nativeAllocs[ai].hoursPerDay || 0;
+  var hrsRemaining = (sb.laborHours || 0) - saHrs;
+
+  var rawPrice = sb.client_price || 0;
+  var hasDisc = sb.has_discount || false;
+  var discAmt = hasDisc ? rawPrice * 0.035 : 0;
+  var tcvPrice = rawPrice - discAmt;
+
+  var noOop = sb.no_oop === true;
+  var noFl  = sb.no_freelancers === true;
+
+  var flBudget   = noFl  ? 0 : (sb.flTotal || 0);
+  var flSpent    = noFl  ? 0 : (sb.flSpent || 0);
+  var flRemaining = flBudget - flSpent;
+
+  var oopBudget   = noOop ? 0 : (sb.oopEffective || sb.oopTotal || 0);
+  var oopSpent    = noOop ? 0 : (sb.oopSpent || 0);
+  var oopPredicted = noOop ? 0 : oopGetPredictedForProject(p.code);
+  var oopRemaining = oopBudget - oopSpent;
+
+  var computedCosts = (sb.laborTotal || 0) + oopBudget + flBudget;
+  var profitVal = tcvPrice - computedCosts;
+  var profitPctVal = tcvPrice > 0 ? ((profitVal / tcvPrice) * 100).toFixed(1) : 0;
+
+  var internalLaborCost = sb.laborCostInternal || sb.laborTotal || 0;
+  var marginPctVal = tcvPrice > 0 ? ((tcvPrice - internalLaborCost - oopBudget) / tcvPrice * 100).toFixed(1) : 0;
+  var marginColor = parseFloat(marginPctVal) > 30 ? '#81C784' : parseFloat(marginPctVal) >= 15 ? 'var(--honey)' : '#C62828';
+
+  var effRate = saHrs > 0 ? (tcvPrice / saHrs) : 0;
+  var effRateDisplay = saHrs > 0 ? '$' + Math.round(effRate).toLocaleString() + '/hr' : '\u2014';
+  var effRateColor = effRate >= 200 ? '#81C784' : effRate > 0 ? 'var(--ember)' : 'var(--white)';
+
+  var agencyRate = 200;
+  var laborSpent$ = saHrs * agencyRate;
+  var laborRemaining$ = Math.max(0, hrsRemaining) * agencyRate;
+  var barTotal = tcvPrice > 0 ? tcvPrice : 1;
+  var profitBar$ = Math.max(0, tcvPrice - laborSpent$ - laborRemaining$ - oopSpent - Math.max(0, oopRemaining) - flBudget);
+
+  /* Toggle button style helper */
+  function toggleBtn(field, isOn, label) {
+    var onStyle = 'background:rgba(255,255,255,.12);color:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.2);border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;font-weight:600';
+    var offStyle = 'background:rgba(255,255,255,.04);color:rgba(255,255,255,.35);border:1px dashed rgba(255,255,255,.2);border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;font-weight:500';
+    return '<button style="' + (isOn ? onStyle : offStyle) + '" onclick="sparkToggleBudgetSection(\'' + sb.id + '\',\'' + p.code + '\',\'' + field + '\')" title="' + (isOn ? 'Click to re-enable' : 'Click to mark as not needed') + '">' + (isOn ? '✕ ' : '') + label + '</button>';
+  }
+
+  var h = '';
+  h += '<div class="snapshot-banner" style="margin-bottom:16px">';
+  h += '<div class="snap-header"><div class="snap-title">Project Financials</div><div class="snap-version">Live from Furnace &#128293;</div></div>';
+
+  /* ── Top summary row ── */
+  h += '<div class="snap-financials">';
+  h += '<div class="snap-fin-item"><div class="sf-label">Client Price</div><div class="sf-value sf-gold">$' + Math.round(tcvPrice).toLocaleString() + '</div>';
+  if (hasDisc) h += '<div class="sf-sub">Before discount: $' + Math.round(rawPrice).toLocaleString() + '</div>';
+  h += '</div>';
+  h += '<div class="snap-fin-item"><div class="sf-label">Labor Cost</div><div class="sf-value">$' + Math.round(sb.laborTotal || 0).toLocaleString() + '</div><div class="sf-sub">' + (sb.laborHours || 0).toFixed(0) + ' hrs @ $200/hr</div></div>';
+  h += '<div class="snap-fin-item"><div class="sf-label">OOP Cost</div><div class="sf-value">' + (noOop ? '<span style="opacity:.4">—</span>' : '$' + Math.round(oopBudget).toLocaleString()) + '</div></div>';
+  h += '<div class="snap-fin-item"><div class="sf-label">Reserve</div><div class="sf-value ' + (profitVal >= 0 ? 'sf-green' : '') + '">$' + Math.round(profitVal).toLocaleString() + '</div><div class="sf-sub">' + profitPctVal + '%</div></div>';
+  h += '<div class="snap-fin-item"><div class="sf-label">Margin</div><div class="sf-value" style="color:' + marginColor + '">' + marginPctVal + '%</div><div class="sf-sub">Internal cost: $' + Math.round(internalLaborCost).toLocaleString() + '</div></div>';
+  h += '<div class="snap-fin-item"><div class="sf-label">Eff. Rate</div><div class="sf-value" style="color:' + effRateColor + '">' + effRateDisplay + '</div>' + (saHrs > 0 ? '<div class="sf-sub">vs $200 target</div>' : '<div class="sf-sub">No hours tracked</div>') + '</div>';
+  h += '</div>';
+
+  /* ── Progress bar ── */
+  var pLaborSpent = Math.min(100, laborSpent$ / barTotal * 100);
+  var pLaborRem   = Math.min(100 - pLaborSpent, laborRemaining$ / barTotal * 100);
+  var pOopSpent   = Math.min(100 - pLaborSpent - pLaborRem, oopSpent / barTotal * 100);
+  var pOopRem     = Math.min(100 - pLaborSpent - pLaborRem - pOopSpent, Math.max(0, oopRemaining) / barTotal * 100);
+  var pFlSpent    = Math.min(100 - pLaborSpent - pLaborRem - pOopSpent - pOopRem, flSpent / barTotal * 100);
+  var pFlRem      = Math.min(100 - pLaborSpent - pLaborRem - pOopSpent - pOopRem - pFlSpent, Math.max(0, flRemaining) / barTotal * 100);
+  var pProfit     = Math.max(0, 100 - pLaborSpent - pLaborRem - pOopSpent - pOopRem - pFlSpent - pFlRem);
+  h += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1)">';
+  h += '<div class="lob-bar">';
+  if (pLaborSpent > 0) h += '<div class="lob-seg" style="width:' + pLaborSpent.toFixed(1) + '%;background:var(--ember)">' + (pLaborSpent >= 8 ? '$' + Math.round(laborSpent$).toLocaleString() : '') + '</div>';
+  if (pLaborRem > 0.5) h += '<div class="lob-seg" style="width:' + pLaborRem.toFixed(1) + '%;background:var(--ocean)">' + (pLaborRem >= 8 ? '$' + Math.round(laborRemaining$).toLocaleString() : '') + '</div>';
+  if (pOopSpent > 0)   h += '<div class="lob-seg" style="width:' + pOopSpent.toFixed(1) + '%;background:#F57F17">' + (pOopSpent >= 8 ? '$' + Math.round(oopSpent).toLocaleString() : '') + '</div>';
+  if (pOopRem > 0.5)   h += '<div class="lob-seg" style="width:' + pOopRem.toFixed(1) + '%;background:#FFE0B2;color:var(--abyss)">' + (pOopRem >= 8 ? '$' + Math.round(Math.max(0, oopRemaining)).toLocaleString() : '') + '</div>';
+  if (pFlSpent > 0)    h += '<div class="lob-seg" style="width:' + pFlSpent.toFixed(1) + '%;background:#7B1FA2">' + (pFlSpent >= 8 ? '$' + Math.round(flSpent).toLocaleString() : '') + '</div>';
+  if (pFlRem > 0.5)    h += '<div class="lob-seg" style="width:' + pFlRem.toFixed(1) + '%;background:#E1BEE7;color:var(--abyss)">' + (pFlRem >= 8 ? '$' + Math.round(Math.max(0, flRemaining)).toLocaleString() : '') + '</div>';
+  if (pProfit > 0.5)   h += '<div class="lob-seg" style="width:' + pProfit.toFixed(1) + '%;background:#81C784">' + (pProfit >= 8 ? '$' + Math.round(profitBar$).toLocaleString() : '') + '</div>';
+  h += '</div>';
+  h += '<div class="lob-legend">';
+  h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ember)"></div>Labor Spent</div>';
+  h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ocean)"></div>Labor Remaining</div>';
+  if (!noOop) { h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#F57F17"></div>OOP Spent</div>'; }
+  if (!noOop) { h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#FFE0B2"></div>OOP Remaining</div>'; }
+  if (!noFl && flBudget > 0) { h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#7B1FA2"></div>FL Paid</div>'; }
+  if (!noFl && flBudget > 0) { h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#E1BEE7"></div>FL Unpaid</div>'; }
+  h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Reserve</div>';
+  h += '</div></div>';
+
+  /* ── Labor hours row ── */
+  h += '<div class="snap-financials" style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1)">';
+  h += '<div class="snap-fin-item"><div class="sf-label">Hours Budget</div><div class="sf-value">' + (sb.laborHours || 0).toFixed(1) + '</div></div>';
+  h += '<div class="snap-fin-item"><div class="sf-label">Hours Spent</div><div class="sf-value" style="color:var(--ember)">' + saHrs.toFixed(1) + '</div><div class="sf-sub">' + pct(saHrs, sb.laborHours || 0) + '% of budget</div></div>';
+  h += '<div class="snap-fin-item"><div class="sf-label">Hours Predicted</div><div class="sf-value">' + allocHrs.toFixed(1) + '</div><div class="sf-sub">From allocations</div></div>';
+  h += '<div class="snap-fin-item"><div class="sf-label">Hours Remaining</div><div class="sf-value" style="color:' + (hrsRemaining < 0 ? 'var(--ember)' : 'var(--white)') + '">' + hrsRemaining.toFixed(1) + '</div></div>';
+  h += '</div>';
+
+  /* ── OOP row — always shown, collapsible via toggle ── */
+  h += '<div style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">';
+  h += '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;opacity:.5;font-weight:600">Out-of-Pocket</div>';
+  h += toggleBtn('no_oop', noOop, 'No OOP');
+  h += '</div>';
+  if (noOop) {
+    h += '<div style="font-size:12px;color:var(--mid-gray);padding:8px 0;font-style:italic">Marked as no out-of-pocket costs for this project.</div>';
+  } else {
+    h += '<div class="snap-financials">';
+    h += '<div class="snap-fin-item"><div class="sf-label">OOP Budget</div><div class="sf-value">$' + Math.round(oopBudget).toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">OOP Spent</div><div class="sf-value" style="color:#F57F17">$' + Math.round(oopSpent).toLocaleString() + '</div><div class="sf-sub">' + pct(oopSpent, oopBudget) + '% of budget</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">OOP Predicted</div><div class="sf-value">' + (oopPredicted > 0 ? '$' + Math.round(oopPredicted).toLocaleString() : '\u2014') + '</div><div class="sf-sub">From OOP planner</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">OOP Remaining</div><div class="sf-value" style="color:' + (oopRemaining < 0 ? 'var(--ember)' : 'var(--white)') + '">$' + Math.round(oopRemaining).toLocaleString() + '</div></div>';
+    h += '</div>';
+  }
+
+  /* ── Freelancer row — always shown, collapsible via toggle ── */
+  h += '<div style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">';
+  h += '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;opacity:.5;font-weight:600">Freelancers</div>';
+  h += toggleBtn('no_freelancers', noFl, 'No Freelancers');
+  h += '</div>';
+  if (noFl) {
+    h += '<div style="font-size:12px;color:var(--mid-gray);padding:8px 0;font-style:italic">Marked as no freelancers on this project.</div>';
+  } else if (flBudget > 0) {
+    var flUnpaid = flBudget - flSpent;
+    h += '<div class="snap-financials">';
+    h += '<div class="snap-fin-item"><div class="sf-label">FL Budgeted</div><div class="sf-value" style="color:#CE93D8">$' + Math.round(flBudget).toLocaleString() + '</div><div class="sf-sub">' + (sb._flEntries || []).length + ' entries</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">FL Paid</div><div class="sf-value" style="color:#81C784">$' + Math.round(flSpent).toLocaleString() + '</div><div class="sf-sub">' + pct(flSpent, flBudget) + '% of budget</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">FL Unpaid</div><div class="sf-value" style="color:' + (flUnpaid > 0 ? '#CE93D8' : 'var(--white)') + '">$' + Math.round(flUnpaid).toLocaleString() + '</div><div class="sf-sub">Pending payment</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">FL Remaining</div><div class="sf-value" style="color:' + (flRemaining < 0 ? 'var(--ember)' : 'var(--white)') + '">$' + Math.round(flRemaining).toLocaleString() + '</div></div>';
+    h += '</div>';
+  } else {
+    h += '<div style="font-size:12px;color:var(--mid-gray);padding:8px 0;font-style:italic">No freelancer entries yet — add them in the Budget Snapshot below.</div>';
+  }
+
+  h += '</div>'; /* end snapshot-banner */
+  el.innerHTML = h;
+}
+
+async function sparkToggleBudgetSection(budgetId, projCode, field) {
+  var sb = SUPA_BUDGETS && SUPA_BUDGETS[projCode];
+  if (!sb) return;
+  var newVal = !sb[field];
+  sb[field] = newVal;
+  /* Persist to Supabase */
+  var patch = {};
+  patch[field] = newVal;
+  await sparkFetch('budgets?id=eq.' + budgetId, '', 'PATCH', patch);
+  /* Re-render just the financials banner */
+  var p = null;
+  if (CLIENTS) {
+    outer: for (var ci = 0; ci < CLIENTS.length; ci++) {
+      for (var pi = 0; pi < CLIENTS[ci].projects.length; pi++) {
+        if (CLIENTS[ci].projects[pi].code === projCode) { p = CLIENTS[ci].projects[pi]; break outer; }
+      }
+    }
+  }
+  if (p) renderProjFinancials(p);
+}
+
 /* ── RENDER: PROJECT ── */
 function renderProject(projectId) {
   var p = projectById(projectId);
@@ -1920,125 +2088,7 @@ function renderProject(projectId) {
 
   /* ── SUPABASE SUMMARY CARD (always visible at top) ── */
   if (p._supabudget) {
-    var sb = p._supabudget;
-    var saHrs = SUPA_ACTUALS[p.code] ? SUPA_ACTUALS[p.code].totalHours : 0;
-
-    /* Hours Predicted from Furnace allocations (Manage Resources) */
-    var allocHrs = 0;
-    var nativeAllocs = getAllocationsForProject(p.id);
-    for (var ai = 0; ai < nativeAllocs.length; ai++) {
-      allocHrs += nativeAllocs[ai].hoursPerDay || 0;
-    }
-
-    var hrsRemaining = (sb.laborHours || 0) - saHrs;
-
-    /* Apply discount to client price */
-    var rawPrice = sb.client_price || 0;
-    var hasDisc = sb.has_discount || false;
-    var discAmt = hasDisc ? rawPrice * 0.035 : 0;
-    var tcvPrice = rawPrice - discAmt;
-    /* Freelancer metrics */
-    var flBudget = sb.flTotal || 0;
-    var flSpent = sb.flSpent || 0;
-    var flRemaining = flBudget - flSpent;
-
-    var computedCosts = (sb.laborTotal || 0) + (sb.oopEffective || sb.oopTotal || 0) + flBudget;
-    var profitVal = tcvPrice - computedCosts;
-    var profitPctVal = tcvPrice > 0 ? ((profitVal / tcvPrice) * 100).toFixed(1) : 0;
-
-    /* OOP metrics */
-    var oopBudget = sb.oopEffective || sb.oopTotal || 0;
-    var oopSpent = sb.oopSpent || 0;
-    var oopPredicted = oopGetPredictedForProject(p.code);
-    var oopRemaining = oopBudget - oopSpent;
-
-    /* Convert to dollars for the progress bar — flat $200/hr */
-    var agencyRate = 200;
-    var laborSpent$ = saHrs * agencyRate;
-    var laborRemaining$ = Math.max(0, hrsRemaining) * agencyRate;
-    var barTotal = tcvPrice > 0 ? tcvPrice : 1;
-    var profitBar$ = Math.max(0, tcvPrice - laborSpent$ - laborRemaining$ - oopSpent - Math.max(0, oopRemaining) - flBudget);
-
-    /* Margin % = (TCV - Internal Labor Cost - OOP Effective) / TCV */
-    var internalLaborCost = sb.laborCostInternal || sb.laborTotal || 0;
-    var oopInternal = sb.oopEffective || sb.oopTotal || 0;
-    var marginPctVal = tcvPrice > 0 ? ((tcvPrice - internalLaborCost - oopInternal) / tcvPrice * 100).toFixed(1) : 0;
-    var marginColor = parseFloat(marginPctVal) > 30 ? '#81C784' : parseFloat(marginPctVal) >= 15 ? 'var(--honey)' : '#C62828';
-
-    /* Effective Rate = TCV / Actual Hours Spent */
-    var effRate = saHrs > 0 ? (tcvPrice / saHrs) : 0;
-    var effRateDisplay = saHrs > 0 ? '$' + Math.round(effRate).toLocaleString() + '/hr' : '\u2014';
-    var effRateColor = effRate >= 200 ? '#81C784' : effRate > 0 ? 'var(--ember)' : 'var(--white)';
-
-    h += '<div class="snapshot-banner" style="margin-bottom:16px">';
-    h += '<div class="snap-header"><div class="snap-title">Project Financials</div><div class="snap-version">Live from Furnace &#128293;</div></div>';
-    h += '<div class="snap-financials">';
-    h += '<div class="snap-fin-item"><div class="sf-label">Client Price</div><div class="sf-value sf-gold">$' + Math.round(tcvPrice).toLocaleString() + '</div>';
-    if (hasDisc) h += '<div class="sf-sub">Before discount: $' + Math.round(rawPrice).toLocaleString() + '</div>';
-    h += '</div>';
-    h += '<div class="snap-fin-item"><div class="sf-label">Labor Cost</div><div class="sf-value">$' + Math.round(sb.laborTotal || 0).toLocaleString() + '</div><div class="sf-sub">' + (sb.laborHours || 0).toFixed(0) + ' hrs @ $200/hr</div></div>';
-    h += '<div class="snap-fin-item"><div class="sf-label">OOP Cost</div><div class="sf-value">$' + Math.round(sb.oopTotal || 0).toLocaleString() + '</div></div>';
-    h += '<div class="snap-fin-item"><div class="sf-label">Reserve</div><div class="sf-value ' + (profitVal >= 0 ? 'sf-green' : '') + '">$' + Math.round(profitVal).toLocaleString() + '</div><div class="sf-sub">' + profitPctVal + '%</div></div>';
-    h += '<div class="snap-fin-item"><div class="sf-label">Margin</div><div class="sf-value" style="color:' + marginColor + '">' + marginPctVal + '%</div><div class="sf-sub">Internal cost: $' + Math.round(internalLaborCost).toLocaleString() + '</div></div>';
-    h += '<div class="snap-fin-item"><div class="sf-label">Eff. Rate</div><div class="sf-value" style="color:' + effRateColor + '">' + effRateDisplay + '</div>' + (saHrs > 0 ? '<div class="sf-sub">vs $200 target</div>' : '<div class="sf-sub">No hours tracked</div>') + '</div>';
-    h += '</div>';
-
-    /* ── Progress Bar ── */
-    var pLaborSpent = Math.min(100, laborSpent$ / barTotal * 100);
-    var pLaborRem = Math.min(100 - pLaborSpent, laborRemaining$ / barTotal * 100);
-    var pOopSpent = Math.min(100 - pLaborSpent - pLaborRem, oopSpent / barTotal * 100);
-    var pOopRem = Math.min(100 - pLaborSpent - pLaborRem - pOopSpent, Math.max(0, oopRemaining) / barTotal * 100);
-    var pFlSpent = Math.min(100 - pLaborSpent - pLaborRem - pOopSpent - pOopRem, flSpent / barTotal * 100);
-    var pFlRem = Math.min(100 - pLaborSpent - pLaborRem - pOopSpent - pOopRem - pFlSpent, Math.max(0, flRemaining) / barTotal * 100);
-    var pProfit = Math.max(0, 100 - pLaborSpent - pLaborRem - pOopSpent - pOopRem - pFlSpent - pFlRem);
-    h += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1)">';
-    h += '<div class="lob-bar">';
-    if (pLaborSpent > 0) h += '<div class="lob-seg" style="width:' + pLaborSpent.toFixed(1) + '%;background:var(--ember)">' + (pLaborSpent >= 8 ? '$' + Math.round(laborSpent$).toLocaleString() : '') + '</div>';
-    if (pLaborRem > 0.5) h += '<div class="lob-seg" style="width:' + pLaborRem.toFixed(1) + '%;background:var(--ocean)">' + (pLaborRem >= 8 ? '$' + Math.round(laborRemaining$).toLocaleString() : '') + '</div>';
-    if (pOopSpent > 0) h += '<div class="lob-seg" style="width:' + pOopSpent.toFixed(1) + '%;background:#F57F17">' + (pOopSpent >= 8 ? '$' + Math.round(oopSpent).toLocaleString() : '') + '</div>';
-    if (pOopRem > 0.5) h += '<div class="lob-seg" style="width:' + pOopRem.toFixed(1) + '%;background:#FFE0B2;color:var(--abyss)">' + (pOopRem >= 8 ? '$' + Math.round(Math.max(0, oopRemaining)).toLocaleString() : '') + '</div>';
-    if (pFlSpent > 0) h += '<div class="lob-seg" style="width:' + pFlSpent.toFixed(1) + '%;background:#7B1FA2">' + (pFlSpent >= 8 ? '$' + Math.round(flSpent).toLocaleString() : '') + '</div>';
-    if (pFlRem > 0.5) h += '<div class="lob-seg" style="width:' + pFlRem.toFixed(1) + '%;background:#E1BEE7;color:var(--abyss)">' + (pFlRem >= 8 ? '$' + Math.round(Math.max(0, flRemaining)).toLocaleString() : '') + '</div>';
-    if (pProfit > 0.5) h += '<div class="lob-seg" style="width:' + pProfit.toFixed(1) + '%;background:#81C784">' + (pProfit >= 8 ? '$' + Math.round(profitBar$).toLocaleString() : '') + '</div>';
-    h += '</div>';
-    h += '<div class="lob-legend">';
-    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ember)"></div>Labor Spent</div>';
-    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ocean)"></div>Labor Remaining</div>';
-    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#F57F17"></div>OOP Spent</div>';
-    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#FFE0B2"></div>OOP Remaining</div>';
-    if (flBudget > 0) h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#7B1FA2"></div>FL Paid</div>';
-    if (flBudget > 0) h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#E1BEE7"></div>FL Unpaid</div>';
-    h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Reserve</div>';
-    h += '</div></div>';
-
-    /* ── Hours Row ── */
-    h += '<div class="snap-financials" style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1)">';
-    h += '<div class="snap-fin-item"><div class="sf-label">Hours Budget</div><div class="sf-value">' + (sb.laborHours || 0).toFixed(1) + '</div></div>';
-    h += '<div class="snap-fin-item"><div class="sf-label">Hours Spent</div><div class="sf-value" style="color:var(--ember)">' + saHrs.toFixed(1) + '</div><div class="sf-sub">' + pct(saHrs, sb.laborHours || 0) + '% of budget</div></div>';
-    h += '<div class="snap-fin-item"><div class="sf-label">Hours Predicted</div><div class="sf-value">' + allocHrs.toFixed(1) + '</div><div class="sf-sub">From allocations</div></div>';
-    h += '<div class="snap-fin-item"><div class="sf-label">Hours Remaining</div><div class="sf-value" style="color:' + (hrsRemaining < 0 ? 'var(--ember)' : 'var(--white)') + '">' + hrsRemaining.toFixed(1) + '</div></div>';
-    h += '</div>';
-
-    /* ── OOP Row ── */
-    h += '<div class="snap-financials" style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1)">';
-    h += '<div class="snap-fin-item"><div class="sf-label">OOP Budget</div><div class="sf-value">$' + Math.round(oopBudget).toLocaleString() + '</div></div>';
-    h += '<div class="snap-fin-item"><div class="sf-label">OOP Spent</div><div class="sf-value" style="color:#F57F17">$' + Math.round(oopSpent).toLocaleString() + '</div><div class="sf-sub">' + pct(oopSpent, oopBudget) + '% of budget</div></div>';
-    h += '<div class="snap-fin-item"><div class="sf-label">OOP Predicted</div><div class="sf-value">' + (oopPredicted > 0 ? '$' + Math.round(oopPredicted).toLocaleString() : '\u2014') + '</div><div class="sf-sub">From OOP planner</div></div>';
-    h += '<div class="snap-fin-item"><div class="sf-label">OOP Remaining</div><div class="sf-value" style="color:' + (oopRemaining < 0 ? 'var(--ember)' : 'var(--white)') + '">$' + Math.round(oopRemaining).toLocaleString() + '</div></div>';
-    h += '</div>';
-
-    /* ── Freelancer Row ── only show if there are freelancer entries */
-    if (flBudget > 0) {
-      var flUnpaid = flBudget - flSpent;
-      h += '<div class="snap-financials" style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1)">';
-      h += '<div class="snap-fin-item"><div class="sf-label">FL Budgeted</div><div class="sf-value" style="color:#CE93D8">$' + Math.round(flBudget).toLocaleString() + '</div><div class="sf-sub">' + (sb._flEntries || []).length + ' entries</div></div>';
-      h += '<div class="snap-fin-item"><div class="sf-label">FL Paid</div><div class="sf-value" style="color:#81C784">$' + Math.round(flSpent).toLocaleString() + '</div><div class="sf-sub">' + pct(flSpent, flBudget) + '% of budget</div></div>';
-      h += '<div class="snap-fin-item"><div class="sf-label">FL Unpaid</div><div class="sf-value" style="color:' + (flUnpaid > 0 ? '#CE93D8' : 'var(--white)') + '">$' + Math.round(flUnpaid).toLocaleString() + '</div><div class="sf-sub">Pending payment</div></div>';
-      h += '<div class="snap-fin-item"><div class="sf-label">FL Remaining</div><div class="sf-value" style="color:' + (flRemaining < 0 ? 'var(--ember)' : 'var(--white)') + '">$' + Math.round(flRemaining).toLocaleString() + '</div></div>';
-      h += '</div>';
-    }
-
-    h += '</div>';
+    h += '<div id="projFin-' + p.code + '"></div>';
   }
 
   var isBizDev = p.projectType === 'bizdev';
@@ -2449,6 +2499,9 @@ function renderProject(projectId) {
   }
 
   document.getElementById('mainContent').innerHTML = h;
+
+  /* Render the financials banner into its placeholder div */
+  if (p._supabudget) renderProjFinancials(p);
 
   /* Async: load Spark budget data into the project page */
   if (sparkAuth.connected) {
