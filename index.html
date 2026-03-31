@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Furnace — Forge Portfolio Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root {
   --black: #000000; --canvas: #D6D1CA; --abyss: #184047;
@@ -8563,12 +8564,6 @@ async function loadData() {
     var savedView = null;
     try { savedView = localStorage.getItem('furnace_view'); } catch(e) {}
     navigate(savedView || 'master');
-    /* Show logged-in user in sidebar */
-    try {
-      var _sess = JSON.parse(localStorage.getItem(FURNACE_SESSION_KEY) || '{}');
-      var _nameEl = document.getElementById('furnaceSidebarUserName');
-      if (_nameEl && _sess.name) _nameEl.textContent = _sess.name;
-    } catch(e) {}
   } catch(e) {
     console.error('loadData error:', e);
     document.getElementById('mainContent').innerHTML = '<div style="padding:60px 40px;text-align:center"><h2 style="color:var(--ember)">Unable to load data</h2><p style="color:var(--mid-gray);margin-top:12px">' + e.message + '</p></div>';
@@ -8576,94 +8571,86 @@ async function loadData() {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   FURNACE AUTH — simple credential gate for the Vercel deployment
-   Credentials are hashed (username + password + salt → btoa).
-   To add/change users, update FURNACE_ACCOUNTS below.
+   FURNACE AUTH — Google OAuth via Supabase, restricted to
+   @createdbyforge.com email addresses.
    ══════════════════════════════════════════════════════════════ */
-var FURNACE_AUTH_SALT = 'frgMd2026xK9';
-var FURNACE_SESSION_KEY = 'furnace_session_v1';
+var FURNACE_ALLOWED_DOMAIN = 'createdbyforge.com';
+var _furnaceAuthClient = supabase.createClient(
+  'https://jnwdscddyqujjikesdpb.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impud2RzY2RkeXF1amppa2VzZHBiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyODgxOTEsImV4cCI6MjA4OTg2NDE5MX0.EQueTlfX30ULmpLDF7ijSv0xR0_baAT2kPjYoK_RnpA'
+);
 
-/* Accounts: { displayName, token }
-   Token = btoa(salt + ':' + username + ':' + password) */
-var FURNACE_ACCOUNTS = {
-  'anthony':  { display: 'Anthony',    token: btoa(FURNACE_AUTH_SALT + ':anthony:Furnace2026!') },
-  'forge':    { display: 'Forge Team', token: btoa(FURNACE_AUTH_SALT + ':forge:Spark2026!') }
-};
-
-function furnaceCheckAuth() {
-  try {
-    var stored = localStorage.getItem(FURNACE_SESSION_KEY);
-    if (!stored) return false;
-    var parsed = JSON.parse(stored);
-    var acct = FURNACE_ACCOUNTS[parsed.user];
-    return acct && acct.token === parsed.token;
-  } catch(e) { return false; }
-}
-
-function furnaceLogin(username, password) {
-  var u = (username || '').toLowerCase().trim();
-  var acct = FURNACE_ACCOUNTS[u];
-  if (!acct) return false;
-  var expected = btoa(FURNACE_AUTH_SALT + ':' + u + ':' + password);
-  if (expected !== acct.token) return false;
-  try { localStorage.setItem(FURNACE_SESSION_KEY, JSON.stringify({ user: u, token: acct.token, name: acct.display })); } catch(e) {}
-  return true;
-}
-
-function furnaceLogout() {
-  try { localStorage.removeItem(FURNACE_SESSION_KEY); } catch(e) {}
-  location.reload();
-}
-
-function furnaceShowLogin() {
-  /* Hide main app */
+function furnaceShowLogin(errorMsg) {
   document.querySelector('.sidebar').style.display = 'none';
   document.getElementById('mainContent').style.display = 'none';
-
-  var el = document.getElementById('furnaceLoginOverlay');
-  if (el) { el.style.display = 'flex'; return; }
+  var existing = document.getElementById('furnaceLoginOverlay');
+  if (existing) existing.remove();
 
   var overlay = document.createElement('div');
   overlay.id = 'furnaceLoginOverlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:var(--abyss);display:flex;align-items:center;justify-content:center;z-index:9999;font-family:Arial,sans-serif';
+  overlay.style.cssText = 'position:fixed;inset:0;background:#184047;display:flex;align-items:center;justify-content:center;z-index:9999;font-family:Arial,sans-serif';
+  var errHtml = errorMsg
+    ? '<div style="background:rgba(206,115,56,.18);border:1px solid rgba(206,115,56,.4);color:#E3A65E;font-size:12px;padding:10px 14px;border-radius:7px;margin-bottom:20px;line-height:1.5">' + errorMsg + '</div>'
+    : '';
   overlay.innerHTML = [
-    '<div style="width:360px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:40px 36px;text-align:center">',
-      '<div style="font-size:22px;font-weight:700;letter-spacing:2px;color:var(--sand);margin-bottom:4px">FURNACE</div>',
-      '<div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:32px;letter-spacing:.5px">Forge Portfolio Tracker</div>',
-      '<div id="furnaceLoginErr" style="display:none;background:rgba(206,115,56,.18);border:1px solid rgba(206,115,56,.4);color:var(--honey);font-size:12px;padding:8px 12px;border-radius:6px;margin-bottom:16px">Incorrect username or password.</div>',
-      '<input id="furnaceUser" type="text" placeholder="Username" autocomplete="username" style="width:100%;padding:10px 14px;border-radius:7px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:var(--white);font-size:14px;margin-bottom:10px;outline:none" />',
-      '<input id="furnacePass" type="password" placeholder="Password" autocomplete="current-password" style="width:100%;padding:10px 14px;border-radius:7px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:var(--white);font-size:14px;margin-bottom:20px;outline:none" />',
-      '<button onclick="furnaceAttemptLogin()" style="width:100%;padding:11px;border-radius:7px;border:none;background:var(--ocean);color:var(--white);font-size:14px;font-weight:600;cursor:pointer;letter-spacing:.5px">Sign In</button>',
+    '<div style="width:380px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:44px 40px;text-align:center">',
+      '<div style="font-size:24px;font-weight:700;letter-spacing:2.5px;color:#DAC38E;margin-bottom:6px">FURNACE</div>',
+      '<div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:36px;letter-spacing:.5px">Forge Portfolio Tracker</div>',
+      errHtml,
+      '<button id="furnaceGoogleBtn" onclick="furnaceGoogleSignIn()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:12px;padding:12px 20px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:14px;font-weight:500;cursor:pointer;transition:background .2s" onmouseenter="this.style.background=\'rgba(255,255,255,.14)\'" onmouseleave="this.style.background=\'rgba(255,255,255,.08)\'">',
+        '<svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-3.59-13.46-8.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>',
+        'Sign in with Google',
+      '</button>',
+      '<div style="margin-top:20px;font-size:11px;color:rgba(255,255,255,.25)">Access restricted to @createdbyforge.com accounts</div>',
     '</div>'
   ].join('');
   document.body.appendChild(overlay);
-
-  /* Allow Enter key to submit */
-  overlay.addEventListener('keydown', function(e) { if (e.key === 'Enter') furnaceAttemptLogin(); });
-  setTimeout(function() { var u = document.getElementById('furnaceUser'); if (u) u.focus(); }, 50);
 }
 
-function furnaceAttemptLogin() {
-  var u = document.getElementById('furnaceUser');
-  var p = document.getElementById('furnacePass');
-  var err = document.getElementById('furnaceLoginErr');
-  if (furnaceLogin(u.value, p.value)) {
-    document.getElementById('furnaceLoginOverlay').style.display = 'none';
-    document.querySelector('.sidebar').style.display = '';
-    document.getElementById('mainContent').style.display = '';
-    loadData();
-  } else {
-    if (err) err.style.display = 'block';
-    if (p) { p.value = ''; p.focus(); }
+async function furnaceGoogleSignIn() {
+  var btn = document.getElementById('furnaceGoogleBtn');
+  if (btn) { btn.textContent = 'Redirecting…'; btn.disabled = true; }
+  await _furnaceAuthClient.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.origin + window.location.pathname }
+  });
+}
+
+async function furnaceLogout() {
+  await _furnaceAuthClient.auth.signOut();
+  location.reload();
+}
+
+function furnaceShowApp(user) {
+  var overlay = document.getElementById('furnaceLoginOverlay');
+  if (overlay) overlay.remove();
+  document.querySelector('.sidebar').style.display = '';
+  document.getElementById('mainContent').style.display = '';
+  /* Show name in sidebar */
+  var nameEl = document.getElementById('furnaceSidebarUserName');
+  if (nameEl && user) {
+    var name = (user.user_metadata && user.user_metadata.full_name) ? user.user_metadata.full_name.split(' ')[0] : user.email;
+    nameEl.textContent = name;
   }
+  loadData();
 }
 
 /* ── INIT ── */
-if (furnaceCheckAuth()) {
-  loadData();
-} else {
-  furnaceShowLogin();
-}
+(async function() {
+  var sessionData = await _furnaceAuthClient.auth.getSession();
+  var session = sessionData.data && sessionData.data.session;
+  if (session && session.user) {
+    var email = session.user.email || '';
+    if (email.endsWith('@' + FURNACE_ALLOWED_DOMAIN)) {
+      furnaceShowApp(session.user);
+    } else {
+      await _furnaceAuthClient.auth.signOut();
+      furnaceShowLogin('This tool is restricted to @' + FURNACE_ALLOWED_DOMAIN + ' accounts.<br>You signed in as <strong>' + email + '</strong>.');
+    }
+  } else {
+    furnaceShowLogin();
+  }
+})();
 </script>
 </body>
 </html>
