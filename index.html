@@ -4130,6 +4130,31 @@ async function sparkDeleteOopEntry(entryId) {
   sparkRenderSummary();
 }
 
+async function sparkAssignOopCategory(entryId, categoryId) {
+  if (!entryId || !categoryId) return;
+  sparkShowSaving();
+  await sparkFetch('oop_budget_entries?id=eq.' + entryId, '', 'PATCH', { category_id: categoryId });
+  /* Update local data so the entry moves out of uncategorized on re-render */
+  if (sparkCurrentData && sparkCurrentData.oop) {
+    for (var i = 0; i < sparkCurrentData.oop.length; i++) {
+      if (sparkCurrentData.oop[i].id === entryId) {
+        sparkCurrentData.oop[i].category_id = categoryId;
+        /* Also resolve category object from oopCategories for display */
+        var cats = sparkCurrentData.oopCategories || [];
+        for (var c = 0; c < cats.length; c++) {
+          if (cats[c].id === categoryId) {
+            sparkCurrentData.oop[i].category = { id: cats[c].id, name: cats[c].name };
+            break;
+          }
+        }
+        break;
+      }
+    }
+  }
+  sparkHideSaving();
+  sparkRenderOopContent();
+}
+
 function sparkRenderSummary() {
   var el = document.getElementById('sparkSummaryBar');
   if (!el || !sparkCurrentData) return;
@@ -4921,6 +4946,12 @@ function sparkRenderOopContent() {
         h += '<div class="cat-total">' + sparkFmt(uncatTotal) + '</div>';
         h += '</div>';
         if (uncatExpanded) {
+          /* Build category options for this section so the user can assign the entry */
+          var uncatSecCats = (catsBySec[secId] || []);
+          var uncatCatOpts = '<option value="">— Assign category —</option>';
+          for (var uc = 0; uc < uncatSecCats.length; uc++) {
+            uncatCatOpts += '<option value="' + uncatSecCats[uc].id + '">' + (uncatSecCats[uc].name || 'Unnamed') + '</option>';
+          }
           for (var u = 0; u < activeUncatForSec.length; u++) {
             var item = activeUncatForSec[u];
             var iid = item.id;
@@ -4947,8 +4978,12 @@ function sparkRenderOopContent() {
             h += '<input type="checkbox" ' + (isPaid ? 'checked' : '') + ' onchange="sparkTogglePaidWithDate(\'' + iid + '\',this.checked)" title="Mark as paid" style="cursor:pointer;width:15px;height:15px;accent-color:#81C784">';
             if (isPaid) h += '<input type="date" class="spark-input" style="width:90px;font-size:9px;padding:1px 3px;text-align:center;color:#2E7D32;border-color:#C8E6C9" value="' + paidDate + '" onchange="sparkDebouncedPatchOop(\'' + iid + '\',\'paid_date\',this.value)" title="Date paid">';
             h += '</div>';
-            h += '<div style="display:flex;align-items:center;gap:4px"><input type="text" class="spark-input" style="flex:1;text-align:left" value="' + (item.notes || '').replace(/"/g, '&quot;') + '" placeholder="Notes" onchange="sparkDebouncedPatchOop(\'' + iid + '\',\'notes\',this.value)">';
-            h += '<button onclick="sparkDeleteOopEntry(\'' + iid + '\')" title="Delete line item" style="background:none;border:none;color:var(--mid-gray);cursor:pointer;font-size:14px;padding:2px 4px;opacity:.5;transition:opacity .2s" onmouseenter="this.style.opacity=1;this.style.color=\'var(--ember)\'" onmouseleave="this.style.opacity=.5;this.style.color=\'var(--mid-gray)\'">&times;</button></div>';
+            /* Notes + category assign dropdown + delete */
+            h += '<div style="display:flex;align-items:center;gap:4px;grid-column:1/-1;padding:0 0 2px 0">';
+            h += '<input type="text" class="spark-input" style="flex:1;text-align:left" value="' + (item.notes || '').replace(/"/g, '&quot;') + '" placeholder="Notes" onchange="sparkDebouncedPatchOop(\'' + iid + '\',\'notes\',this.value)">';
+            h += '<select class="spark-input" style="flex:0 0 auto;font-size:11px;color:var(--ocean);border-color:var(--ocean);background:var(--white)" onchange="if(this.value)sparkAssignOopCategory(\'' + iid + '\',this.value)" title="Move to category">' + uncatCatOpts + '</select>';
+            h += '<button onclick="sparkDeleteOopEntry(\'' + iid + '\')" title="Delete line item" style="background:none;border:none;color:var(--mid-gray);cursor:pointer;font-size:14px;padding:2px 4px;opacity:.5;transition:opacity .2s" onmouseenter="this.style.opacity=1;this.style.color=\'var(--ember)\'" onmouseleave="this.style.opacity=.5;this.style.color=\'var(--mid-gray)\'">&times;</button>';
+            h += '</div>';
             h += '</div>';
           }
         }
