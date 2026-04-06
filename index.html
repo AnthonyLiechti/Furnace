@@ -745,6 +745,7 @@ let currentView = 'master';
 let displayUnit = 'hours';
 let openClients = {};
 let showFinalized = false;
+let showFlaggedAll = false; /* Needs Attention: false=active only, true=all projects */
 let showInactiveClients = false;
 
 /* ── GLOBAL DATE FILTER ── */
@@ -2522,10 +2523,13 @@ function renderProject(projectId) {
 
 /* ── RENDER: FLAGGED ── */
 function renderFlagged() {
-  var h = '<h1 class="page-title">Needs Attention</h1>';
+  var h = '<h1 class="page-title">Needs Attention';
+  h += '<span class="view-toggle"><button class="view-toggle-btn ' + (!showFlaggedAll ? 'active' : '') + '" onclick="showFlaggedAll=false;navigate(\'flagged\')">Active</button>';
+  h += '<button class="view-toggle-btn ' + (showFlaggedAll ? 'active' : '') + '" onclick="showFlaggedAll=true;navigate(\'flagged\')">All Projects</button></span>';
+  h += '</h1>';
   h += '<p class="page-subtitle">Projects missing data or requiring team input</p>';
 
-  var all = activeProjects();
+  var all = showFlaggedAll ? allProjects() : activeProjects();
 
   /* Categorize ALL projects by data completeness using Supabase data */
   var noBudget = [];      /* No Supabase budget at all */
@@ -2536,7 +2540,7 @@ function renderFlagged() {
 
   for (var i = 0; i < all.length; i++) {
     var p = all[i];
-    if (isProjectCompleted(p)) continue;
+    if (!showFlaggedAll && isProjectCompleted(p)) continue;
     var sb = p._supabudget;
 
     /* Skip non-billable, bizdev, and internal projects from Needs Attention entirely */
