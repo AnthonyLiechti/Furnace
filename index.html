@@ -3835,9 +3835,13 @@ async function sparkRenderSmallProjectList(projectCode) {
   if (!container) return;
   sparkSmallProjProjectCode = null;
 
-  /* Clear the overview panel — just show a quiet label */
+  /* Show a small-projects overview banner in the always-visible area */
   var overviewEl = document.getElementById('sparkProjectOverview');
-  if (overviewEl) overviewEl.innerHTML = '';
+  if (overviewEl) {
+    var totalBudget = 0, snapshotCount = 0;
+    /* We'll populate this after fetching budgets — placeholder for now */
+    overviewEl.innerHTML = '<div class="snapshot-banner" style="margin-bottom:16px"><div style="font-size:16px;font-weight:700;margin-bottom:4px">SMALL PROJECTS</div><div style="font-size:12px;opacity:.55">Loading snapshots\u2026</div></div>';
+  }
 
   container.innerHTML = '<div style="padding:16px;color:var(--mid-gray);font-size:13px">Loading snapshots\u2026</div>';
 
@@ -3849,9 +3853,24 @@ async function sparkRenderSmallProjectList(projectCode) {
     ? await sparkFetch('budgets', 'project_id=eq.' + projId + '&visibility=eq.visible&select=id,name,status,client_price,has_discount,created_at&order=created_at.asc')
     : [];
 
+  /* Update overview banner with real totals */
+  if (overviewEl) {
+    var aggPrice = 0;
+    for (var bi = 0; bi < (budgets || []).length; bi++) aggPrice += budgets[bi].client_price || 0;
+    var bCount = budgets ? budgets.length : 0;
+    overviewEl.innerHTML = '<div class="snapshot-banner" style="margin-bottom:16px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+      + '<div style="font-size:16px;font-weight:700">SMALL PROJECTS</div>'
+      + '<div style="font-size:11px;opacity:.5">' + bCount + ' snapshot' + (bCount !== 1 ? 's' : '') + '</div>'
+      + '</div>'
+      + '<div class="snap-financials">'
+      + '<div class="snap-fin-item"><div class="sf-label">Total Budget</div><div class="sf-value sf-gold">$' + Math.round(aggPrice).toLocaleString() + '</div></div>'
+      + '</div></div>';
+  }
+
   var h = '<div style="background:var(--white);border-radius:10px;padding:18px 20px;margin-bottom:16px">';
   h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
-  h += '<div style="font-size:14px;font-weight:700;color:var(--ink)">Snapshots <span style="font-size:11px;font-weight:400;color:var(--mid-gray)">(' + (budgets ? budgets.length : 0) + ')</span></div>';
+  h += '<div style="font-size:14px;font-weight:700;color:var(--abyss)">Snapshots <span style="font-size:11px;font-weight:400;color:var(--mid-gray)">(' + (budgets ? budgets.length : 0) + ')</span></div>';
   h += '<button onclick="sparkShowAddSnapshotForm(\'' + projectCode + '\')" style="padding:6px 14px;border-radius:6px;border:none;background:var(--ocean);color:var(--white);cursor:pointer;font-size:12px;font-weight:600">+ Add Snapshot</button>';
   h += '</div>';
 
@@ -3866,10 +3885,10 @@ async function sparkRenderSmallProjectList(projectCode) {
       var price = b.client_price || 0;
       h += '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--canvas);border-radius:8px">';
       h += '<div style="flex:1;min-width:0">';
-      h += '<div style="font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (b.name || 'Untitled') + '</div>';
+      h += '<div style="font-size:13px;font-weight:600;color:var(--abyss);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (b.name || 'Untitled') + '</div>';
       h += '<div style="font-size:11px;color:var(--mid-gray);margin-top:3px">$' + Math.round(price).toLocaleString() + ' &nbsp;&middot;&nbsp; <span style="color:' + sc + ';font-weight:600">' + (b.status || 'proposed') + '</span></div>';
       h += '</div>';
-      h += '<button onclick="sparkEditSmallSnapshot(\'' + b.id + '\',\'' + projectCode + '\')" style="padding:5px 12px;border-radius:6px;border:1px solid var(--canvas-border,#ddd);background:var(--white);color:var(--ink);cursor:pointer;font-size:12px;font-weight:500;white-space:nowrap;flex-shrink:0">Edit ›</button>';
+      h += '<button onclick="sparkEditSmallSnapshot(\'' + b.id + '\',\'' + projectCode + '\')" style="padding:5px 12px;border-radius:6px;border:1px solid var(--canvas);background:var(--white);color:var(--abyss);cursor:pointer;font-size:12px;font-weight:500;white-space:nowrap;flex-shrink:0">Edit ›</button>';
       h += '</div>';
     }
     h += '</div>';
@@ -3923,12 +3942,12 @@ function sparkShowAddSnapshotForm(projectCode) {
   var container = document.getElementById('sparkProjectBudget');
   if (!container) return;
   var h = '<div style="background:var(--white);border-radius:10px;padding:20px;margin-bottom:16px">';
-  h += '<div style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:14px">New Snapshot</div>';
+  h += '<div style="font-size:14px;font-weight:700;color:var(--abyss);margin-bottom:14px">New Snapshot</div>';
   h += '<label style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray)">Snapshot Name</label>';
-  h += '<input id="sparkNewSnapName" type="text" placeholder="e.g. Q2 Social Ads" style="display:block;width:100%;box-sizing:border-box;margin-top:6px;margin-bottom:14px;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;color:var(--ink)">';
+  h += '<input id="sparkNewSnapName" type="text" placeholder="e.g. Q2 Social Ads" style="display:block;width:100%;box-sizing:border-box;margin-top:6px;margin-bottom:14px;padding:8px 12px;border:1px solid var(--canvas);border-radius:6px;font-size:14px;color:var(--abyss)">';
   h += '<div style="display:flex;gap:10px">';
   h += '<button onclick="sparkCreateSmallSnapshot(\'' + projectCode + '\')" style="padding:8px 20px;border-radius:6px;border:none;background:var(--ocean);color:var(--white);cursor:pointer;font-size:13px;font-weight:600">Create</button>';
-  h += '<button onclick="sparkRenderSmallProjectList(\'' + projectCode + '\')" style="padding:8px 16px;border-radius:6px;border:1px solid #ddd;background:var(--white);color:var(--ink);cursor:pointer;font-size:13px">Cancel</button>';
+  h += '<button onclick="sparkRenderSmallProjectList(\'' + projectCode + '\')" style="padding:8px 16px;border-radius:6px;border:1px solid var(--canvas);background:var(--white);color:var(--abyss);cursor:pointer;font-size:13px">Cancel</button>';
   h += '</div></div>';
   container.innerHTML = h;
   var inp = document.getElementById('sparkNewSnapName');
