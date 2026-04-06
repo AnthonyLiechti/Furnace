@@ -693,7 +693,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.26.0 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Mar 28, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.27.0 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 6, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -3579,6 +3579,12 @@ var sparkOopCategoryExpanded = {};
 var sparkSaveTimers = {};
 var sparkBudgetMap = {};
 var sparkBudgetMapFetched = false;
+var sparkSmallProjProjectCode = null; /* tracks project code when browsing multi-snapshot small project */
+
+function isSmallProjectCode(code) {
+  if (!code) return false;
+  return (code.indexOf('_10_') >= 0 && code.indexOf('XXX') >= 0) || code === '334_20_01';
+}
 
 async function sparkFindBudgetForProject(projectCode) {
   if (!sparkAuth.connected) return null;
@@ -3764,6 +3770,12 @@ async function sparkLoadBudgetForProject(projectCode) {
   var container = document.getElementById('sparkProjectBudget');
   if (!container) return;
 
+  /* Small projects get a multi-snapshot list view instead of single editor */
+  if (isSmallProjectCode(projectCode)) {
+    sparkSmallProjProjectCode = null;
+    return sparkRenderSmallProjectList(projectCode);
+  }
+
   var budgetId = await sparkFindBudgetForProject(projectCode);
   if (!budgetId) {
     /* Issue 4: Show "Create Budget" button for unbudgeted projects */
@@ -3814,6 +3826,192 @@ async function sparkLoadBudgetForProject(projectCode) {
 
   /* Subscribe to real-time changes for this budget so collaborators see live updates */
   sparkSubscribeRealtime(sparkCurrentData.budget.id);
+}
+
+/* ── SMALL PROJECT MULTI-SNAPSHOT ── */
+
+async function sparkRenderSmallProjectList(projectCode) {
+  var container = document.getElementById('sparkProjectBudget');
+  if (!container) return;
+  sparkSmallProjProjectCode = null;
+
+  /* Clear the overview panel — just show a quiet label */
+  var overviewEl = document.getElementById('sparkProjectOverview');
+  if (overviewEl) overviewEl.innerHTML = '';
+
+  container.innerHTML = '<div style="padding:16px;color:var(--mid-gray);font-size:13px">Loading snapshots\u2026</div>';
+
+  /* Fetch project record */
+  var projRows = await sparkFetch('projects', 'project_code=eq.' + encodeURIComponent(projectCode) + '&select=id');
+  var projId = projRows && projRows.length ? projRows[0].id : null;
+
+  var budgets = projId
+    ? await sparkFetch('budgets', 'project_id=eq.' + projId + '&visibility=eq.visible&select=id,name,status,client_price,has_discount,created_at&order=created_at.asc')
+    : [];
+
+  var h = '<div style="background:var(--white);border-radius:10px;padding:18px 20px;margin-bottom:16px">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
+  h += '<div style="font-size:14px;font-weight:700;color:var(--ink)">Snapshots <span style="font-size:11px;font-weight:400;color:var(--mid-gray)">(' + (budgets ? budgets.length : 0) + ')</span></div>';
+  h += '<button onclick="sparkShowAddSnapshotForm(\'' + projectCode + '\')" style="padding:6px 14px;border-radius:6px;border:none;background:var(--ocean);color:var(--white);cursor:pointer;font-size:12px;font-weight:600">+ Add Snapshot</button>';
+  h += '</div>';
+
+  if (!budgets || !budgets.length) {
+    h += '<div style="font-size:13px;color:var(--mid-gray);text-align:center;padding:20px 0">No snapshots yet — add the first one above.</div>';
+  } else {
+    h += '<div style="display:flex;flex-direction:column;gap:8px">';
+    var statusColors = { active:'var(--ocean)', complete:'#81C784', proposed:'var(--sand)', nonbillable:'var(--mid-gray)', bizdev:'#F57F17' };
+    for (var i = 0; i < budgets.length; i++) {
+      var b = budgets[i];
+      var sc = statusColors[b.status] || 'var(--mid-gray)';
+      var price = b.client_price || 0;
+      h += '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--canvas);border-radius:8px">';
+      h += '<div style="flex:1;min-width:0">';
+      h += '<div style="font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (b.name || 'Untitled') + '</div>';
+      h += '<div style="font-size:11px;color:var(--mid-gray);margin-top:3px">$' + Math.round(price).toLocaleString() + ' &nbsp;&middot;&nbsp; <span style="color:' + sc + ';font-weight:600">' + (b.status || 'proposed') + '</span></div>';
+      h += '</div>';
+      h += '<button onclick="sparkEditSmallSnapshot(\'' + b.id + '\',\'' + projectCode + '\')" style="padding:5px 12px;border-radius:6px;border:1px solid var(--canvas-border,#ddd);background:var(--white);color:var(--ink);cursor:pointer;font-size:12px;font-weight:500;white-space:nowrap;flex-shrink:0">Edit ›</button>';
+      h += '</div>';
+    }
+    h += '</div>';
+  }
+  h += '</div>';
+  container.innerHTML = h;
+}
+
+async function sparkEditSmallSnapshot(budgetId, projectCode) {
+  var container = document.getElementById('sparkProjectBudget');
+  if (!container) return;
+  sparkSmallProjProjectCode = projectCode;
+  container.innerHTML = '<div style="padding:16px;color:var(--mid-gray);font-size:13px">Loading\u2026</div>';
+
+  sparkSelectedBudget = budgetId;
+  var results = await Promise.all([
+    sparkFetch('budgets', 'id=eq.' + budgetId + '&select=*,projects(id,name,project_code,clients(id,name,client_number))'),
+    sparkFetch('labor_budget_entries', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,billable_rate,fully_burdened_rate,department,employment_type)&order=department.asc,display_order.asc'),
+    sparkFetch('oop_budget_entries', 'budget_id=eq.' + budgetId + '&select=*,section:oop_sections(id,name,slug),category:oop_categories(id,name)&order=display_order.asc'),
+    sparkFetch('oop_sections', 'select=*&order=display_order.asc'),
+    sparkFetch('oop_categories', 'select=*&order=display_order.asc'),
+    sparkFetch('labor_actuals', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,department,employment_type)&order=work_date.desc'),
+    sparkFetch('agency_settings', 'select=*&order=category.asc,sort_order.asc'),
+    sparkFetch('freelancer_budget_entries', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,billable_rate,fully_burdened_rate)&order=team_member_id.asc,display_order.asc')
+  ]);
+
+  sparkCurrentData = {
+    budget: results[0] && results[0][0] ? results[0][0] : null,
+    labor: results[1] || [],
+    oop: results[2] || [],
+    oopSections: results[3] || [],
+    oopCategories: results[4] || [],
+    actuals: results[5] || [],
+    settings: results[6] || [],
+    freelancerEntries: results[7] || []
+  };
+
+  sparkPhaseTab = 'all';
+  sparkOopTab = (sparkCurrentData.oopSections.length && sparkCurrentData.oopSections[0].slug) || 'creative';
+
+  if (!sparkCurrentData.budget) {
+    container.innerHTML = '<div style="padding:16px 20px;color:var(--mid-gray);font-size:13px;background:var(--white);border-radius:10px;margin-bottom:20px">Could not load budget data.</div>';
+    return;
+  }
+
+  sparkSubscribeRealtime(sparkCurrentData.budget.id);
+  sparkRenderBudgetContent(true);
+}
+
+function sparkShowAddSnapshotForm(projectCode) {
+  var container = document.getElementById('sparkProjectBudget');
+  if (!container) return;
+  var h = '<div style="background:var(--white);border-radius:10px;padding:20px;margin-bottom:16px">';
+  h += '<div style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:14px">New Snapshot</div>';
+  h += '<label style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray)">Snapshot Name</label>';
+  h += '<input id="sparkNewSnapName" type="text" placeholder="e.g. Q2 Social Ads" style="display:block;width:100%;box-sizing:border-box;margin-top:6px;margin-bottom:14px;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;color:var(--ink)">';
+  h += '<div style="display:flex;gap:10px">';
+  h += '<button onclick="sparkCreateSmallSnapshot(\'' + projectCode + '\')" style="padding:8px 20px;border-radius:6px;border:none;background:var(--ocean);color:var(--white);cursor:pointer;font-size:13px;font-weight:600">Create</button>';
+  h += '<button onclick="sparkRenderSmallProjectList(\'' + projectCode + '\')" style="padding:8px 16px;border-radius:6px;border:1px solid #ddd;background:var(--white);color:var(--ink);cursor:pointer;font-size:13px">Cancel</button>';
+  h += '</div></div>';
+  container.innerHTML = h;
+  var inp = document.getElementById('sparkNewSnapName');
+  if (inp) inp.focus();
+}
+
+async function sparkCreateSmallSnapshot(projectCode) {
+  var nameEl = document.getElementById('sparkNewSnapName');
+  var snapName = nameEl ? nameEl.value.trim() : '';
+  if (!snapName) { if (nameEl) nameEl.focus(); return; }
+
+  var container = document.getElementById('sparkProjectBudget');
+  if (container) container.innerHTML = '<div style="padding:16px;color:var(--mid-gray);font-size:13px">Creating snapshot\u2026</div>';
+
+  try {
+    /* Find or create the Supabase project record */
+    var existingProj = await sparkFetch('projects', 'project_code=eq.' + encodeURIComponent(projectCode) + '&select=id');
+    var supaProjectId;
+    if (existingProj && existingProj.length) {
+      supaProjectId = existingProj[0].id;
+    } else {
+      /* Look up from portfolio for client info */
+      var portfolioProj = null;
+      for (var ci = 0; ci < CLIENTS.length; ci++) {
+        for (var pi = 0; pi < CLIENTS[ci].projects.length; pi++) {
+          if (CLIENTS[ci].projects[pi].code === projectCode) {
+            portfolioProj = CLIENTS[ci].projects[pi];
+            portfolioProj._clientName = CLIENTS[ci].name;
+            portfolioProj._clientCode = CLIENTS[ci].code;
+            break;
+          }
+        }
+        if (portfolioProj) break;
+      }
+      if (!portfolioProj) throw new Error('Project not found in portfolio');
+      var existingClient = await sparkFetch('clients', 'client_number=eq.' + encodeURIComponent(portfolioProj._clientCode) + '&select=id');
+      var clientId = existingClient && existingClient.length ? existingClient[0].id : null;
+      if (!clientId) {
+        var nc = await sparkFetch('clients', '', 'POST', { name: portfolioProj._clientName, client_number: portfolioProj._clientCode });
+        if (!nc || !nc[0]) throw new Error('Failed to create client');
+        clientId = nc[0].id;
+      }
+      var np = await sparkFetch('projects', '', 'POST', { name: portfolioProj.name, project_code: projectCode, client_id: clientId });
+      if (!np || !np[0]) throw new Error('Failed to create project');
+      supaProjectId = np[0].id;
+    }
+
+    /* Create the budget */
+    var newBudget = await sparkFetch('budgets', '', 'POST', {
+      name: snapName,
+      project_id: supaProjectId,
+      status: 'proposed',
+      visibility: 'visible',
+      client_price: 0,
+      has_discount: false,
+      discount_percentage: 0,
+      reserve_percentage: 5,
+      oop_markup_percentage: 10,
+      no_oop: true,
+      no_freelancers: true
+    });
+    if (!newBudget || !newBudget[0]) throw new Error('Failed to create budget');
+    var budgetId = newBudget[0].id;
+
+    /* Pre-fill active team members */
+    var allTeam = await sparkFetch('team_members', 'select=id,name,department,employment_type&is_active=eq.true&order=name.asc');
+    if (allTeam && allTeam.length) {
+      var lb = [];
+      for (var ti = 0; ti < allTeam.length; ti++) {
+        var tm = allTeam[ti];
+        lb.push({ budget_id: budgetId, team_member_id: tm.id, department: tm.department,
+          employment_type: tm.employment_type || 'Employee',
+          phase1: 0, phase2: 0, phase3_1: 0, phase3_2: 0, phase4: 0, phase5: 0, display_order: ti });
+      }
+      await sparkFetch('labor_budget_entries', '', 'POST', lb);
+    }
+
+    /* Reload list */
+    await sparkRenderSmallProjectList(projectCode);
+  } catch (err) {
+    console.error('Failed to create snapshot:', err);
+    if (container) container.innerHTML = '<div style="padding:16px;color:var(--ember);font-size:13px;background:var(--white);border-radius:10px">Failed to create snapshot: ' + err.message + '</div>';
+  }
 }
 
 /* ── REAL-TIME COLLABORATION ── */
@@ -5403,6 +5601,9 @@ function sparkRenderBudgetContent(embedded) {
       var oh = '';
       var curStatus = budget.status || 'active';
       oh += '<div class="snapshot-banner" style="margin-bottom:16px">';
+      if (sparkSmallProjProjectCode) {
+        oh += '<div style="margin-bottom:12px"><button onclick="sparkRenderSmallProjectList(\'' + sparkSmallProjProjectCode + '\')" style="background:none;border:none;cursor:pointer;font-size:12px;color:rgba(255,255,255,.6);font-weight:600;padding:0;letter-spacing:.3px">&#8249; All Snapshots</button></div>';
+      }
       oh += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">';
       oh += '<div style="font-size:16px;font-weight:700;display:flex;align-items:center;gap:10px">PROJECT OVERVIEW <span style="font-size:13px;font-weight:400;opacity:.5">#' + (budget.estimate_number || '\u2014') + '</span><span id="sparkLiveDot" title="Live updates active" style="display:none;width:8px;height:8px;border-radius:50%;background:rgba(129,199,132,.5);transition:background .4s"></span></div>';
       oh += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
