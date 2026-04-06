@@ -685,6 +685,11 @@ html.dark .spark-oop-markup-row { color:var(--dm-text-muted); }
 html.dark .spark-oop-markup-row input { background:var(--dm-surface2); border-color:var(--dm-border); color:var(--dm-text); }
 html.dark .spark-oop-dept-total { color:var(--dm-text); }
 html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
+@keyframes furnaceShimmer {
+  0%   { opacity: 1; }
+  50%  { opacity: .45; }
+  100% { opacity: 1; }
+}
 </style>
 </head>
 <body>
@@ -8509,7 +8514,7 @@ async function sparkFetchAll(table, query) {
    Cache keyed by version so schema changes auto-bust it.
    ══════════════════════════════════════════════════════════════ */
 var FURNACE_CACHE_KEY = 'furnace_supa_v4';
-var FURNACE_CACHE_TTL = 10 * 60 * 1000; /* 10 min — treat as stale after this */
+var FURNACE_CACHE_TTL = 45 * 60 * 1000; /* 45 min — real-time handles live updates */
 
 function furnaceSaveCache(payload) {
   try { localStorage.setItem(FURNACE_CACHE_KEY, JSON.stringify({ ts: Date.now(), d: payload })); } catch(e) {}
@@ -8679,11 +8684,16 @@ async function loadSupabaseData() {
       furnaceSubscribeGlobalRealtime();
       if (!isStale) return; /* cache is fresh — skip re-fetch, render will happen in loadData */
     }
-    /* 0. Fetch active team members for rate lookups */
-    FURNACE_TEAM_MEMBERS = await sparkFetchAll('team_members', 'select=id,name,department,employment_type,fully_burdened_rate,billable_rate,is_active&is_active=eq.true&order=department.asc,name.asc') || [];
+    /* 0+1+1b. Fetch team members, budgets, and project ID map in parallel */
+    var _phase1 = await Promise.all([
+      sparkFetchAll('team_members', 'select=id,name,department,employment_type,fully_burdened_rate,billable_rate,is_active&is_active=eq.true&order=department.asc,name.asc'),
+      sparkFetchAll('budgets', 'select=id,name,status,client_price,total_amount,has_discount,discount_percentage,reserve_percentage,oop_markup_percentage,no_oop,no_freelancers,project_id,projects(id,project_code,name)&visibility=eq.visible'),
+      sparkFetchAll('projects', 'select=id,project_code')
+    ]);
+    FURNACE_TEAM_MEMBERS = _phase1[0] || [];
+    var budgets = _phase1[1];
+    var projRows = _phase1[2] || [];
 
-    /* 1. Fetch all visible budgets with project info */
-    var budgets = await sparkFetchAll('budgets', 'select=id,name,status,client_price,total_amount,has_discount,discount_percentage,reserve_percentage,oop_markup_percentage,no_oop,no_freelancers,project_id,projects(id,project_code,name)&visibility=eq.visible');
     if (!budgets || !budgets.length) {
       /* Fallback: try without the projects join in case join is failing */
       console.warn('[Furnace] budgets with join returned empty — trying without join');
@@ -8691,19 +8701,25 @@ async function loadSupabaseData() {
       if (!budgets || !budgets.length) { console.warn('[Furnace] No Supabase budgets found — check Supabase RLS policies and table data'); SUPA_LOADED = false; return; }
     }
 
-    /* 1b. Build project_id → project_code lookup as fallback when join is null */
     PROJ_CODE_MAP = {};
-    var projRows = await sparkFetchAll('projects', 'select=id,project_code') || [];
     for (var i = 0; i < projRows.length; i++) {
       if (projRows[i].project_code) PROJ_CODE_MAP[projRows[i].id] = projRows[i].project_code;
     }
-    var projCodeMap = PROJ_CODE_MAP; // keep local alias for code below
+    var projCodeMap = PROJ_CODE_MAP;
 
-    /* 2. Fetch labor_budget_entries, oop_budget_entries, and freelancer_budget_entries for all budgets */
+    /* 2. Fetch all entry tables + actuals + allocations in parallel */
     var budgetIds = budgets.map(function(b) { return b.id; });
-    var laborEntries = await sparkFetchAll('labor_budget_entries', 'select=id,budget_id,department,employment_type,phase1,phase2,phase3_1,phase3_2,phase4,phase5,rate_override,team_member_id,team_member:team_members(id,name,fully_burdened_rate)&budget_id=in.(' + budgetIds.join(',') + ')');
-    var oopEntries = await sparkFetchAll('oop_budget_entries', 'select=id,budget_id,line_item_name,count,rate,days,head_count,adjusted_count,adjusted_rate,adjusted_days,adjusted_head_count,actual_count,actual_rate,actual_days,actual_head_count,actual_amount,paid,paid_date,is_active&budget_id=in.(' + budgetIds.join(',') + ')');
-    var flEntries = await sparkFetchAll('freelancer_budget_entries', 'select=id,budget_id,team_member_id,week_label,hours,rate,paid,paid_date,notes&budget_id=in.(' + budgetIds.join(',') + ')') || [];
+    var _bids = budgetIds.join(',');
+    var _phase2 = await Promise.all([
+      sparkFetchAll('labor_budget_entries', 'select=id,budget_id,department,employment_type,phase1,phase2,phase3_1,phase3_2,phase4,phase5,rate_override,team_member_id,team_member:team_members(id,name,fully_burdened_rate)&budget_id=in.(' + _bids + ')'),
+      sparkFetchAll('oop_budget_entries', 'select=id,budget_id,line_item_name,count,rate,days,head_count,adjusted_count,adjusted_rate,adjusted_days,adjusted_head_count,actual_count,actual_rate,actual_days,actual_head_count,actual_amount,paid,paid_date,is_active&budget_id=in.(' + _bids + ')'),
+      sparkFetchAll('freelancer_budget_entries', 'select=id,budget_id,team_member_id,week_label,hours,rate,paid,paid_date,notes&budget_id=in.(' + _bids + ')'),
+      sparkFetchAll('labor_actuals', 'select=id,hours,work_date,person_name,project_code,phase_key,is_billable,is_bizdev,is_timeoff,board_name&source=eq.timetracker&work_date=gte.2025-01-01&order=work_date.desc'),
+      sparkFetchAll('allocations', 'select=id,person,project,date,hours_per_day,week_of&order=date.asc')
+    ]);
+    var laborEntries = _phase2[0];
+    var oopEntries   = _phase2[1];
+    var flEntries    = _phase2[2] || [];
 
     /* 3. Group entries by budget_id */
     var laborByBudget = {}, oopByBudget = {}, flByBudget = {};
@@ -8820,9 +8836,8 @@ async function loadSupabaseData() {
       SUPA_BUDGETS[projCode] = b;
     }
 
-    /* 5. Fetch labor_actuals — only 2025+ for fast initial load */
-    /* Older data and finished project data loaded on-demand when needed */
-    SUPA_ACTUALS_ALL = await sparkFetchAll('labor_actuals', 'select=id,hours,work_date,person_name,project_code,phase_key,is_billable,is_bizdev,is_timeoff,board_name&source=eq.timetracker&work_date=gte.2025-01-01&order=work_date.desc');
+    /* 5. labor_actuals already fetched in phase 2 parallel batch */
+    SUPA_ACTUALS_ALL = _phase2[3] || [];
 
     /* 6. Build SUPA_ACTUALS keyed by project_code */
     /* Code aliases: map 7pace board codes to Furnace project codes */
@@ -8871,8 +8886,8 @@ async function loadSupabaseData() {
       }
     }
 
-    /* 7. Fetch allocations from Supabase */
-    var supaAllocs = await sparkFetchAll('allocations', 'select=id,person,project,date,hours_per_day,week_of&order=date.asc');
+    /* 7. Allocations already fetched in phase 2 parallel batch */
+    var supaAllocs = _phase2[4];
     if (supaAllocs && supaAllocs.length > 0) {
       ALLOCATIONS.allocations = supaAllocs.map(function(a) {
         return { id: a.id, person: a.person, project: a.project, date: a.date, hoursPerDay: a.hours_per_day, weekOf: a.week_of };
@@ -8971,9 +8986,12 @@ function enrichProjectsWithSupabase() {
 
 /* ── BUILD CLIENTS FROM SUPABASE ── */
 async function buildClientsFromSupabase() {
-  var clients  = await sparkFetch('clients', 'select=id,name,client_number,color,client_status&order=client_number.asc') || [];
-  /* select=* is safest — never errors on column names regardless of schema state */
-  var projects = await sparkFetchAll('projects', 'select=*&order=project_code.asc') || [];
+  var _results = await Promise.all([
+    sparkFetch('clients', 'select=id,name,client_number,color,client_status&order=client_number.asc'),
+    sparkFetchAll('projects', 'select=*&order=project_code.asc')
+  ]);
+  var clients  = _results[0] || [];
+  var projects = _results[1] || [];
 
   console.log('[Furnace] buildClientsFromSupabase: ' + clients.length + ' clients, ' + projects.length + ' projects');
 
@@ -9052,13 +9070,19 @@ async function loadData() {
     await sparkCheckStatus();
     await loadSupabaseData();
 
-    /* Build client/project list from Supabase */
-    await buildClientsFromSupabase();
+    /* Build client/project list + allocations + payment schedule in parallel */
+    var _loadResults = await Promise.all([
+      buildClientsFromSupabase(),
+      sparkFetchAll('allocations', 'select=*&order=date.asc'),
+      sparkFetch('payment_schedule', 'select=*&order=scheduled_date.asc')
+    ]);
+    var allocRows = _loadResults[1] || [];
+    var schedRows = _loadResults[2] || [];
+
     enrichProjectsWithSupabase();
     buildProjectBudgetLookup();
 
-    /* Load allocations from Supabase */
-    var allocRows = await sparkFetchAll('allocations', 'select=*&order=date.asc') || [];
+    /* Process allocations */
     ALLOCATIONS = {
       version: 2,
       forecastProjects: [],
@@ -9071,7 +9095,6 @@ async function loadData() {
         };
       })
     };
-    /* Build forecastProjects and team list from allocation data */
     var fpSet = {}, teamSet = {};
     for (var i = 0; i < ALLOCATIONS.allocations.length; i++) {
       fpSet[ALLOCATIONS.allocations[i].project] = true;
@@ -9080,8 +9103,7 @@ async function loadData() {
     ALLOCATIONS.forecastProjects = Object.keys(fpSet).sort();
     ALLOCATIONS.team = Object.keys(teamSet).sort();
 
-    /* Load OOP payment schedule from Supabase */
-    var schedRows = await sparkFetch('payment_schedule', 'select=*&order=scheduled_date.asc') || [];
+    /* Process payment schedule */
     OOP_SCHEDULE = {
       version: 2,
       entries: (schedRows || []).map(function(r) {
@@ -9170,6 +9192,17 @@ function furnaceShowApp(user) {
     var name = (user.user_metadata && user.user_metadata.full_name) ? user.user_metadata.full_name.split(' ')[0] : user.email;
     nameEl.textContent = name;
   }
+  /* Show loading state immediately so screen isn't blank */
+  document.getElementById('mainContent').innerHTML =
+    '<div style="padding:48px 40px">' +
+    '<div style="height:28px;width:220px;background:var(--canvas);border-radius:6px;margin-bottom:12px;animation:furnaceShimmer 1.4s ease-in-out infinite"></div>' +
+    '<div style="height:14px;width:160px;background:var(--canvas);border-radius:4px;margin-bottom:32px;animation:furnaceShimmer 1.4s ease-in-out infinite .1s"></div>' +
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px">' +
+    [0,1,2,3].map(function(i){ return '<div style="height:80px;background:var(--canvas);border-radius:10px;animation:furnaceShimmer 1.4s ease-in-out infinite ' + (i*0.08) + 's"></div>'; }).join('') +
+    '</div>' +
+    '<div style="height:120px;background:var(--canvas);border-radius:10px;margin-bottom:16px;animation:furnaceShimmer 1.4s ease-in-out infinite .3s"></div>' +
+    '<div style="height:80px;background:var(--canvas);border-radius:10px;animation:furnaceShimmer 1.4s ease-in-out infinite .4s"></div>' +
+    '</div>';
   loadData();
 }
 
