@@ -9127,6 +9127,28 @@ async function loadData() {
 
     var savedView = null;
     try { savedView = localStorage.getItem('furnace_view'); } catch(e) {}
+    /* If the fast path already loaded the budget editor, just re-render the
+       project shell around it (title, actuals, phases) without re-fetching
+       the budget — sparkProjectBudget content is already live */
+    var _fastCode = savedView && savedView.indexOf('project:') === 0 ? savedView.split(':')[1] : null;
+    if (_fastCode && document.getElementById('sparkProjectBudget')) {
+      var _fp = null;
+      for (var _ci = 0; _ci < CLIENTS.length && !_fp; _ci++) {
+        for (var _pi = 0; _pi < CLIENTS[_ci].projects.length && !_fp; _pi++) {
+          if (CLIENTS[_ci].projects[_pi].code === _fastCode || CLIENTS[_ci].projects[_pi].id === _fastCode) {
+            _fp = CLIENTS[_ci].projects[_pi];
+          }
+        }
+      }
+      if (_fp) {
+        /* Re-render project shell (title, phases, actuals) preserving budget editor */
+        currentView = savedView;
+        renderSidebar();
+        renderProject(_fp.id);
+        /* Re-attach the already-loaded budget editor if renderProject replaced it */
+        return;
+      }
+    }
     navigate(savedView || 'master');
   } catch(e) {
     console.error('loadData error:', e);
@@ -9196,17 +9218,51 @@ function furnaceShowApp(user) {
     var name = (user.user_metadata && user.user_metadata.full_name) ? user.user_metadata.full_name.split(' ')[0] : user.email;
     nameEl.textContent = name;
   }
-  /* Show loading state immediately so screen isn't blank */
-  document.getElementById('mainContent').innerHTML =
-    '<div style="padding:48px 40px">' +
-    '<div style="height:28px;width:220px;background:var(--canvas);border-radius:6px;margin-bottom:12px;animation:furnaceShimmer 1.4s ease-in-out infinite"></div>' +
-    '<div style="height:14px;width:160px;background:var(--canvas);border-radius:4px;margin-bottom:32px;animation:furnaceShimmer 1.4s ease-in-out infinite .1s"></div>' +
-    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px">' +
-    [0,1,2,3].map(function(i){ return '<div style="height:80px;background:var(--canvas);border-radius:10px;animation:furnaceShimmer 1.4s ease-in-out infinite ' + (i*0.08) + 's"></div>'; }).join('') +
-    '</div>' +
-    '<div style="height:120px;background:var(--canvas);border-radius:10px;margin-bottom:16px;animation:furnaceShimmer 1.4s ease-in-out infinite .3s"></div>' +
-    '<div style="height:80px;background:var(--canvas);border-radius:10px;animation:furnaceShimmer 1.4s ease-in-out infinite .4s"></div>' +
-    '</div>';
+
+  /* ── FAST PATH: if last view was a project, load its budget immediately
+     in parallel with the full data load so the budget editor appears
+     within ~1 request round-trip instead of waiting for all data ── */
+  var savedView = null;
+  try { savedView = localStorage.getItem('furnace_view'); } catch(e) {}
+  var fastProjectCode = null;
+  if (savedView && savedView.indexOf('project:') === 0) {
+    fastProjectCode = savedView.split(':')[1];
+  }
+
+  if (fastProjectCode) {
+    /* Render a project-shaped skeleton immediately */
+    var mc = document.getElementById('mainContent');
+    mc.innerHTML =
+      '<div style="padding:48px 40px 0">' +
+      '<div style="height:11px;width:90px;background:var(--canvas);border-radius:4px;margin-bottom:10px;animation:furnaceShimmer 1.4s ease-in-out infinite"></div>' +
+      '<div style="height:28px;width:300px;background:var(--canvas);border-radius:6px;margin-bottom:8px;animation:furnaceShimmer 1.4s ease-in-out infinite .05s"></div>' +
+      '<div style="height:13px;width:180px;background:var(--canvas);border-radius:4px;margin-bottom:28px;animation:furnaceShimmer 1.4s ease-in-out infinite .1s"></div>' +
+      '</div>' +
+      '<div style="padding:0 40px" id="sparkProjectOverview"></div>' +
+      '<div style="padding:0 40px">' +
+      '<div style="height:40px;width:160px;background:var(--canvas);border-radius:6px;margin-bottom:16px;animation:furnaceShimmer 1.4s ease-in-out infinite .15s"></div>' +
+      '<div id="sparkProjectBudget"><div style="height:200px;background:var(--canvas);border-radius:10px;animation:furnaceShimmer 1.4s ease-in-out infinite .2s"></div></div>' +
+      '</div>';
+
+    /* Fire budget load immediately — doesn't need full CLIENTS data */
+    sparkAuth.connected = true;
+    sparkLoadBudgetForProject(fastProjectCode);
+  } else {
+    /* Generic shimmer for non-project views */
+    document.getElementById('mainContent').innerHTML =
+      '<div style="padding:48px 40px">' +
+      '<div style="height:28px;width:220px;background:var(--canvas);border-radius:6px;margin-bottom:12px;animation:furnaceShimmer 1.4s ease-in-out infinite"></div>' +
+      '<div style="height:14px;width:160px;background:var(--canvas);border-radius:4px;margin-bottom:32px;animation:furnaceShimmer 1.4s ease-in-out infinite .1s"></div>' +
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px">' +
+      [0,1,2,3].map(function(i){ return '<div style="height:80px;background:var(--canvas);border-radius:10px;animation:furnaceShimmer 1.4s ease-in-out infinite ' + (i*0.08) + 's"></div>'; }).join('') +
+      '</div>' +
+      '<div style="height:120px;background:var(--canvas);border-radius:10px;margin-bottom:16px;animation:furnaceShimmer 1.4s ease-in-out infinite .3s"></div>' +
+      '<div style="height:80px;background:var(--canvas);border-radius:10px;animation:furnaceShimmer 1.4s ease-in-out infinite .4s"></div>' +
+      '</div>';
+  }
+
+  /* Full data load always runs — when done it re-renders the correct view,
+     enriching the fast-path content with sidebar, actuals, etc. */
   loadData();
 }
 
