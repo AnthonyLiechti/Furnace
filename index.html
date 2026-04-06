@@ -3579,7 +3579,7 @@ async function updateTeamMemberRate(tmId, field, value) {
 
 /* ── SPARK BUDGET EDITOR STATE ── */
 var sparkBudgets = [];
-var sparkSelectedBudget = null;
+var sparkSelectedBudget = (function(){ try { return localStorage.getItem('furnace_spark_budget') || null; } catch(e) { return null; } })();
 var sparkCurrentData = null;
 var sparkPhaseTab = 'all';
 var sparkOopTab = 'creative';
@@ -3796,7 +3796,7 @@ async function sparkLoadBudgetForProject(projectCode) {
   }
 
   /* Load full budget data */
-  sparkSelectedBudget = budgetId;
+  sparkSelectedBudget = budgetId; try { if (budgetId) localStorage.setItem("furnace_spark_budget", budgetId); else localStorage.removeItem("furnace_spark_budget"); } catch(e) {}
   var loadingEl = container;
   loadingEl.innerHTML = '<div style="padding:20px;color:var(--mid-gray)">Loading budget data...</div>';
 
@@ -3912,7 +3912,7 @@ async function sparkEditSmallSnapshot(budgetId, projectCode) {
   sparkSmallProjProjectCode = projectCode;
   container.innerHTML = '<div style="padding:16px;color:var(--mid-gray);font-size:13px">Loading\u2026</div>';
 
-  sparkSelectedBudget = budgetId;
+  sparkSelectedBudget = budgetId; try { if (budgetId) localStorage.setItem("furnace_spark_budget", budgetId); else localStorage.removeItem("furnace_spark_budget"); } catch(e) {}
   var results = await Promise.all([
     sparkFetch('budgets', 'id=eq.' + budgetId + '&select=*,projects(id,name,project_code,clients(id,name,client_number))'),
     sparkFetch('labor_budget_entries', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,billable_rate,fully_burdened_rate,department,employment_type)&order=department.asc,display_order.asc'),
@@ -5538,7 +5538,7 @@ function sparkSetPhaseTab(tab) {
 }
 
 async function sparkLoadBudget(budgetId) {
-  sparkSelectedBudget = budgetId;
+  sparkSelectedBudget = budgetId; try { if (budgetId) localStorage.setItem("furnace_spark_budget", budgetId); else localStorage.removeItem("furnace_spark_budget"); } catch(e) {}
   if (!budgetId) { sparkCurrentData = null; sparkRenderBudgetContent(); return; }
 
   var loadingEl = document.getElementById('sparkBudgetContent');
@@ -9227,6 +9227,52 @@ function furnaceShowApp(user) {
   var fastProjectCode = null;
   if (savedView && savedView.indexOf('project:') === 0) {
     fastProjectCode = savedView.split(':')[1];
+  }
+
+  /* ── FAST PATH: Spark editor — re-open last selected budget immediately ── */
+  if (savedView === 'spark' && sparkSelectedBudget) {
+    document.getElementById('mainContent').innerHTML =
+      '<h1 class="page-title">&#9889; Spark Budget Editor</h1>' +
+      '<p class="page-subtitle">Edit live project budgets from Spark</p>' +
+      '<div style="margin-bottom:24px"><select class="spark-select" id="sparkBudgetSelect" onchange="sparkLoadBudget(this.value)"><option value="">Loading budgets\u2026</option></select></div>' +
+      '<div id="sparkBudgetContent"><div style="height:200px;background:var(--canvas);border-radius:10px;animation:furnaceShimmer 1.4s ease-in-out infinite"></div></div>';
+    sparkAuth.connected = true;
+    sparkLoadBudget(sparkSelectedBudget);
+  }
+
+  /* ── FAST PATH: Client page — show financial banner immediately ── */
+  var fastClientCode = (savedView && savedView.indexOf('client:') === 0) ? savedView.split(':')[1] : null;
+  if (fastClientCode) {
+    document.getElementById('mainContent').innerHTML =
+      '<div style="padding:48px 40px 0">' +
+      '<div style="height:28px;width:200px;background:var(--canvas);border-radius:6px;margin-bottom:8px;animation:furnaceShimmer 1.4s ease-in-out infinite"></div>' +
+      '<div style="height:13px;width:140px;background:var(--canvas);border-radius:4px;margin-bottom:28px;animation:furnaceShimmer 1.4s ease-in-out infinite .1s"></div>' +
+      '<div id="fastClientBanner" style="height:130px;background:var(--canvas);border-radius:10px;margin-bottom:20px;animation:furnaceShimmer 1.4s ease-in-out infinite .15s"></div>' +
+      [0,1,2].map(function(i){ return '<div style="height:72px;background:var(--canvas);border-radius:10px;margin-bottom:10px;animation:furnaceShimmer 1.4s ease-in-out infinite ' + (.2+i*.07) + 's"></div>'; }).join('') +
+      '</div>';
+    sparkAuth.connected = true;
+    (async function() {
+      try {
+        var _cr = await sparkFetch('clients', 'client_number=eq.' + encodeURIComponent(fastClientCode) + '&select=id,name,client_number');
+        if (!_cr || !_cr.length) return;
+        var _pr = await sparkFetch('projects', 'client_id=eq.' + _cr[0].id + '&select=id&order=project_code.asc');
+        if (!_pr || !_pr.length) return;
+        var _br = await sparkFetch('budgets', 'project_id=in.(' + _pr.map(function(p){return p.id;}).join(',') + ')&visibility=eq.visible&select=status,client_price');
+        var _total = 0, _active = 0;
+        for (var _i = 0; _i < (_br||[]).length; _i++) { _total += _br[_i].client_price||0; if (_br[_i].status==='active') _active++; }
+        var _el = document.getElementById('fastClientBanner');
+        if (_el) {
+          _el.style.cssText = '';
+          _el.className = 'snapshot-banner';
+          _el.innerHTML = '<div class="snap-header"><div class="snap-title">' + _cr[0].client_number + ' — ' + _cr[0].name + '</div><div class="snap-version">Loading full data\u2026</div></div>' +
+            '<div class="snap-financials">' +
+            '<div class="snap-fin-item"><div class="sf-label">Total Budget</div><div class="sf-value sf-gold">$' + Math.round(_total).toLocaleString() + '</div></div>' +
+            '<div class="snap-fin-item"><div class="sf-label">Active Projects</div><div class="sf-value">' + _active + '</div></div>' +
+            '<div class="snap-fin-item"><div class="sf-label">Total Snapshots</div><div class="sf-value">' + (_br||[]).length + '</div></div>' +
+            '</div>';
+        }
+      } catch(e) {}
+    })();
   }
 
   if (fastProjectCode) {
