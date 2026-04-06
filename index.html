@@ -8292,6 +8292,7 @@ function navigate(view) {
   try { localStorage.setItem('furnace_view', view); } catch(e) {}
   if (view.indexOf('client:') === 0) {
     openClients[view.split(':')[1]] = true;
+    showFinalized = false; /* always default to active-only when entering a client */
   } else if (view.indexOf('project:') === 0) {
     var pid = view.split(':')[1];
     for (var i = 0; i < CLIENTS.length; i++) {
