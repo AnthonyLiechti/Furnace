@@ -698,7 +698,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.27.0 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 6, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.0 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 6, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -1629,6 +1629,7 @@ function renderClient(clientId) {
   var h = '<h1 class="page-title">' + c.code + ' ' + c.name;
   h += '<span class="view-toggle"><button class="view-toggle-btn ' + (!showFinalized ? 'active' : '') + '" onclick="showFinalized=false;navigate(currentView)">Active</button>';
   h += '<button class="view-toggle-btn ' + (showFinalized ? 'active' : '') + '" onclick="showFinalized=true;navigate(currentView)">All</button></span>';
+  h += '<button onclick="showAddProjectForm(\'' + c.id + '\')" style="margin-left:12px;padding:5px 14px;border-radius:6px;border:none;background:var(--ocean);color:var(--white);cursor:pointer;font-size:12px;font-weight:600;vertical-align:middle;letter-spacing:.3px">+ Add Project</button>';
   h += '</h1>';
   var label = showFinalized ? (visibleList.length + ' total project' + (visibleList.length !== 1 ? 's' : '')) : (activeList.length + ' active project' + (activeList.length !== 1 ? 's' : '') + (doneList.length ? ' &middot; ' + doneList.length + ' completed' : ''));
   h += '<p class="page-subtitle">' + label + ' &middot; Rate: ' + (rate > 0 ? '$' + rate + '/hr' : 'Not set') + '</p>';
@@ -4042,6 +4043,166 @@ async function sparkCreateSmallSnapshot(projectCode) {
   }
 }
 
+/* ── ADD PROJECT MODAL ── */
+function showAddProjectForm(preselectedClientId) {
+  addProjectFormClientId = preselectedClientId || null;
+
+  /* Build client dropdown options */
+  var activeClients = CLIENTS.filter(function(cl) { return cl.status !== 'inactive'; });
+  activeClients.sort(function(a, b) { return a.code < b.code ? -1 : a.code > b.code ? 1 : 0; });
+
+  /* Suggest next code if client pre-selected */
+  var suggestedCode = '';
+  if (preselectedClientId) {
+    var cl = clientById(preselectedClientId);
+    if (cl) {
+      var codes = cl.projects.map(function(p){ return p.code; }).filter(function(c){ return c; }).sort();
+      suggestedCode = cl.code + '_';
+    }
+  }
+
+  var overlay = document.getElementById('addProjectOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'addProjectOverlay';
+    document.body.appendChild(overlay);
+  }
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45)';
+
+  var clientOpts = '';
+  for (var i = 0; i < activeClients.length; i++) {
+    var cl2 = activeClients[i];
+    var sel = cl2.id === preselectedClientId ? ' selected' : '';
+    clientOpts += '<option value="' + cl2.id + '"' + sel + '>' + cl2.code + ' ' + cl2.name + '</option>';
+  }
+
+  overlay.innerHTML = '<div style="background:var(--white);border-radius:12px;padding:28px 28px 24px;width:480px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.3)">' +
+    '<div style="font-size:16px;font-weight:700;color:var(--abyss);margin-bottom:20px">New Project</div>' +
+    '<div style="margin-bottom:14px">' +
+      '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);margin-bottom:6px">Client</label>' +
+      '<select id="addProjClientSelect" style="width:100%;padding:8px 12px;border:1px solid var(--canvas);border-radius:6px;font-size:14px;color:var(--abyss);background:var(--white)">' +
+        clientOpts +
+      '</select>' +
+    '</div>' +
+    '<div style="margin-bottom:14px">' +
+      '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);margin-bottom:6px">Project Name</label>' +
+      '<input id="addProjName" type="text" placeholder="e.g. Summer Campaign 2026" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--canvas);border-radius:6px;font-size:14px;color:var(--abyss)">' +
+    '</div>' +
+    '<div style="margin-bottom:22px">' +
+      '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);margin-bottom:6px">Project Code</label>' +
+      '<input id="addProjCode" type="text" placeholder="e.g. ' + suggestedCode + 'XX_XX" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--canvas);border-radius:6px;font-size:14px;color:var(--abyss);font-family:monospace">' +
+    '</div>' +
+    '<div id="addProjError" style="color:var(--ember);font-size:12px;margin-bottom:12px;display:none"></div>' +
+    '<div style="display:flex;gap:10px">' +
+      '<button onclick="createNewProject()" style="padding:9px 22px;border-radius:6px;border:none;background:var(--ocean);color:var(--white);cursor:pointer;font-size:13px;font-weight:600">Create Project</button>' +
+      '<button onclick="hideAddProjectForm()" style="padding:9px 16px;border-radius:6px;border:1px solid var(--canvas);background:none;color:var(--abyss);cursor:pointer;font-size:13px">Cancel</button>' +
+    '</div>' +
+  '</div>';
+
+  /* Close on backdrop click */
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) hideAddProjectForm(); });
+
+  /* Auto-update code hint when client changes */
+  var sel = document.getElementById('addProjClientSelect');
+  if (sel) sel.addEventListener('change', function() {
+    var cl3 = clientById(this.value);
+    var codeEl = document.getElementById('addProjCode');
+    if (cl3 && codeEl && !codeEl.value) codeEl.placeholder = cl3.code + '_XX_XX';
+  });
+
+  var nameEl = document.getElementById('addProjName');
+  if (nameEl) nameEl.focus();
+}
+
+function hideAddProjectForm() {
+  var overlay = document.getElementById('addProjectOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+async function createNewProject() {
+  var clientEl = document.getElementById('addProjClientSelect');
+  var nameEl = document.getElementById('addProjName');
+  var codeEl = document.getElementById('addProjCode');
+  var errEl = document.getElementById('addProjError');
+
+  var clientId = clientEl ? clientEl.value : '';
+  var name = nameEl ? nameEl.value.trim() : '';
+  var code = codeEl ? codeEl.value.trim().toUpperCase() : '';
+
+  function showErr(msg) {
+    if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
+  }
+  if (!clientId) { showErr('Please select a client.'); return; }
+  if (!name) { showErr('Project name is required.'); if (nameEl) nameEl.focus(); return; }
+  if (!code) { showErr('Project code is required.'); if (codeEl) codeEl.focus(); return; }
+
+  /* Disable button during creation */
+  var btn = document.querySelector('#addProjectOverlay button');
+  if (btn) { btn.textContent = 'Creating\u2026'; btn.disabled = true; }
+  if (errEl) errEl.style.display = 'none';
+
+  try {
+    /* 1. Create project in Supabase */
+    var newProj = await sparkFetch('projects', '', 'POST', {
+      name: name,
+      project_code: code,
+      client_id: clientId
+    });
+    if (!newProj || !newProj[0]) throw new Error('Failed to create project record.');
+    var projId = newProj[0].id;
+
+    /* 2. Create initial budget */
+    await sparkFetch('budgets', '', 'POST', {
+      project_id: projId,
+      name: 'Initial Snapshot',
+      status: 'proposed',
+      visibility: 'visible',
+      client_price: 0,
+      has_discount: false,
+      discount_percentage: 0,
+      reserve_percentage: 5,
+      oop_markup_percentage: 10,
+      no_oop: false,
+      no_freelancers: false
+    });
+
+    /* 3. Update CLIENTS local state */
+    for (var ci = 0; ci < CLIENTS.length; ci++) {
+      if (CLIENTS[ci].id === clientId) {
+        CLIENTS[ci].projects.push({
+          id: projId,
+          name: name,
+          code: code,
+          status: 'active',
+          budget: 0, spent: 0,
+          laborCost: 0, oopCost: 0, profit: 0, clientPrice: 0
+        });
+        break;
+      }
+    }
+
+    /* 4. Add to ALLOCATIONS.forecastProjects so it appears in resource planner */
+    if (ALLOCATIONS && ALLOCATIONS.forecastProjects) {
+      if (ALLOCATIONS.forecastProjects.indexOf(name) < 0) {
+        ALLOCATIONS.forecastProjects.push(name);
+        ALLOCATIONS.forecastProjects.sort();
+      }
+    }
+
+    /* 5. Bust cache */
+    try { localStorage.removeItem('furnace_supa_v4'); } catch(e) {}
+
+    /* 6. Navigate to new project page */
+    hideAddProjectForm();
+    navigate('project:' + code);
+
+  } catch(err) {
+    console.error('createNewProject error:', err);
+    showErr('Error: ' + (err.message || 'Unknown error'));
+    if (btn) { btn.textContent = 'Create Project'; btn.disabled = false; }
+  }
+}
+
 /* ── REAL-TIME COLLABORATION ── */
 var _sparkRealtimeChannel = null;
 var _sparkRealtimeBudgetId = null;
@@ -5838,6 +5999,9 @@ var rtProjFilter = 'active'; /* active | all */
 var rtExpandedFinancials = {};
 var rtCollapsedClients = {};
 
+/* ── ADD PROJECT STATE ── */
+var addProjectFormClientId = null;
+
 function rtGetCurrentIdx() {
   if (rtWeekIdx >= 0 && rtWeekIdx < RT_WEEKS.length) return rtWeekIdx;
   /* Default: latest week with actual hours */
@@ -6878,7 +7042,7 @@ function renderAllocations() {
 
   /* ── PROJECT SIDEBAR ── */
   h += '<div class="alloc-proj-sidebar">';
-  h += '<div class="aps-header">Projects</div>';
+  h += '<div class="aps-header" style="display:flex;align-items:center;justify-content:space-between">Projects<button onclick="showAddProjectForm(null)" style="padding:3px 9px;border-radius:5px;border:none;background:var(--ocean);color:var(--white);cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.3px">+</button></div>';
   h += '<input class="aps-search" type="text" placeholder="Search projects..." value="' + (allocProjSearch || '') + '" oninput="allocProjSearch=this.value;renderAllocProjList()" id="allocProjSearchInput">';
   h += '<div id="allocProjListInner"></div>';
   h += '</div>';
