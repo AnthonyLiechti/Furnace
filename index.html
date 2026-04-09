@@ -7013,7 +7013,6 @@ function getAllocWeekLabel(mondayISO) {
 }
 
 function getProjectList() {
-  var forecast = (ALLOCATIONS && ALLOCATIONS.forecastProjects) || [];
   var list = [];
   for (var i = 0; i < CLIENTS.length; i++) {
     var c = CLIENTS[i];
@@ -7021,7 +7020,6 @@ function getProjectList() {
     for (var j = 0; j < c.projects.length; j++) {
       var p = c.projects[j];
       if (p.status !== 'active' && (p.status === 'finished' || p.status === 'closed' || p.status === 'completed' || p.status === 'complete')) continue;
-      if (forecast.length > 0 && forecast.indexOf(p.name) < 0) continue;
       list.push({ client: c.name, clientCode: c.code, clientColor: c.color, name: p.name, code: p.code, id: p.id });
     }
   }
@@ -8870,7 +8868,7 @@ async function sparkFetchAll(table, query) {
    On load: serve cached data instantly, then fetch fresh in background.
    Cache keyed by version so schema changes auto-bust it.
    ══════════════════════════════════════════════════════════════ */
-var FURNACE_CACHE_KEY = 'furnace_supa_v4';
+var FURNACE_CACHE_KEY = 'furnace_supa_v5';
 var FURNACE_CACHE_TTL = 45 * 60 * 1000; /* 45 min — real-time handles live updates */
 
 function furnaceSaveCache(payload) {
