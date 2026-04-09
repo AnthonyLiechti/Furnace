@@ -3595,32 +3595,40 @@ function showAddFreelancerForm() {
     overlay.id = 'addFreelancerOverlay';
     document.body.appendChild(overlay);
   }
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45)';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55)';
 
-  overlay.innerHTML = '<div style="background:var(--white);border-radius:12px;padding:28px 28px 24px;width:440px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.3)">' +
-    '<div style="font-size:16px;font-weight:700;color:var(--abyss);margin-bottom:20px">New Freelancer</div>' +
+  var dk = document.documentElement.classList.contains('dark');
+  var mBg     = dk ? '#242424' : '#ffffff';
+  var mText   = dk ? '#e0e0e0' : 'var(--abyss)';
+  var mMuted  = dk ? '#888'    : 'var(--mid-gray)';
+  var mBorder = dk ? '#3a3a3a' : 'var(--canvas)';
+  var mInput  = dk ? '#2e2e2e' : '#ffffff';
+  var mCancel = dk ? 'rgba(255,255,255,.08)' : 'none';
+
+  overlay.innerHTML = '<div style="background:' + mBg + ';border-radius:12px;padding:28px 28px 24px;width:440px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.4)">' +
+    '<div style="font-size:16px;font-weight:700;color:' + mText + ';margin-bottom:20px">New Freelancer</div>' +
     '<div style="margin-bottom:14px">' +
-      '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);margin-bottom:6px">Name</label>' +
-      '<input id="addFlName" type="text" placeholder="e.g. Jane Smith" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--canvas);border-radius:6px;font-size:14px;color:var(--abyss)">' +
+      '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:' + mMuted + ';margin-bottom:6px">Name</label>' +
+      '<input id="addFlName" type="text" placeholder="e.g. Jane Smith" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid ' + mBorder + ';border-radius:6px;font-size:14px;color:' + mText + ';background:' + mInput + '">' +
     '</div>' +
     '<div style="margin-bottom:14px">' +
-      '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);margin-bottom:6px">Department <span style="text-transform:none;font-style:italic">(optional)</span></label>' +
-      '<input id="addFlDept" type="text" placeholder="e.g. Motion, Edit, Photography" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--canvas);border-radius:6px;font-size:14px;color:var(--abyss)">' +
+      '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:' + mMuted + ';margin-bottom:6px">Department <span style="text-transform:none;font-style:italic">(optional)</span></label>' +
+      '<input id="addFlDept" type="text" placeholder="e.g. Motion, Edit, Photography" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid ' + mBorder + ';border-radius:6px;font-size:14px;color:' + mText + ';background:' + mInput + '">' +
     '</div>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:22px">' +
       '<div>' +
-        '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);margin-bottom:6px">Cost Rate ($/hr)</label>' +
-        '<input id="addFlCostRate" type="number" placeholder="0" min="0" step="5" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--canvas);border-radius:6px;font-size:14px;color:var(--abyss)">' +
+        '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:' + mMuted + ';margin-bottom:6px">Cost Rate ($/hr)</label>' +
+        '<input id="addFlCostRate" type="number" placeholder="0" min="0" step="5" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid ' + mBorder + ';border-radius:6px;font-size:14px;color:' + mText + ';background:' + mInput + '">' +
       '</div>' +
       '<div>' +
-        '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);margin-bottom:6px">Billable Rate ($/hr)</label>' +
-        '<input id="addFlBillRate" type="number" placeholder="0" min="0" step="5" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--canvas);border-radius:6px;font-size:14px;color:var(--abyss)">' +
+        '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:' + mMuted + ';margin-bottom:6px">Billable Rate ($/hr)</label>' +
+        '<input id="addFlBillRate" type="number" placeholder="0" min="0" step="5" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid ' + mBorder + ';border-radius:6px;font-size:14px;color:' + mText + ';background:' + mInput + '">' +
       '</div>' +
     '</div>' +
     '<div id="addFlError" style="color:var(--ember);font-size:12px;margin-bottom:12px;display:none"></div>' +
     '<div style="display:flex;gap:10px">' +
-      '<button onclick="createNewFreelancer()" style="padding:9px 22px;border-radius:6px;border:none;background:var(--honey);color:var(--white);cursor:pointer;font-size:13px;font-weight:600">Add Freelancer</button>' +
-      '<button onclick="hideAddFreelancerForm()" style="padding:9px 16px;border-radius:6px;border:1px solid var(--canvas);background:none;color:var(--abyss);cursor:pointer;font-size:13px">Cancel</button>' +
+      '<button onclick="createNewFreelancer()" style="padding:9px 22px;border-radius:6px;border:none;background:var(--honey);color:#ffffff;cursor:pointer;font-size:13px;font-weight:600">Add Freelancer</button>' +
+      '<button onclick="hideAddFreelancerForm()" style="padding:9px 16px;border-radius:6px;border:1px solid ' + mBorder + ';background:' + mCancel + ';color:' + mText + ';cursor:pointer;font-size:13px">Cancel</button>' +
     '</div>' +
   '</div>';
 
@@ -4167,7 +4175,15 @@ function showAddProjectForm(preselectedClientId) {
     overlay.id = 'addProjectOverlay';
     document.body.appendChild(overlay);
   }
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45)';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55)';
+
+  var dk = document.documentElement.classList.contains('dark');
+  var mBg  = dk ? '#242424' : '#ffffff';
+  var mText = dk ? '#e0e0e0' : 'var(--abyss)';
+  var mMuted = dk ? '#888' : 'var(--mid-gray)';
+  var mBorder = dk ? '#3a3a3a' : 'var(--canvas)';
+  var mInput = dk ? '#2e2e2e' : '#ffffff';
+  var mCancel = dk ? 'rgba(255,255,255,.08)' : 'none';
 
   var clientOpts = '';
   for (var i = 0; i < activeClients.length; i++) {
@@ -4176,26 +4192,26 @@ function showAddProjectForm(preselectedClientId) {
     clientOpts += '<option value="' + cl2.id + '"' + sel + '>' + cl2.code + ' ' + cl2.name + '</option>';
   }
 
-  overlay.innerHTML = '<div style="background:var(--white);border-radius:12px;padding:28px 28px 24px;width:480px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.3)">' +
-    '<div style="font-size:16px;font-weight:700;color:var(--abyss);margin-bottom:20px">New Project</div>' +
+  overlay.innerHTML = '<div style="background:' + mBg + ';border-radius:12px;padding:28px 28px 24px;width:480px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.4)">' +
+    '<div style="font-size:16px;font-weight:700;color:' + mText + ';margin-bottom:20px">New Project</div>' +
     '<div style="margin-bottom:14px">' +
-      '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);margin-bottom:6px">Client</label>' +
-      '<select id="addProjClientSelect" style="width:100%;padding:8px 12px;border:1px solid var(--canvas);border-radius:6px;font-size:14px;color:var(--abyss);background:var(--white)">' +
+      '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:' + mMuted + ';margin-bottom:6px">Client</label>' +
+      '<select id="addProjClientSelect" style="width:100%;padding:8px 12px;border:1px solid ' + mBorder + ';border-radius:6px;font-size:14px;color:' + mText + ';background:' + mInput + '">' +
         clientOpts +
       '</select>' +
     '</div>' +
     '<div style="margin-bottom:14px">' +
-      '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);margin-bottom:6px">Project Name</label>' +
-      '<input id="addProjName" type="text" placeholder="e.g. Summer Campaign 2026" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--canvas);border-radius:6px;font-size:14px;color:var(--abyss)">' +
+      '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:' + mMuted + ';margin-bottom:6px">Project Name</label>' +
+      '<input id="addProjName" type="text" placeholder="e.g. Summer Campaign 2026" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid ' + mBorder + ';border-radius:6px;font-size:14px;color:' + mText + ';background:' + mInput + '">' +
     '</div>' +
     '<div style="margin-bottom:22px">' +
-      '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);margin-bottom:6px">Project Code</label>' +
-      '<input id="addProjCode" type="text" placeholder="e.g. ' + suggestedCode + 'XX_XX" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--canvas);border-radius:6px;font-size:14px;color:var(--abyss);font-family:monospace">' +
+      '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:' + mMuted + ';margin-bottom:6px">Project Code</label>' +
+      '<input id="addProjCode" type="text" placeholder="e.g. ' + suggestedCode + 'XX_XX" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid ' + mBorder + ';border-radius:6px;font-size:14px;color:' + mText + ';background:' + mInput + ';font-family:monospace">' +
     '</div>' +
     '<div id="addProjError" style="color:var(--ember);font-size:12px;margin-bottom:12px;display:none"></div>' +
     '<div style="display:flex;gap:10px">' +
-      '<button onclick="createNewProject()" style="padding:9px 22px;border-radius:6px;border:none;background:var(--ocean);color:var(--white);cursor:pointer;font-size:13px;font-weight:600">Create Project</button>' +
-      '<button onclick="hideAddProjectForm()" style="padding:9px 16px;border-radius:6px;border:1px solid var(--canvas);background:none;color:var(--abyss);cursor:pointer;font-size:13px">Cancel</button>' +
+      '<button onclick="createNewProject()" style="padding:9px 22px;border-radius:6px;border:none;background:var(--ocean);color:#ffffff;cursor:pointer;font-size:13px;font-weight:600">Create Project</button>' +
+      '<button onclick="hideAddProjectForm()" style="padding:9px 16px;border-radius:6px;border:1px solid ' + mBorder + ';background:' + mCancel + ';color:' + mText + ';cursor:pointer;font-size:13px">Cancel</button>' +
     '</div>' +
   '</div>';
 
