@@ -1215,7 +1215,9 @@ function completedProjects() {
   return out;
 }
 function clientById(id) {
-  for (var i = 0; i < CLIENTS.length; i++) { if (CLIENTS[i].id === id) return CLIENTS[i]; }
+  for (var i = 0; i < CLIENTS.length; i++) {
+    if (CLIENTS[i].id === id || CLIENTS[i]._supaId === id) return CLIENTS[i];
+  }
   return null;
 }
 function projectById(id) {
@@ -4196,8 +4198,9 @@ function showAddProjectForm(preselectedClientId) {
   var clientOpts = '';
   for (var i = 0; i < activeClients.length; i++) {
     var cl2 = activeClients[i];
-    var sel = cl2.id === preselectedClientId ? ' selected' : '';
-    clientOpts += '<option value="' + cl2.id + '"' + sel + '>' + cl2.code + ' ' + cl2.name + '</option>';
+    var supaId = cl2._supaId || cl2.id;
+    var sel = (cl2.id === preselectedClientId || cl2._supaId === preselectedClientId) ? ' selected' : '';
+    clientOpts += '<option value="' + supaId + '"' + sel + '>' + cl2.code + ' ' + cl2.name + '</option>';
   }
 
   overlay.innerHTML = '<div style="background:' + mBg + ';border-radius:12px;padding:28px 28px 24px;width:480px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.4)">' +
