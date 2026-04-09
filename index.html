@@ -3483,10 +3483,18 @@ async function sparkFetch(table, query, method, body) {
   if (body) opts.body = JSON.stringify(body);
   try {
     var resp = await fetch(url, opts);
-    if (!resp.ok) { console.error('Spark fetch error', resp.status, await resp.text()); return null; }
+    if (!resp.ok) {
+      var errText = await resp.text();
+      var errMsg = errText;
+      try { var errJson = JSON.parse(errText); errMsg = errJson.message || errJson.details || errText; } catch(e) {}
+      console.error('Spark fetch error', resp.status, errText);
+      var e = new Error(errMsg);
+      e.status = resp.status;
+      throw e;
+    }
     var text = await resp.text();
     return text ? JSON.parse(text) : true;
-  } catch (err) { console.error('Spark fetch exception', err); return null; }
+  } catch (err) { console.error('Spark fetch exception', err); throw err; }
 }
 
 function renderSettings() {
@@ -4264,7 +4272,7 @@ async function createNewProject() {
       project_code: code,
       client_id: clientId
     });
-    if (!newProj || !newProj[0]) throw new Error('Failed to create project record.');
+    if (!newProj || !newProj[0]) throw new Error('No record returned — the project code may already be in use.');
     var projId = newProj[0].id;
 
     /* 2. Create initial budget */
