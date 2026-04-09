@@ -1387,10 +1387,13 @@ function renderMaster() {
   var estRemainDollar = remainingHrs * costPerHr;
 
   /* Header */
-  var h = '<h1 class="page-title">Master Dashboard';
+  var h = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">';
+  h += '<h1 class="page-title" style="margin-bottom:0">Master Dashboard';
   h += '<span class="view-toggle"><button class="view-toggle-btn ' + (!showFinalized ? 'active' : '') + '" onclick="showFinalized=false;navigate(currentView)">Active</button>';
   h += '<button class="view-toggle-btn ' + (showFinalized ? 'active' : '') + '" onclick="showFinalized=true;navigate(currentView)">All</button></span>';
   h += '</h1>';
+  h += '<button onclick="showAddProjectForm(null)" style="padding:6px 16px;border-radius:6px;border:none;background:var(--ocean);color:var(--white);cursor:pointer;font-size:12px;font-weight:600;letter-spacing:.3px;white-space:nowrap">+ Add Project</button>';
+  h += '</div>';
   h += '<p class="page-subtitle">' + (showFinalized ? all.length + ' total projects across Forge clients' : all.length + ' active projects &middot; ' + doneCount + ' completed &middot; ' + billableCount + ' billable, ' + bizdevCount + ' biz dev') + '</p>';
 
   /* Date filter indicator */
@@ -1626,11 +1629,13 @@ function renderClient(clientId) {
     }
   }
 
-  var h = '<h1 class="page-title">' + c.code + ' ' + c.name;
+  var h = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">';
+  h += '<h1 class="page-title" style="margin-bottom:0">' + c.code + ' ' + c.name;
   h += '<span class="view-toggle"><button class="view-toggle-btn ' + (!showFinalized ? 'active' : '') + '" onclick="showFinalized=false;navigate(currentView)">Active</button>';
   h += '<button class="view-toggle-btn ' + (showFinalized ? 'active' : '') + '" onclick="showFinalized=true;navigate(currentView)">All</button></span>';
-  h += '<button onclick="showAddProjectForm(\'' + c.id + '\')" style="margin-left:12px;padding:5px 14px;border-radius:6px;border:none;background:var(--ocean);color:var(--white);cursor:pointer;font-size:12px;font-weight:600;vertical-align:middle;letter-spacing:.3px">+ Add Project</button>';
   h += '</h1>';
+  h += '<button onclick="showAddProjectForm(\'' + c.id + '\')" style="padding:6px 16px;border-radius:6px;border:none;background:var(--ocean);color:var(--white);cursor:pointer;font-size:12px;font-weight:600;letter-spacing:.3px;white-space:nowrap">+ Add Project</button>';
+  h += '</div>';
   var label = showFinalized ? (visibleList.length + ' total project' + (visibleList.length !== 1 ? 's' : '')) : (activeList.length + ' active project' + (activeList.length !== 1 ? 's' : '') + (doneList.length ? ' &middot; ' + doneList.length + ' completed' : ''));
   h += '<p class="page-subtitle">' + label + ' &middot; Rate: ' + (rate > 0 ? '$' + rate + '/hr' : 'Not set') + '</p>';
 
@@ -3534,10 +3539,15 @@ function renderSettings() {
       });
 
       h += '<div style="background:var(--white);border-radius:10px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06);overflow-x:auto;margin-bottom:16px">';
-      h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">';
+      h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px">';
+      h += '<div style="display:flex;align-items:center;gap:10px">';
       h += '<span style="font-size:18px">' + sec.icon + '</span>';
       h += '<div><div style="font-size:14px;font-weight:700;color:' + sec.color + '">' + sec.label + ' <span style="font-weight:400;font-size:12px;color:var(--mid-gray)">(' + members.length + ')</span></div>';
       h += '<div style="font-size:11px;color:var(--mid-gray)">' + sec.desc + '</div></div>';
+      h += '</div>';
+      if (sec.key === 'Freelancer') {
+        h += '<button onclick="showAddFreelancerForm()" style="padding:4px 12px;border-radius:5px;border:none;background:var(--honey);color:var(--white);cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.3px;white-space:nowrap">+ Add Freelancer</button>';
+      }
       h += '</div>';
 
       if (members.length === 0) {
@@ -3575,6 +3585,96 @@ async function updateTeamMemberRate(tmId, field, value) {
   /* Update local cache */
   for (var i = 0; i < FURNACE_TEAM_MEMBERS.length; i++) {
     if (FURNACE_TEAM_MEMBERS[i].id === tmId) FURNACE_TEAM_MEMBERS[i][field] = val;
+  }
+}
+
+function showAddFreelancerForm() {
+  var overlay = document.getElementById('addFreelancerOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'addFreelancerOverlay';
+    document.body.appendChild(overlay);
+  }
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45)';
+
+  overlay.innerHTML = '<div style="background:var(--white);border-radius:12px;padding:28px 28px 24px;width:440px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.3)">' +
+    '<div style="font-size:16px;font-weight:700;color:var(--abyss);margin-bottom:20px">New Freelancer</div>' +
+    '<div style="margin-bottom:14px">' +
+      '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);margin-bottom:6px">Name</label>' +
+      '<input id="addFlName" type="text" placeholder="e.g. Jane Smith" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--canvas);border-radius:6px;font-size:14px;color:var(--abyss)">' +
+    '</div>' +
+    '<div style="margin-bottom:14px">' +
+      '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);margin-bottom:6px">Department <span style="text-transform:none;font-style:italic">(optional)</span></label>' +
+      '<input id="addFlDept" type="text" placeholder="e.g. Motion, Edit, Photography" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--canvas);border-radius:6px;font-size:14px;color:var(--abyss)">' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:22px">' +
+      '<div>' +
+        '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);margin-bottom:6px">Cost Rate ($/hr)</label>' +
+        '<input id="addFlCostRate" type="number" placeholder="0" min="0" step="5" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--canvas);border-radius:6px;font-size:14px;color:var(--abyss)">' +
+      '</div>' +
+      '<div>' +
+        '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);margin-bottom:6px">Billable Rate ($/hr)</label>' +
+        '<input id="addFlBillRate" type="number" placeholder="0" min="0" step="5" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--canvas);border-radius:6px;font-size:14px;color:var(--abyss)">' +
+      '</div>' +
+    '</div>' +
+    '<div id="addFlError" style="color:var(--ember);font-size:12px;margin-bottom:12px;display:none"></div>' +
+    '<div style="display:flex;gap:10px">' +
+      '<button onclick="createNewFreelancer()" style="padding:9px 22px;border-radius:6px;border:none;background:var(--honey);color:var(--white);cursor:pointer;font-size:13px;font-weight:600">Add Freelancer</button>' +
+      '<button onclick="hideAddFreelancerForm()" style="padding:9px 16px;border-radius:6px;border:1px solid var(--canvas);background:none;color:var(--abyss);cursor:pointer;font-size:13px">Cancel</button>' +
+    '</div>' +
+  '</div>';
+
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) hideAddFreelancerForm(); });
+
+  var nameEl = document.getElementById('addFlName');
+  if (nameEl) nameEl.focus();
+}
+
+function hideAddFreelancerForm() {
+  var overlay = document.getElementById('addFreelancerOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+async function createNewFreelancer() {
+  var nameEl = document.getElementById('addFlName');
+  var deptEl = document.getElementById('addFlDept');
+  var costEl = document.getElementById('addFlCostRate');
+  var billEl = document.getElementById('addFlBillRate');
+  var errEl  = document.getElementById('addFlError');
+
+  var name     = nameEl ? nameEl.value.trim() : '';
+  var dept     = deptEl ? deptEl.value.trim() : '';
+  var costRate = parseFloat(costEl ? costEl.value : 0) || 0;
+  var billRate = parseFloat(billEl ? billEl.value : 0) || 0;
+
+  function showErr(msg) { if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; } }
+  if (!name) { showErr('Name is required.'); if (nameEl) nameEl.focus(); return; }
+
+  var btn = document.querySelector('#addFreelancerOverlay button');
+  if (btn) { btn.textContent = 'Adding\u2026'; btn.disabled = true; }
+  if (errEl) errEl.style.display = 'none';
+
+  try {
+    var payload = {
+      name: name,
+      employment_type: 'Freelancer',
+      is_active: true,
+      fully_burdened_rate: costRate,
+      billable_rate: billRate
+    };
+    if (dept) payload.department = dept;
+
+    var result = await sparkFetch('team_members', '', 'POST', payload);
+    if (!result || !result[0]) throw new Error('Failed to create team member.');
+
+    /* Update local cache */
+    FURNACE_TEAM_MEMBERS.push(result[0]);
+
+    hideAddFreelancerForm();
+    renderSettings();
+  } catch(e) {
+    showErr(e.message || 'Something went wrong.');
+    if (btn) { btn.textContent = 'Add Freelancer'; btn.disabled = false; }
   }
 }
 
