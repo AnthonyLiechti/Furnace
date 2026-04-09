@@ -4325,7 +4325,12 @@ async function createNewProject() {
 
   } catch(err) {
     console.error('createNewProject error:', err);
-    showErr('Error: ' + (err.message || 'Unknown error'));
+    var msg = err.message || 'Unknown error';
+    if (msg.indexOf('idx_projects_code') >= 0 || msg.indexOf('unique') >= 0 || msg.indexOf('duplicate key') >= 0) {
+      msg = 'That project code is already in use — please choose a different one.';
+      if (codeEl) codeEl.focus();
+    }
+    showErr(msg);
     if (btn) { btn.textContent = 'Create Project'; btn.disabled = false; }
   }
 }
