@@ -1175,6 +1175,8 @@ function projectSpent(proj) {
   return s;
 }
 function isProjectCompleted(p) {
+  /* Explicitly active projects always show as active, regardless of budget/phase state */
+  if (p.status === 'active') return false;
   if (p.status === 'finished' || p.status === 'complete') return true;
   /* Check if Supabase budget is marked complete */
   if (p._supabudget && p._supabudget.status === 'complete') return true;
@@ -6997,7 +6999,7 @@ function getProjectList() {
     if (c.status === 'inactive') continue;
     for (var j = 0; j < c.projects.length; j++) {
       var p = c.projects[j];
-      if (p.status === 'finished' || p.status === 'closed' || p.status === 'completed' || p.status === 'complete') continue;
+      if (p.status !== 'active' && (p.status === 'finished' || p.status === 'closed' || p.status === 'completed' || p.status === 'complete')) continue;
       if (forecast.length > 0 && forecast.indexOf(p.name) < 0) continue;
       list.push({ client: c.name, clientCode: c.code, clientColor: c.color, name: p.name, code: p.code, id: p.id });
     }
