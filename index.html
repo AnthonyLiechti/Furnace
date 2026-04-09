@@ -4281,7 +4281,7 @@ async function createNewProject() {
     var projId = newProj[0].id;
 
     /* 2. Create initial budget */
-    await sparkFetch('budgets', '', 'POST', {
+    var newBudget = await sparkFetch('budgets', '', 'POST', {
       project_id: projId,
       name: 'Initial Snapshot',
       status: 'proposed',
@@ -4294,6 +4294,27 @@ async function createNewProject() {
       no_oop: false,
       no_freelancers: false
     });
+
+    /* 2b. Pre-fill all active team members with 0 hours across all phases */
+    if (newBudget && newBudget[0]) {
+      var budgetId = newBudget[0].id;
+      var allTeam = await sparkFetch('team_members', 'select=id,department,employment_type&is_active=eq.true&order=name.asc');
+      if (allTeam && allTeam.length) {
+        var laborBatch = [];
+        for (var ti = 0; ti < allTeam.length; ti++) {
+          var tm = allTeam[ti];
+          var dept = tm.department;
+          if (dept && dept !== 'Executive/Admin' && dept !== 'Account' && dept !== 'Creative' && dept !== 'Post') dept = null;
+          laborBatch.push({
+            budget_id: budgetId, team_member_id: tm.id, department: dept,
+            employment_type: tm.employment_type || 'Employee',
+            phase1: 0, phase2: 0, phase3_1: 0, phase3_2: 0, phase4: 0, phase5: 0,
+            display_order: ti
+          });
+        }
+        await sparkFetch('labor_budget_entries', '', 'POST', laborBatch);
+      }
+    }
 
     /* 3. Update CLIENTS local state */
     for (var ci = 0; ci < CLIENTS.length; ci++) {
