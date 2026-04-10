@@ -3603,14 +3603,54 @@ async function updateTeamMemberRate(tmId, field, value) {
   /* If billable_rate changed, cascade to all freelancer_budget_entries for this member */
   if (field === 'billable_rate') {
     await sparkFetch('freelancer_budget_entries?team_member_id=eq.' + tmId, '', 'PATCH', { rate: val });
-    /* Update in-memory entries if a budget is currently open */
+
+    /* Update sb._flEntries in every SUPA_BUDGET that has entries for this member,
+       then recompute only flTotal/flSpent — do NOT touch laborCostInternal */
+    if (SUPA_BUDGETS) {
+      for (var bc in SUPA_BUDGETS) {
+        var sbCheck = SUPA_BUDGETS[bc];
+        if (!sbCheck._flEntries) continue;
+        var changed = false;
+        for (var fi = 0; fi < sbCheck._flEntries.length; fi++) {
+          if (sbCheck._flEntries[fi].team_member_id === tmId) {
+            sbCheck._flEntries[fi].rate = val;
+            changed = true;
+          }
+        }
+        if (changed) {
+          var newFlTotal = 0, newFlSpent = 0;
+          for (var fk = 0; fk < sbCheck._flEntries.length; fk++) {
+            var fc = (sbCheck._flEntries[fk].hours || 0) * (sbCheck._flEntries[fk].rate || 0);
+            newFlTotal += fc;
+            if (sbCheck._flEntries[fk].paid) newFlSpent += fc;
+          }
+          sbCheck.flTotal = newFlTotal;
+          sbCheck.flSpent = newFlSpent;
+        }
+      }
+    }
+
+    /* Also update sparkCurrentData if a budget snapshot is open (instant feedback) */
     if (sparkCurrentData && sparkCurrentData.freelancerEntries) {
       for (var j = 0; j < sparkCurrentData.freelancerEntries.length; j++) {
         if (sparkCurrentData.freelancerEntries[j].team_member_id === tmId) {
           sparkCurrentData.freelancerEntries[j].rate = val;
         }
       }
-      syncProjFinancialsFromCurrent();
+      sparkRenderFreelancersContent();
+      sparkRenderSummary();
+    }
+
+    /* Re-render the financials banner for any project currently visible in the DOM */
+    if (CLIENTS) {
+      for (var ci = 0; ci < CLIENTS.length; ci++) {
+        for (var pi = 0; pi < CLIENTS[ci].projects.length; pi++) {
+          var pp = CLIENTS[ci].projects[pi];
+          if (pp._supabudget && document.getElementById('projFin-' + pp.code)) {
+            renderProjFinancials(pp);
+          }
+        }
+      }
     }
   }
 }
