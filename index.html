@@ -1925,11 +1925,13 @@ function renderProjFinancials(p) {
   if (!el || !p._supabudget) return;
   var sb = p._supabudget;
 
-  var saHrs = SUPA_ACTUALS[p.code] ? SUPA_ACTUALS[p.code].totalHours : 0;
+  var allTimeHrs = SUPA_ACTUALS[p.code] ? SUPA_ACTUALS[p.code].totalHours : 0;
+  var saHrs = filteredProjectSpent(p); /* respects global date filter */
+  var isFiltered = (globalDateFilter !== 'all');
   var allocHrs = 0;
   var nativeAllocs = getAllocationsForProject(p.id);
   for (var ai = 0; ai < nativeAllocs.length; ai++) allocHrs += nativeAllocs[ai].hoursPerDay || 0;
-  var hrsRemaining = (sb.laborHours || 0) - saHrs;
+  var hrsRemaining = (sb.laborHours || 0) - allTimeHrs; /* always all-time so remaining is accurate */
 
   var rawPrice = sb.client_price || 0;
   var hasDisc = sb.has_discount || false;
@@ -2021,7 +2023,7 @@ function renderProjFinancials(p) {
   /* ── Labor hours row ── */
   h += '<div class="snap-financials" style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1)">';
   h += '<div class="snap-fin-item"><div class="sf-label">Hours Budget</div><div class="sf-value">' + (sb.laborHours || 0).toFixed(1) + '</div></div>';
-  h += '<div class="snap-fin-item"><div class="sf-label">Hours Spent</div><div class="sf-value" style="color:var(--ember)">' + saHrs.toFixed(1) + '</div><div class="sf-sub">' + pct(saHrs, sb.laborHours || 0) + '% of budget</div></div>';
+  h += '<div class="snap-fin-item"><div class="sf-label">Hours Spent</div><div class="sf-value" style="color:var(--ember)">' + saHrs.toFixed(1) + '</div><div class="sf-sub">' + (isFiltered ? 'filtered &middot; ' + allTimeHrs.toFixed(1) + ' all-time' : pct(saHrs, sb.laborHours || 0) + '% of budget') + '</div></div>';
   h += '<div class="snap-fin-item"><div class="sf-label">Hours Predicted</div><div class="sf-value">' + allocHrs.toFixed(1) + '</div><div class="sf-sub">From allocations</div></div>';
   h += '<div class="snap-fin-item"><div class="sf-label">Hours Remaining</div><div class="sf-value" style="color:' + (hrsRemaining < 0 ? 'var(--ember)' : 'var(--white)') + '">' + hrsRemaining.toFixed(1) + '</div></div>';
   h += '</div>';
