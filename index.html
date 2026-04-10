@@ -3600,6 +3600,19 @@ async function updateTeamMemberRate(tmId, field, value) {
   for (var i = 0; i < FURNACE_TEAM_MEMBERS.length; i++) {
     if (FURNACE_TEAM_MEMBERS[i].id === tmId) FURNACE_TEAM_MEMBERS[i][field] = val;
   }
+  /* If billable_rate changed, cascade to all freelancer_budget_entries for this member */
+  if (field === 'billable_rate') {
+    await sparkFetch('freelancer_budget_entries?team_member_id=eq.' + tmId, '', 'PATCH', { rate: val });
+    /* Update in-memory entries if a budget is currently open */
+    if (sparkCurrentData && sparkCurrentData.freelancerEntries) {
+      for (var j = 0; j < sparkCurrentData.freelancerEntries.length; j++) {
+        if (sparkCurrentData.freelancerEntries[j].team_member_id === tmId) {
+          sparkCurrentData.freelancerEntries[j].rate = val;
+        }
+      }
+      syncProjFinancialsFromCurrent();
+    }
+  }
 }
 
 function showAddFreelancerForm() {
