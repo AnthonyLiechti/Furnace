@@ -6044,7 +6044,7 @@ function sparkRenderBudgetContent(embedded) {
       if (totalFreelancerCost > 0 || totalFreelancerHrs > 0) {
         oh += '<div style="font-size:12px;margin-bottom:6px">Freelancers <span style="float:right;font-weight:600;color:#5B4A8A">$' + Math.round(totalFreelancerCost).toLocaleString() + '</span></div>';
       }
-      oh += '<div style="font-size:12px;margin-bottom:6px">Pass-Through (OOP) <span style="float:right;font-weight:600">$' + Math.round(totalOopWithMarkup).toLocaleString() + '</span></div>';
+      oh += '<div style="font-size:12px;margin-bottom:6px">OOP <span style="float:right;font-weight:600">$' + Math.round(totalOopWithMarkup).toLocaleString() + '</span></div>';
       oh += '</div>';
       oh += '</div>';
       oh += '</div>';
@@ -6077,7 +6077,7 @@ function sparkRenderBudgetContent(embedded) {
     h += '<div class="spark-overview-item"><div class="so-label">TCV</div><div class="so-value">' + sparkFmt(tcv) + '</div></div>';
     h += '<div class="spark-overview-item"><div class="so-label">Fee (Labor)</div><div class="so-value" style="color:var(--ocean)">' + sparkFmt(totalLaborCost) + '</div></div>';
     h += '<div class="spark-overview-item"><div class="so-label">Freelancers</div><div class="so-value" style="color:#5B4A8A">' + sparkFmt(totalFreelancerCost) + '</div></div>';
-    h += '<div class="spark-overview-item"><div class="so-label">Pass-Through (OOP)</div><div class="so-value">' + sparkFmt(totalOopWithMarkup) + '</div></div>';
+    h += '<div class="spark-overview-item"><div class="so-label">OOP</div><div class="so-value">' + sparkFmt(totalOopWithMarkup) + '</div></div>';
     h += '<div class="spark-overview-item"><div class="so-label">Reserve (' + reservePct + '%)</div><div class="so-value">' + sparkFmt(reserveAmt) + '</div></div>';
     h += '</div></div>';
   }
