@@ -6199,6 +6199,8 @@ async function renderSpark() {
 /* ── RESOURCE TRACKER STATE ── */
 var RT_WEEKS = [];
 var RT_LEADERSHIP = ['Jeff Butcher', 'Jeff Cole', 'Richelle Butcher'];
+var CAPACITY_EXECUTIVES = ['Jeff Cole', 'Jeff Butcher', 'Dave Macleod', 'Richelle Butcher'];
+var allocShowExecutives = false;
 var rtView = 'people';
 var rtShowLeadership = false;
 var rtSortBy = 'project';
@@ -8624,6 +8626,13 @@ function renderCapacityPanel() {
   }
   people.sort(function(a, b) { return b.total - a.total; });
 
+  /* Split into regular team and executives */
+  var regularPeople = [], execPeople = [];
+  for (var i = 0; i < people.length; i++) {
+    if (CAPACITY_EXECUTIVES.indexOf(people[i].name) >= 0) execPeople.push(people[i]);
+    else regularPeople.push(people[i]);
+  }
+
   var totalAllocated = 0;
   var activeCount = 0;
   for (var i = 0; i < people.length; i++) {
@@ -8631,35 +8640,49 @@ function renderCapacityPanel() {
     if (people[i].total > 0) activeCount++;
   }
 
+  function renderCapPerson(p) {
+    var colorClass = p.total >= 40 ? 'cap-red' : p.total >= 32 ? 'cap-yellow' : 'cap-green';
+    var pc = PC[p.name] || '#9B9590';
+    var projKeys = Object.keys(p.projects).sort(function(a, b) { return p.projects[b] - p.projects[a]; });
+    var segColors = ['var(--ocean)', 'var(--honey)', 'var(--ember)', '#7A8B6F', '#9B8EC2', '#6B9DAD', '#B8948A', '#5B7FAF'];
+    var s = '<div class="cap-person">';
+    s += '<div class="cap-person-header">';
+    s += '<div class="cap-person-name"><span class="cp-dot" style="background:' + pc + '"></span>' + p.name + '</div>';
+    s += '<div class="cap-person-hrs ' + colorClass + '">' + p.total.toFixed(1) + ' / ' + maxCap + '</div>';
+    s += '</div>';
+    s += '<div class="cap-bar">';
+    for (var j = 0; j < projKeys.length; j++) {
+      var segPct = maxCap > 0 ? (p.projects[projKeys[j]] / maxCap) * 100 : 0;
+      s += '<div class="cap-bar-seg" style="width:' + Math.min(segPct, 100) + '%;background:' + segColors[j % segColors.length] + '" title="' + projKeys[j] + ': ' + p.projects[projKeys[j]].toFixed(1) + 'h"></div>';
+    }
+    s += '</div>';
+    if (projKeys.length > 0) {
+      s += '<div class="cap-projects">';
+      var parts = [];
+      for (var j = 0; j < projKeys.length; j++) parts.push(projKeys[j] + ' ' + p.projects[projKeys[j]].toFixed(1) + 'h');
+      s += parts.join(' &bull; ');
+      s += '</div>';
+    }
+    s += '</div>';
+    return s;
+  }
+
   var h = '';
   h += '<h3>Team Capacity</h3>';
   h += '<div class="cap-sub">' + totalAllocated.toFixed(1) + ' hrs &bull; ' + activeCount + ' people allocated</div>';
 
-  for (var i = 0; i < people.length; i++) {
-    var p = people[i];
-    var pct = maxCap > 0 ? (p.total / maxCap) * 100 : 0;
-    var colorClass = p.total >= 40 ? 'cap-red' : p.total >= 32 ? 'cap-yellow' : 'cap-green';
-    var pc = PC[p.name] || '#9B9590';
+  for (var i = 0; i < regularPeople.length; i++) h += renderCapPerson(regularPeople[i]);
 
-    h += '<div class="cap-person">';
-    h += '<div class="cap-person-header">';
-    h += '<div class="cap-person-name"><span class="cp-dot" style="background:' + pc + '"></span>' + p.name + '</div>';
-    h += '<div class="cap-person-hrs ' + colorClass + '">' + p.total.toFixed(1) + ' / ' + maxCap + '</div>';
-    h += '</div>';
-    h += '<div class="cap-bar">';
-    var projKeys = Object.keys(p.projects).sort(function(a, b) { return p.projects[b] - p.projects[a]; });
-    var segColors = ['var(--ocean)', 'var(--honey)', 'var(--ember)', '#7A8B6F', '#9B8EC2', '#6B9DAD', '#B8948A', '#5B7FAF'];
-    for (var j = 0; j < projKeys.length; j++) {
-      var segPct = maxCap > 0 ? (p.projects[projKeys[j]] / maxCap) * 100 : 0;
-      h += '<div class="cap-bar-seg" style="width:' + Math.min(segPct, 100) + '%;background:' + segColors[j % segColors.length] + '" title="' + projKeys[j] + ': ' + p.projects[projKeys[j]].toFixed(1) + 'h"></div>';
-    }
-    h += '</div>';
-    if (projKeys.length > 0) {
-      h += '<div class="cap-projects">';
-      var parts = [];
-      for (var j = 0; j < projKeys.length; j++) parts.push(projKeys[j] + ' ' + p.projects[projKeys[j]].toFixed(1) + 'h');
-      h += parts.join(' &bull; ');
-      h += '</div>';
+  /* Executives section at bottom with toggle */
+  if (execPeople.length > 0) {
+    h += '<div style="margin-top:12px;border-top:1px solid var(--canvas);padding-top:10px">';
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:' + (allocShowExecutives ? '8' : '0') + 'px">';
+    h += '<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid-gray)">Executives</span>';
+    h += '<div onclick="allocShowExecutives=!allocShowExecutives;renderCapacityPanel()" style="width:28px;height:16px;border-radius:8px;background:' + (allocShowExecutives ? 'var(--ocean)' : 'var(--canvas)') + ';cursor:pointer;position:relative;transition:background .2s;flex-shrink:0">';
+    h += '<div style="width:12px;height:12px;border-radius:50%;background:var(--white);position:absolute;top:2px;' + (allocShowExecutives ? 'left:14px' : 'left:2px') + ';transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></div>';
+    h += '</div></div>';
+    if (allocShowExecutives) {
+      for (var i = 0; i < execPeople.length; i++) h += renderCapPerson(execPeople[i]);
     }
     h += '</div>';
   }
