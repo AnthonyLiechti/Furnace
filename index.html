@@ -8610,6 +8610,21 @@ function renderCapacityPanel() {
   var maxCap = ALLOCATIONS.weeklyCapacity || 40;
   var team = ALLOCATIONS.team || [];
 
+  /* Build project name → billable lookup */
+  var projBillable = {};
+  if (CLIENTS) {
+    for (var ci = 0; ci < CLIENTS.length; ci++) {
+      for (var pi = 0; pi < CLIENTS[ci].projects.length; pi++) {
+        var _p = CLIENTS[ci].projects[pi];
+        var _nb = _p.projectType === 'internal' || _p.projectType === 'bizdev'
+          || _p.code.indexOf('100_') === 0 || _p.code.indexOf('101_') === 0
+          || _p.code.indexOf('359_') === 0
+          || (_p._supabudget && (_p._supabudget.status === 'nonbillable' || _p._supabudget.status === 'bizdev'));
+        projBillable[_p.name] = !_nb;
+      }
+    }
+  }
+
   /* Build capacity data for current week */
   var people = [];
   for (var i = 0; i < team.length; i++) {
@@ -8624,7 +8639,12 @@ function renderCapacityPanel() {
         projMap[allocs[j].project] += allocs[j].hoursPerDay;
       }
     }
-    people.push({ name: team[i], total: total, projects: projMap });
+    /* Compute billable hours */
+    var billableHrs = 0;
+    for (var proj in projMap) {
+      if (projBillable[proj] !== false) billableHrs += projMap[proj];
+    }
+    people.push({ name: team[i], total: total, projects: projMap, billableHrs: billableHrs });
   }
   people.sort(function(a, b) { return b.total - a.total; });
 
@@ -8647,10 +8667,15 @@ function renderCapacityPanel() {
     var pc = PC[p.name] || '#9B9590';
     var projKeys = Object.keys(p.projects).sort(function(a, b) { return p.projects[b] - p.projects[a]; });
     var segColors = ['var(--ocean)', 'var(--honey)', 'var(--ember)', '#7A8B6F', '#9B8EC2', '#6B9DAD', '#B8948A', '#5B7FAF'];
+    var billPct = p.total > 0 ? Math.round(p.billableHrs / p.total * 100) : null;
+    var billColor = billPct === null ? 'var(--mid-gray)' : billPct >= 80 ? '#81C784' : billPct >= 50 ? 'var(--honey)' : 'var(--ember)';
     var s = '<div class="cap-person">';
     s += '<div class="cap-person-header">';
     s += '<div class="cap-person-name"><span class="cp-dot" style="background:' + pc + '"></span>' + p.name + '</div>';
+    s += '<div style="display:flex;align-items:center;gap:6px">';
+    if (billPct !== null) s += '<span style="font-size:10px;font-weight:600;color:' + billColor + '">' + billPct + '%</span>';
     s += '<div class="cap-person-hrs ' + colorClass + '">' + p.total.toFixed(1) + ' / ' + maxCap + '</div>';
+    s += '</div>';
     s += '</div>';
     s += '<div class="cap-bar">';
     for (var j = 0; j < projKeys.length; j++) {
