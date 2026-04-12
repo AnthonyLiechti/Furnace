@@ -5069,7 +5069,9 @@ function sparkRenderSummary() {
   var totalOopWithMarkup = totalOop * (1 + markupPct / 100);
   var totalAmount = totalLaborCost + totalFlCost + totalOopWithMarkup;
   var budget = data.budget;
-  var clientPrice = budget.client_price || 0;
+  var rawPrice = budget.client_price || 0;
+  var discAmt = budget.has_discount ? rawPrice * 0.035 : 0;
+  var clientPrice = rawPrice - discAmt;
   var profit = clientPrice - totalAmount;
   var margin = clientPrice > 0 ? (profit / clientPrice * 100) : 0;
 
@@ -5078,7 +5080,7 @@ function sparkRenderSummary() {
   h += '<div class="spark-summary-item"><div class="ss-label">Freelancers</div><div class="ss-value" style="color:#5B4A8A">' + sparkFmt(totalFlCost) + '</div><div class="ss-sub">' + totalFlHrs.toFixed(1) + ' hrs</div></div>';
   h += '<div class="spark-summary-item"><div class="ss-label">OOP</div><div class="ss-value">' + sparkFmt(totalOopWithMarkup) + '</div><div class="ss-sub">incl. ' + markupPct + '% markup</div></div>';
   h += '<div class="spark-summary-item"><div class="ss-label">Total Amount</div><div class="ss-value">' + sparkFmt(totalAmount) + '</div></div>';
-  h += '<div class="spark-summary-item"><div class="ss-label">Client Price</div><div class="ss-value" style="color:var(--sand)">' + sparkFmt(clientPrice) + '</div></div>';
+  h += '<div class="spark-summary-item"><div class="ss-label">Client Price</div><div class="ss-value" style="color:var(--sand)">' + sparkFmt(clientPrice) + '</div>' + (discAmt > 0 ? '<div class="ss-sub">after ' + sparkFmt(discAmt) + ' disc.</div>' : '') + '</div>';
   h += '<div class="spark-summary-item"><div class="ss-label">Reserve</div><div class="ss-value" style="color:' + (profit >= 0 ? '#81C784' : 'var(--ember)') + '">' + sparkFmt(profit) + '</div><div class="ss-sub">' + margin.toFixed(1) + '% margin</div></div>';
   el.innerHTML = h;
   syncProjFinancialsFromCurrent();
