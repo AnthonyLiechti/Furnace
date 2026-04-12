@@ -6203,6 +6203,7 @@ var RT_WEEKS = [];
 var RT_LEADERSHIP = ['Jeff Butcher', 'Jeff Cole', 'Richelle Butcher'];
 var CAPACITY_EXECUTIVES = ['Jeff Cole', 'Jeff Butcher', 'Dave MacLeod', 'Richelle Butcher'];
 var allocShowExecutives = false;
+var allocCapSort = 'busy'; /* 'busy' | 'alpha' */
 var rtView = 'people';
 var rtShowLeadership = false;
 var rtSortBy = 'project';
@@ -8646,7 +8647,11 @@ function renderCapacityPanel() {
     }
     people.push({ name: team[i], total: total, projects: projMap, billableHrs: billableHrs });
   }
-  people.sort(function(a, b) { return b.total - a.total; });
+  if (allocCapSort === 'alpha') {
+    people.sort(function(a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+  } else {
+    people.sort(function(a, b) { return b.total - a.total; });
+  }
 
   /* Split into regular team and executives */
   var regularPeople = [], execPeople = [];
@@ -8695,7 +8700,12 @@ function renderCapacityPanel() {
   }
 
   var h = '';
-  h += '<h3>Team Capacity</h3>';
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">';
+  h += '<h3 style="margin:0">Team Capacity</h3>';
+  h += '<div style="display:flex;gap:2px;background:var(--canvas);border-radius:6px;padding:2px">';
+  h += '<button onclick="allocCapSort=\'busy\';renderCapacityPanel()" style="border:none;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:600;cursor:pointer;background:' + (allocCapSort==='busy' ? 'var(--white)' : 'transparent') + ';color:' + (allocCapSort==='busy' ? 'var(--abyss)' : 'var(--mid-gray)') + '">Busy</button>';
+  h += '<button onclick="allocCapSort=\'alpha\';renderCapacityPanel()" style="border:none;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:600;cursor:pointer;background:' + (allocCapSort==='alpha' ? 'var(--white)' : 'transparent') + ';color:' + (allocCapSort==='alpha' ? 'var(--abyss)' : 'var(--mid-gray)') + '">A–Z</button>';
+  h += '</div></div>';
   h += '<div class="cap-sub">' + totalAllocated.toFixed(1) + ' hrs &bull; ' + activeCount + ' people allocated</div>';
 
   for (var i = 0; i < regularPeople.length; i++) h += renderCapPerson(regularPeople[i]);
