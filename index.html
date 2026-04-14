@@ -3484,7 +3484,8 @@ async function oppCreateNew() {
   m += '<input id="oppProjName" placeholder="e.g. Brand Identity Redesign" style="width:100%;padding:9px 12px;border:1px solid rgba(0,0,0,.12);border-radius:7px;font-size:13px;box-sizing:border-box">';
   m += '</div>';
 
-  m += '<div style="display:flex;gap:10px;margin-top:24px">';
+  m += '<div id="oppCreateError" style="display:none;color:#C62828;font-size:12px;background:#FFEBEE;padding:8px 12px;border-radius:6px;margin-top:12px"></div>';
+  m += '<div style="display:flex;gap:10px;margin-top:16px">';
   m += '<button onclick="oppSubmitCreate()" style="flex:1;padding:10px 0;border-radius:7px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-size:13px;font-weight:700">Create Opportunity</button>';
   m += '<button onclick="document.getElementById(\'oppCreateOverlay\').remove()" style="padding:10px 18px;border-radius:7px;border:1px solid rgba(0,0,0,.12);background:transparent;cursor:pointer;font-size:13px;color:var(--mid-gray)">Cancel</button>';
   m += '</div>';
@@ -3503,8 +3504,9 @@ function oppToggleNewClient() {
 }
 
 async function oppSubmitCreate() {
-  var sel      = document.getElementById('oppClientSel');
+  var sel        = document.getElementById('oppClientSel');
   var projNameEl = document.getElementById('oppProjName');
+  var errEl      = document.getElementById('oppCreateError');
   if (!sel || !projNameEl) return;
 
   var projName = projNameEl.value.trim();
@@ -3516,70 +3518,89 @@ async function oppSubmitCreate() {
     clientName = ((document.getElementById('oppNewClientName') || {}).value || '').trim();
     clientNum  = ((document.getElementById('oppNewClientNum')  || {}).value || '').trim();
     if (!clientName) { alert('Please enter a client name.'); return; }
-    var newCl = await sparkFetch('clients', '', 'POST', { name: clientName, client_number: clientNum });
-    if (!newCl || !newCl[0]) { alert('Failed to create client record.'); return; }
-    clientId = newCl[0].id;
   } else if (sel.value) {
-    clientId = sel.value;
-    var opt = sel.options[sel.selectedIndex];
-    clientName = opt.getAttribute('data-name') || '';
-    clientNum  = opt.getAttribute('data-num')  || '';
+    clientId   = sel.value;
+    var opt    = sel.options[sel.selectedIndex];
+    clientName = opt ? (opt.getAttribute('data-name') || '') : '';
+    clientNum  = opt ? (opt.getAttribute('data-num')  || '') : '';
   } else {
     alert('Please select a client.'); return;
   }
 
-  /* Unique temporary project code for this opportunity */
-  var oppCode = 'OPP_' + Date.now().toString(36).toUpperCase();
+  /* Disable button to prevent double-submit */
+  var btn = document.querySelector('#oppCreateOverlay button[onclick="oppSubmitCreate()"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Creating…'; }
+  if (errEl) errEl.style.display = 'none';
 
-  sparkShowSaving();
-
-  /* Create project record */
-  var newProj = await sparkFetch('projects', '', 'POST', { name: projName, project_code: oppCode, client_id: clientId });
-  if (!newProj || !newProj[0]) { sparkHideSaving(); alert('Failed to create project record.'); return; }
-  var supaProjectId = newProj[0].id;
-
-  /* Create budget with status = 'opportunity' */
-  var newBudget = await sparkFetch('budgets', '', 'POST', {
-    name: projName, project_id: supaProjectId,
-    status: 'opportunity', visibility: 'visible',
-    client_price: 0, total_amount: 0,
-    has_discount: false, discount_percentage: 0,
-    reserve_percentage: 5, oop_markup_percentage: 20
-  });
-  if (!newBudget || !newBudget[0]) { sparkHideSaving(); alert('Failed to create budget.'); return; }
-  var budgetId = newBudget[0].id;
-
-  /* Pre-fill all active team members with 0 hours */
-  var allTeam = await sparkFetch('team_members', 'select=id,name,department,employment_type&is_active=eq.true&order=name.asc');
-  if (allTeam && allTeam.length) {
-    var lb = [];
-    for (var ti = 0; ti < allTeam.length; ti++) {
-      var tm = allTeam[ti];
-      var dept = tm.department;
-      if (dept && dept !== 'Executive/Admin' && dept !== 'Account' && dept !== 'Creative' && dept !== 'Post') dept = null;
-      lb.push({ budget_id: budgetId, team_member_id: tm.id, department: dept,
-        employment_type: tm.employment_type || 'Employee',
-        phase1: 0, phase2: 0, phase3_1: 0, phase3_2: 0, phase4: 0, phase5: 0, display_order: ti });
+  try {
+    /* Create new client if needed */
+    if (!clientId) {
+      var newCl = await sparkFetch('clients', '', 'POST', { name: clientName, client_number: clientNum });
+      if (!newCl || !newCl[0]) throw new Error('Failed to create client record');
+      clientId = newCl[0].id;
     }
-    await sparkFetch('labor_budget_entries', '', 'POST', lb);
-  }
 
-  /* Default OOP entries */
-  var oopCats = await sparkFetch('oop_categories', 'select=id,name,section_id&order=display_order.asc');
-  if (oopCats && oopCats.length) {
-    for (var i = 0; i < oopCats.length; i++) {
-      await sparkFetch('oop_budget_entries', '', 'POST', {
-        budget_id: budgetId, category_id: oopCats[i].id, section_id: oopCats[i].section_id,
-        line_item_name: oopCats[i].name, count: 0, rate: 0, days: 1, head_count: 1,
-        is_active: true, display_order: i
-      });
+    /* Unique project code for this opportunity */
+    var oppCode = 'OPP_' + Date.now().toString(36).toUpperCase();
+
+    sparkShowSaving();
+
+    /* Create project record */
+    var newProj = await sparkFetch('projects', '', 'POST', { name: projName, project_code: oppCode, client_id: clientId });
+    if (!newProj || !newProj[0]) throw new Error('Failed to create project record');
+    var supaProjectId = newProj[0].id;
+
+    /* Create budget with status = 'opportunity' */
+    var newBudget = await sparkFetch('budgets', '', 'POST', {
+      name: projName, project_id: supaProjectId,
+      status: 'opportunity', visibility: 'visible',
+      client_price: 0, total_amount: 0,
+      has_discount: false, discount_percentage: 0,
+      reserve_percentage: 5, oop_markup_percentage: 20
+    });
+    if (!newBudget || !newBudget[0]) throw new Error('Failed to create budget record');
+    var budgetId = newBudget[0].id;
+
+    /* Pre-fill all active team members with 0 hours */
+    var allTeam = await sparkFetch('team_members', 'select=id,name,department,employment_type&is_active=eq.true&order=name.asc');
+    if (allTeam && allTeam.length) {
+      var lb = [];
+      for (var ti = 0; ti < allTeam.length; ti++) {
+        var tm = allTeam[ti];
+        var dept = tm.department;
+        if (dept && dept !== 'Executive/Admin' && dept !== 'Account' && dept !== 'Creative' && dept !== 'Post') dept = null;
+        lb.push({ budget_id: budgetId, team_member_id: tm.id, department: dept,
+          employment_type: tm.employment_type || 'Employee',
+          phase1: 0, phase2: 0, phase3_1: 0, phase3_2: 0, phase4: 0, phase5: 0, display_order: ti });
+      }
+      await sparkFetch('labor_budget_entries', '', 'POST', lb);
     }
-  }
 
-  sparkHideSaving();
-  var overlay = document.getElementById('oppCreateOverlay');
-  if (overlay) overlay.remove();
-  navigate('opportunity:' + budgetId);
+    /* Default OOP entries */
+    var oopCats = await sparkFetch('oop_categories', 'select=id,name,section_id&order=display_order.asc');
+    if (oopCats && oopCats.length) {
+      for (var i = 0; i < oopCats.length; i++) {
+        await sparkFetch('oop_budget_entries', '', 'POST', {
+          budget_id: budgetId, category_id: oopCats[i].id, section_id: oopCats[i].section_id,
+          line_item_name: oopCats[i].name, count: 0, rate: 0, days: 1, head_count: 1,
+          is_active: true, display_order: i
+        });
+      }
+    }
+
+    sparkHideSaving();
+    var overlay = document.getElementById('oppCreateOverlay');
+    if (overlay) overlay.remove();
+    navigate('opportunity:' + budgetId);
+
+  } catch(err) {
+    sparkHideSaving();
+    console.error('oppSubmitCreate error:', err);
+    var msg = err && err.message ? err.message : String(err);
+    if (errEl) { errEl.textContent = 'Error: ' + msg; errEl.style.display = 'block'; }
+    else { alert('Failed to create opportunity: ' + msg); }
+    if (btn) { btn.disabled = false; btn.textContent = 'Create Opportunity'; }
+  }
 }
 
 async function oppMarkLost(budgetId) {
