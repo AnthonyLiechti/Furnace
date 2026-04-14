@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.5 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 14, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.6 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 14, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -3391,9 +3391,7 @@ async function renderOpportunities() {
     bh += '<div class="snap-header"><div class="snap-title">Pipeline Summary</div><div class="snap-version">' + activeOpps.length + ' active opportunit' + (activeOpps.length === 1 ? 'y' : 'ies') + '</div></div>';
     bh += '<div class="snap-financials">';
     bh += '<div class="snap-fin-item"><div class="sf-label">Total Pipeline</div><div class="sf-value sf-gold">$' + Math.round(totalPipeline).toLocaleString() + '</div></div>';
-    bh += '<div class="snap-fin-item"><div class="sf-label">Avg. Per Opportunity</div><div class="sf-value">$' + Math.round(avgPrice).toLocaleString() + '</div></div>';
     bh += '<div class="snap-fin-item"><div class="sf-label">Total Hours Budgeted</div><div class="sf-value">' + totalHrs.toFixed(1) + ' hrs</div></div>';
-    bh += '<div class="snap-fin-item"><div class="sf-label">Avg. Hrs / Opportunity</div><div class="sf-value">' + (activeOpps.length ? (totalHrs / activeOpps.length).toFixed(1) : '0.0') + ' hrs</div></div>';
     bh += '</div>';
     bh += '</div>';
     sb.innerHTML = bh;
