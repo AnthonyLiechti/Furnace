@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.3 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 14, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.4 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 14, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -3367,9 +3367,13 @@ async function renderOpportunities() {
       : '<div style="font-size:12px;color:var(--mid-gray);font-style:italic">No price set</div>';
     if (isLost) {
       c += '<div style="margin-top:6px"><span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;background:rgba(198,40,40,.15);color:#EF9A9A;text-transform:uppercase;letter-spacing:.05em">Lost</span></div>';
-      c += '<button onclick="event.stopPropagation();oppReopen(\'' + o.id + '\')" style="margin-top:8px;padding:4px 12px;border-radius:5px;border:1px solid var(--mid-gray);background:transparent;color:var(--mid-gray);cursor:pointer;font-size:10px;font-weight:700">Reopen</button>';
+      c += '<div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end">';
+      c += '<button onclick="event.stopPropagation();oppReopen(\'' + o.id + '\')" style="padding:4px 10px;border-radius:5px;border:1px solid var(--mid-gray);background:transparent;color:var(--mid-gray);cursor:pointer;font-size:10px;font-weight:700">Reopen</button>';
+      c += '<button onclick="event.stopPropagation();oppDelete(\'' + o.id + '\',\'' + (proj.id || '') + '\')" style="padding:4px 10px;border-radius:5px;border:1px solid rgba(198,40,40,.4);background:transparent;color:#EF9A9A;cursor:pointer;font-size:10px;font-weight:700" title="Permanently delete">&#128465;</button>';
+      c += '</div>';
     } else {
       c += '<div style="margin-top:6px"><span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;background:rgba(91,74,138,.2);color:#A99FD8;text-transform:uppercase;letter-spacing:.05em">In Progress</span></div>';
+      c += '<button onclick="event.stopPropagation();oppDelete(\'' + o.id + '\',\'' + (proj.id || '') + '\')" style="margin-top:8px;padding:4px 10px;border-radius:5px;border:1px solid rgba(0,0,0,.12);background:transparent;color:var(--mid-gray);cursor:pointer;font-size:10px;font-weight:700" title="Permanently delete">&#128465; Delete</button>';
     }
     c += '</div>';
     c += '</div>';
@@ -3448,13 +3452,18 @@ function oppRenderActionBar() {
   if (clientLabel) h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.5);margin-bottom:5px">Opportunity Estimate &nbsp;·&nbsp; ' + clientLabel + '</div>';
   h += '<div style="font-size:18px;font-weight:700;color:#fff">' + projName + '</div>';
   h += '</div>';
-  h += '<div style="display:flex;gap:10px;flex-wrap:wrap">';
+  var projId = (budget.projects && budget.projects.id) ? budget.projects.id : '';
+  h += '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">';
   h += '<button onclick="oppMarkLost(\'' + budget.id + '\')" '
     + 'style="padding:9px 18px;border-radius:7px;border:2px solid rgba(255,255,255,.3);background:transparent;color:rgba(255,255,255,.85);cursor:pointer;font-size:12px;font-weight:700;letter-spacing:.3px"'
     + ' onmouseenter="this.style.borderColor=\'rgba(255,255,255,.7)\'" onmouseleave="this.style.borderColor=\'rgba(255,255,255,.3)\'">&#10007; Mark Lost</button>';
   h += '<button onclick="oppConvertToActive(\'' + budget.id + '\')" '
     + 'style="padding:9px 18px;border-radius:7px;border:none;background:#fff;color:#3D2E6B;cursor:pointer;font-size:12px;font-weight:700;letter-spacing:.3px"'
     + ' onmouseenter="this.style.background=\'#EDE9F6\'" onmouseleave="this.style.background=\'#fff\'">&#10003; Convert to Active Project</button>';
+  h += '<button onclick="oppDelete(\'' + budget.id + '\',\'' + projId + '\')" '
+    + 'style="padding:9px 14px;border-radius:7px;border:2px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.5);cursor:pointer;font-size:12px;font-weight:700"'
+    + ' title="Permanently delete this opportunity"'
+    + ' onmouseenter="this.style.borderColor=\'rgba(255,100,100,.6)\';this.style.color=\'#EF9A9A\'" onmouseleave="this.style.borderColor=\'rgba(255,255,255,.2)\';this.style.color=\'rgba(255,255,255,.5)\'">&#128465;</button>';
   h += '</div>';
   h += '</div>';
   el.innerHTML = h;
@@ -3638,6 +3647,47 @@ async function oppReopen(budgetId) {
   await sparkFetch('budgets?id=eq.' + budgetId, '', 'PATCH', { status: 'opportunity' });
   sparkHideSaving();
   renderOpportunities();
+}
+
+async function oppDelete(budgetId, projectId) {
+  /* Custom confirmation overlay instead of browser confirm() */
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:99999;display:flex;align-items:center;justify-content:center';
+
+  var isDark = document.documentElement.classList.contains('dark');
+  var mBg = isDark ? 'var(--dm-surface)' : 'var(--white)';
+  var mText = isDark ? 'var(--dm-text)' : 'var(--ink)';
+
+  overlay.innerHTML = '<div style="background:' + mBg + ';border-radius:14px;padding:28px;width:380px;max-width:92vw;text-align:center">'
+    + '<div style="font-size:32px;margin-bottom:12px">&#128465;</div>'
+    + '<div style="font-size:16px;font-weight:700;color:' + mText + ';margin-bottom:8px">Delete Opportunity?</div>'
+    + '<div style="font-size:13px;color:var(--mid-gray);margin-bottom:24px;line-height:1.5">This will permanently delete the estimate and all its data. This cannot be undone.</div>'
+    + '<div style="display:flex;gap:10px;justify-content:center">'
+    + '<button id="oppDelConfirm" style="padding:10px 24px;border-radius:7px;border:none;background:#C62828;color:#fff;cursor:pointer;font-size:13px;font-weight:700">Yes, Delete</button>'
+    + '<button id="oppDelCancel" style="padding:10px 20px;border-radius:7px;border:1px solid var(--mid-gray);background:transparent;cursor:pointer;font-size:13px;color:var(--mid-gray)">Cancel</button>'
+    + '</div></div>';
+
+  document.body.appendChild(overlay);
+  overlay.querySelector('#oppDelCancel').onclick = function() { overlay.remove(); };
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+  overlay.querySelector('#oppDelConfirm').onclick = async function() {
+    overlay.querySelector('#oppDelConfirm').disabled = true;
+    overlay.querySelector('#oppDelConfirm').textContent = 'Deleting…';
+    try {
+      /* Delete child records first, then budget, then project */
+      await sparkFetch('freelancer_budget_entries?budget_id=eq.' + budgetId, '', 'DELETE');
+      await sparkFetch('oop_budget_entries?budget_id=eq.' + budgetId, '', 'DELETE');
+      await sparkFetch('labor_budget_entries?budget_id=eq.' + budgetId, '', 'DELETE');
+      await sparkFetch('budgets?id=eq.' + budgetId, '', 'DELETE');
+      if (projectId) await sparkFetch('projects?id=eq.' + projectId, '', 'DELETE');
+      overlay.remove();
+      navigate('opportunities');
+    } catch(err) {
+      overlay.remove();
+      alert('Delete failed: ' + (err && err.message ? err.message : err));
+    }
+  };
 }
 
 async function oppConvertToActive(budgetId) {
