@@ -1241,6 +1241,7 @@ function renderSidebar() {
   html += '<div class="nav-item ' + (currentView === 'allocations' ? 'active' : '') + '" onclick="navigate(\'allocations\')"><span class="icon">&#9881;</span> Manage Resources</div>';
   html += '<div class="nav-item ' + (currentView === 'resource' ? 'active' : '') + '" onclick="navigate(\'resource\')"><span class="icon">&#9202;</span> Resource Analytics</div>';
   html += '<div class="nav-item ' + (currentView === 'completed' ? 'active' : '') + '" onclick="navigate(\'completed\')"><span class="icon">&#10003;</span> Completed Projects</div>';
+  html += '<div class="nav-item ' + (currentView === 'opportunities' ? 'active' : '') + '" onclick="navigate(\'opportunities\')"><span class="icon">&#9733;</span> New Opportunities</div>';
   html += '<div class="nav-item ' + (currentView === 'settings' ? 'active' : '') + '" onclick="navigate(\'settings\')"><span class="icon">&#9881;</span> Settings</div>';
   html += '<div class="nav-divider"></div>';
 
@@ -3293,6 +3294,331 @@ function renderCompleted() {
     h += '<div style="text-align:center;color:var(--mid-gray);padding:60px 0"><p style="font-size:40px;margin-bottom:12px">&#128230;</p><p>No completed projects yet</p></div>';
   }
   document.getElementById('mainContent').innerHTML = h;
+}
+
+/* ══════════════════════════════════════════════════════════
+   NEW OPPORTUNITIES
+   ══════════════════════════════════════════════════════════ */
+
+async function renderOpportunities() {
+  var mc = document.getElementById('mainContent');
+  mc.innerHTML = '<h1 class="page-title">New Opportunities</h1>'
+    + '<p class="page-subtitle">Build estimate snapshots before a project goes live. Convert to active when the deal closes.</p>'
+    + '<div style="margin-bottom:24px"><button onclick="oppCreateNew()" style="padding:9px 22px;border-radius:7px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-size:13px;font-weight:700">+ New Opportunity</button></div>'
+    + '<div id="oppList"><div style="color:var(--mid-gray);font-size:13px;padding:12px 0">Loading&#8230;</div></div>';
+
+  var opps = await sparkFetch('budgets',
+    'status=in.(opportunity,lost)&visibility=eq.visible'
+    + '&select=id,name,status,client_price,has_discount,created_at,updated_at,project_id,projects(id,name,project_code,clients(id,name,client_number))'
+    + '&order=updated_at.desc');
+  var el = document.getElementById('oppList');
+  if (!el) return;
+
+  var active = (opps || []).filter(function(o) { return o.status === 'opportunity'; });
+  var lost   = (opps || []).filter(function(o) { return o.status === 'lost'; });
+
+  var h = '';
+
+  if (!active.length && !lost.length) {
+    el.innerHTML = '<div style="text-align:center;padding:60px 0;color:var(--mid-gray)">'
+      + '<div style="font-size:40px;margin-bottom:12px">&#9733;</div>'
+      + '<div style="font-size:14px;font-weight:600;margin-bottom:6px">No opportunities yet</div>'
+      + '<div style="font-size:12px">Create your first opportunity to start building an estimate.</div></div>';
+    return;
+  }
+
+  function oppCard(o) {
+    var proj = o.projects || {};
+    var client = proj.clients || {};
+    var clientName = client.name || 'Unknown Client';
+    var clientNum  = client.client_number || '';
+    var projName   = proj.name || o.name || 'Untitled';
+    var price = o.client_price || 0;
+    var tcv   = price - (o.has_discount ? price * 0.035 : 0);
+    var isLost = o.status === 'lost';
+    var updated = o.updated_at ? new Date(o.updated_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '';
+
+    var c = '<div style="background:var(--white);border-radius:10px;padding:16px 20px;margin-bottom:10px;'
+      + 'display:flex;align-items:center;gap:16px;'
+      + 'border:1px solid ' + (isLost ? 'var(--canvas)' : 'rgba(91,74,138,.2)') + ';'
+      + 'opacity:' + (isLost ? '.6' : '1') + ';'
+      + (isLost ? '' : 'cursor:pointer;" onclick="navigate(\'opportunity:' + o.id + '\')"') + '">';
+    c += '<div style="flex:1;min-width:0">';
+    c += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:' + (isLost ? 'var(--mid-gray)' : '#5B4A8A') + ';margin-bottom:3px">' + clientNum + (clientNum && clientName ? ' · ' : '') + clientName + '</div>';
+    c += '<div style="font-size:15px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + projName + '</div>';
+    if (updated) c += '<div style="font-size:11px;color:var(--mid-gray);margin-top:4px">Updated ' + updated + '</div>';
+    c += '</div>';
+    c += '<div style="text-align:right;flex-shrink:0">';
+    c += tcv > 0
+      ? '<div style="font-size:18px;font-weight:700;color:var(--ink)">' + sparkFmt(tcv) + '</div>'
+      : '<div style="font-size:12px;color:var(--mid-gray);font-style:italic">No price set</div>';
+    if (isLost) {
+      c += '<div style="margin-top:6px"><span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;background:#FFEBEE;color:#C62828;text-transform:uppercase;letter-spacing:.05em">Lost</span></div>';
+      c += '<button onclick="event.stopPropagation();oppReopen(\'' + o.id + '\')" style="margin-top:8px;padding:4px 12px;border-radius:5px;border:1px solid var(--mid-gray);background:transparent;color:var(--mid-gray);cursor:pointer;font-size:10px;font-weight:700">Reopen</button>';
+    } else {
+      c += '<div style="margin-top:6px"><span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;background:rgba(91,74,138,.1);color:#5B4A8A;text-transform:uppercase;letter-spacing:.05em">In Progress</span></div>';
+    }
+    c += '</div>';
+    c += '</div>';
+    return c;
+  }
+
+  if (active.length) {
+    h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--mid-gray);margin-bottom:10px">Active Opportunities (' + active.length + ')</div>';
+    for (var i = 0; i < active.length; i++) h += oppCard(active[i]);
+  }
+  if (lost.length) {
+    h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--mid-gray);margin:24px 0 10px">Not Closed (' + lost.length + ')</div>';
+    for (var i = 0; i < lost.length; i++) h += oppCard(lost[i]);
+  }
+
+  el.innerHTML = h;
+}
+
+async function renderOpportunityEditor(budgetId) {
+  var mc = document.getElementById('mainContent');
+  mc.innerHTML = '<div>'
+    + '<div style="margin-bottom:14px"><button onclick="navigate(\'opportunities\')" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--mid-gray);font-weight:600;padding:0;letter-spacing:.3px">&#8249; All Opportunities</button></div>'
+    + '<div id="oppActionBar"></div>'
+    + '<div id="sparkProjectOverview"></div>'
+    + '<div id="sparkProjectBudget"><div style="padding:20px;color:var(--mid-gray)">Loading&#8230;</div></div>'
+    + '</div>';
+
+  sparkSelectedBudget = budgetId;
+
+  var results = await Promise.all([
+    sparkFetch('budgets', 'id=eq.' + budgetId + '&select=*,projects(id,name,project_code,clients(id,name,client_number))'),
+    sparkFetch('labor_budget_entries', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,billable_rate,fully_burdened_rate,department,employment_type)&order=department.asc,display_order.asc'),
+    sparkFetch('oop_budget_entries', 'budget_id=eq.' + budgetId + '&select=*,section:oop_sections(id,name,slug),category:oop_categories(id,name)&order=display_order.asc'),
+    sparkFetch('oop_sections', 'select=*&order=display_order.asc'),
+    sparkFetch('oop_categories', 'select=*&order=display_order.asc'),
+    sparkFetch('labor_actuals', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,department,employment_type)&order=work_date.desc'),
+    sparkFetch('agency_settings', 'select=*&order=category.asc,sort_order.asc'),
+    sparkFetch('freelancer_budget_entries', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,billable_rate,fully_burdened_rate)&order=team_member_id.asc,display_order.asc')
+  ]);
+
+  sparkCurrentData = {
+    budget: results[0] && results[0][0] ? results[0][0] : null,
+    labor: results[1] || [],
+    oop: results[2] || [],
+    oopSections: results[3] || [],
+    oopCategories: results[4] || [],
+    actuals: results[5] || [],
+    settings: results[6] || [],
+    freelancerEntries: results[7] || []
+  };
+
+  sparkPhaseTab = 'all';
+  sparkOopTab = (sparkCurrentData.oopSections.length && sparkCurrentData.oopSections[0].slug) || 'creative';
+
+  if (!sparkCurrentData.budget) {
+    document.getElementById('sparkProjectBudget').innerHTML = '<div style="padding:20px;color:var(--ember)">Could not load opportunity data.</div>';
+    return;
+  }
+
+  oppRenderActionBar();
+  sparkRenderBudgetContent(true);
+  sparkSubscribeRealtime(sparkCurrentData.budget.id);
+}
+
+function oppRenderActionBar() {
+  var el = document.getElementById('oppActionBar');
+  if (!el || !sparkCurrentData || !sparkCurrentData.budget) return;
+  var budget = sparkCurrentData.budget;
+  var proj   = budget.projects || {};
+  var client = proj.clients || {};
+  var clientLabel = [client.client_number, client.name].filter(Boolean).join(' · ');
+  var projName = proj.name || budget.name || 'Untitled';
+
+  var h = '<div style="background:linear-gradient(135deg,#3D2E6B 0%,#5B4A8A 100%);border-radius:12px;padding:16px 20px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">';
+  h += '<div>';
+  if (clientLabel) h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.5);margin-bottom:5px">Opportunity Estimate &nbsp;·&nbsp; ' + clientLabel + '</div>';
+  h += '<div style="font-size:18px;font-weight:700;color:#fff">' + projName + '</div>';
+  h += '</div>';
+  h += '<div style="display:flex;gap:10px;flex-wrap:wrap">';
+  h += '<button onclick="oppMarkLost(\'' + budget.id + '\')" '
+    + 'style="padding:9px 18px;border-radius:7px;border:2px solid rgba(255,255,255,.3);background:transparent;color:rgba(255,255,255,.85);cursor:pointer;font-size:12px;font-weight:700;letter-spacing:.3px"'
+    + ' onmouseenter="this.style.borderColor=\'rgba(255,255,255,.7)\'" onmouseleave="this.style.borderColor=\'rgba(255,255,255,.3)\'">&#10007; Mark Lost</button>';
+  h += '<button onclick="oppConvertToActive(\'' + budget.id + '\')" '
+    + 'style="padding:9px 18px;border-radius:7px;border:none;background:#fff;color:#3D2E6B;cursor:pointer;font-size:12px;font-weight:700;letter-spacing:.3px"'
+    + ' onmouseenter="this.style.background=\'#EDE9F6\'" onmouseleave="this.style.background=\'#fff\'">&#10003; Convert to Active Project</button>';
+  h += '</div>';
+  h += '</div>';
+  el.innerHTML = h;
+}
+
+async function oppCreateNew() {
+  var clients = await sparkFetch('clients', 'select=id,name,client_number&order=name.asc');
+
+  var overlay = document.createElement('div');
+  overlay.id = 'oppCreateOverlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center';
+
+  var opts = '<option value="">&#8212; Select existing client &#8212;</option>';
+  if (clients) {
+    for (var i = 0; i < clients.length; i++) {
+      var c = clients[i];
+      opts += '<option value="' + c.id + '" data-name="' + (c.name||'').replace(/"/g,'&quot;') + '" data-num="' + (c.client_number||'') + '">' + (c.client_number ? c.client_number + ' · ' : '') + c.name + '</option>';
+    }
+  }
+  opts += '<option value="__new__">+ New client&#8230;</option>';
+
+  var m = '<div style="background:var(--white);border-radius:14px;padding:28px;width:460px;max-width:95vw;max-height:90vh;overflow-y:auto">';
+  m += '<div style="font-size:18px;font-weight:700;color:var(--ink);margin-bottom:6px">New Opportunity</div>';
+  m += '<div style="font-size:12px;color:var(--mid-gray);margin-bottom:24px">Build an estimate snapshot before this becomes an active project.</div>';
+
+  m += '<div style="margin-bottom:16px">';
+  m += '<label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid-gray);margin-bottom:6px">Client</label>';
+  m += '<select id="oppClientSel" onchange="oppToggleNewClient()" style="width:100%;padding:9px 12px;border:1px solid rgba(0,0,0,.12);border-radius:7px;font-size:13px;background:var(--white);color:var(--ink)">' + opts + '</select>';
+  m += '</div>';
+
+  m += '<div id="oppNewClientFields" style="display:none;margin-bottom:16px;padding:14px;background:var(--canvas);border-radius:8px">';
+  m += '<label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid-gray);margin-bottom:6px">Client Name</label>';
+  m += '<input id="oppNewClientName" placeholder="e.g. Acme Corp" style="width:100%;padding:9px 12px;border:1px solid rgba(0,0,0,.12);border-radius:7px;font-size:13px;box-sizing:border-box;margin-bottom:10px">';
+  m += '<label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid-gray);margin-bottom:6px">Client Number</label>';
+  m += '<input id="oppNewClientNum" placeholder="e.g. 399" style="width:100%;padding:9px 12px;border:1px solid rgba(0,0,0,.12);border-radius:7px;font-size:13px;box-sizing:border-box">';
+  m += '</div>';
+
+  m += '<div style="margin-bottom:16px">';
+  m += '<label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid-gray);margin-bottom:6px">Opportunity / Project Name</label>';
+  m += '<input id="oppProjName" placeholder="e.g. Brand Identity Redesign" style="width:100%;padding:9px 12px;border:1px solid rgba(0,0,0,.12);border-radius:7px;font-size:13px;box-sizing:border-box">';
+  m += '</div>';
+
+  m += '<div style="display:flex;gap:10px;margin-top:24px">';
+  m += '<button onclick="oppSubmitCreate()" style="flex:1;padding:10px 0;border-radius:7px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-size:13px;font-weight:700">Create Opportunity</button>';
+  m += '<button onclick="document.getElementById(\'oppCreateOverlay\').remove()" style="padding:10px 18px;border-radius:7px;border:1px solid rgba(0,0,0,.12);background:transparent;cursor:pointer;font-size:13px;color:var(--mid-gray)">Cancel</button>';
+  m += '</div>';
+  m += '</div>';
+
+  overlay.innerHTML = m;
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+  setTimeout(function() { var el = document.getElementById('oppProjName'); if (el) el.focus(); }, 50);
+}
+
+function oppToggleNewClient() {
+  var sel    = document.getElementById('oppClientSel');
+  var fields = document.getElementById('oppNewClientFields');
+  if (sel && fields) fields.style.display = sel.value === '__new__' ? 'block' : 'none';
+}
+
+async function oppSubmitCreate() {
+  var sel      = document.getElementById('oppClientSel');
+  var projNameEl = document.getElementById('oppProjName');
+  if (!sel || !projNameEl) return;
+
+  var projName = projNameEl.value.trim();
+  if (!projName) { alert('Please enter a project / opportunity name.'); projNameEl.focus(); return; }
+
+  var clientId = '', clientName = '', clientNum = '';
+
+  if (sel.value === '__new__') {
+    clientName = ((document.getElementById('oppNewClientName') || {}).value || '').trim();
+    clientNum  = ((document.getElementById('oppNewClientNum')  || {}).value || '').trim();
+    if (!clientName) { alert('Please enter a client name.'); return; }
+    var newCl = await sparkFetch('clients', '', 'POST', { name: clientName, client_number: clientNum });
+    if (!newCl || !newCl[0]) { alert('Failed to create client record.'); return; }
+    clientId = newCl[0].id;
+  } else if (sel.value) {
+    clientId = sel.value;
+    var opt = sel.options[sel.selectedIndex];
+    clientName = opt.getAttribute('data-name') || '';
+    clientNum  = opt.getAttribute('data-num')  || '';
+  } else {
+    alert('Please select a client.'); return;
+  }
+
+  /* Unique temporary project code for this opportunity */
+  var oppCode = 'OPP_' + Date.now().toString(36).toUpperCase();
+
+  sparkShowSaving();
+
+  /* Create project record */
+  var newProj = await sparkFetch('projects', '', 'POST', { name: projName, project_code: oppCode, client_id: clientId });
+  if (!newProj || !newProj[0]) { sparkHideSaving(); alert('Failed to create project record.'); return; }
+  var supaProjectId = newProj[0].id;
+
+  /* Create budget with status = 'opportunity' */
+  var newBudget = await sparkFetch('budgets', '', 'POST', {
+    name: projName, project_id: supaProjectId,
+    status: 'opportunity', visibility: 'visible',
+    client_price: 0, total_amount: 0,
+    has_discount: false, discount_percentage: 0,
+    reserve_percentage: 5, oop_markup_percentage: 20
+  });
+  if (!newBudget || !newBudget[0]) { sparkHideSaving(); alert('Failed to create budget.'); return; }
+  var budgetId = newBudget[0].id;
+
+  /* Pre-fill all active team members with 0 hours */
+  var allTeam = await sparkFetch('team_members', 'select=id,name,department,employment_type&is_active=eq.true&order=name.asc');
+  if (allTeam && allTeam.length) {
+    var lb = [];
+    for (var ti = 0; ti < allTeam.length; ti++) {
+      var tm = allTeam[ti];
+      var dept = tm.department;
+      if (dept && dept !== 'Executive/Admin' && dept !== 'Account' && dept !== 'Creative' && dept !== 'Post') dept = null;
+      lb.push({ budget_id: budgetId, team_member_id: tm.id, department: dept,
+        employment_type: tm.employment_type || 'Employee',
+        phase1: 0, phase2: 0, phase3_1: 0, phase3_2: 0, phase4: 0, phase5: 0, display_order: ti });
+    }
+    await sparkFetch('labor_budget_entries', '', 'POST', lb);
+  }
+
+  /* Default OOP entries */
+  var oopCats = await sparkFetch('oop_categories', 'select=id,name,section_id&order=display_order.asc');
+  if (oopCats && oopCats.length) {
+    for (var i = 0; i < oopCats.length; i++) {
+      await sparkFetch('oop_budget_entries', '', 'POST', {
+        budget_id: budgetId, category_id: oopCats[i].id, section_id: oopCats[i].section_id,
+        line_item_name: oopCats[i].name, count: 0, rate: 0, days: 1, head_count: 1,
+        is_active: true, display_order: i
+      });
+    }
+  }
+
+  sparkHideSaving();
+  var overlay = document.getElementById('oppCreateOverlay');
+  if (overlay) overlay.remove();
+  navigate('opportunity:' + budgetId);
+}
+
+async function oppMarkLost(budgetId) {
+  if (!confirm('Mark this opportunity as lost / not closed?')) return;
+  sparkShowSaving();
+  await sparkFetch('budgets?id=eq.' + budgetId, '', 'PATCH', { status: 'lost' });
+  sparkHideSaving();
+  navigate('opportunities');
+}
+
+async function oppReopen(budgetId) {
+  sparkShowSaving();
+  await sparkFetch('budgets?id=eq.' + budgetId, '', 'PATCH', { status: 'opportunity' });
+  sparkHideSaving();
+  renderOpportunities();
+}
+
+async function oppConvertToActive(budgetId) {
+  if (!sparkCurrentData || !sparkCurrentData.budget) return;
+  var proj     = sparkCurrentData.budget.projects || {};
+  var projName = proj.name || sparkCurrentData.budget.name || 'this project';
+  var projCode = proj.project_code || '';
+
+  if (!confirm('Convert "' + projName + '" to an active project?\n\nThis will mark the budget as active. You\'ll need to add the project to portfolio.js to see it in the main dashboard.')) return;
+
+  sparkShowSaving();
+  await sparkFetch('budgets?id=eq.' + budgetId, '', 'PATCH', { status: 'active' });
+  sparkHideSaving();
+
+  var mc = document.getElementById('mainContent');
+  if (mc) {
+    mc.innerHTML = '<div style="text-align:center;padding:80px 24px">'
+      + '<div style="font-size:48px;margin-bottom:16px">&#127881;</div>'
+      + '<div style="font-size:22px;font-weight:700;color:var(--ink);margin-bottom:10px">Project Activated!</div>'
+      + '<div style="font-size:14px;color:var(--mid-gray);max-width:420px;margin:0 auto 8px">"' + projName + '" is now an active budget.</div>'
+      + (projCode ? '<div style="font-size:12px;color:var(--mid-gray);max-width:420px;margin:0 auto 24px">Add project code <code style="background:var(--canvas);padding:2px 6px;border-radius:4px">' + projCode + '</code> to portfolio.js to track it in the main dashboard.</div>' : '<div style="margin-bottom:24px"></div>')
+      + '<button onclick="navigate(\'opportunities\')" style="padding:10px 24px;border-radius:7px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-size:13px;font-weight:700">&#8592; Back to Opportunities</button>'
+      + '</div>';
+  }
 }
 
 /* ── RENDER: SETTINGS ── */
@@ -8792,6 +9118,8 @@ function navigate(view) {
   else if (view === 'allocations') renderAllocations();
   else if (view === 'spark') renderSpark();
   else if (view === 'settings') renderSettings();
+  else if (view === 'opportunities') renderOpportunities();
+  else if (view.indexOf('opportunity:') === 0) renderOpportunityEditor(view.split(':')[1]);
   else if (view.indexOf('client:') === 0) renderClient(view.split(':')[1]);
   else if (view.indexOf('project:') === 0) renderProject(view.split(':')[1]);
 }
@@ -9191,7 +9519,7 @@ async function loadSupabaseData() {
     /* 0+1+1b. Fetch team members, budgets, and project ID map in parallel */
     var _phase1 = await Promise.all([
       sparkFetchAll('team_members', 'select=id,name,department,employment_type,fully_burdened_rate,billable_rate,is_active&is_active=eq.true&order=department.asc,name.asc'),
-      sparkFetchAll('budgets', 'select=id,name,status,client_price,total_amount,has_discount,discount_percentage,reserve_percentage,oop_markup_percentage,no_oop,no_freelancers,project_id,projects(id,project_code,name)&visibility=eq.visible'),
+      sparkFetchAll('budgets', 'select=id,name,status,client_price,total_amount,has_discount,discount_percentage,reserve_percentage,oop_markup_percentage,no_oop,no_freelancers,project_id,projects(id,project_code,name)&visibility=eq.visible&status=neq.opportunity&status=neq.lost'),
       sparkFetchAll('projects', 'select=id,project_code')
     ]);
     FURNACE_TEAM_MEMBERS = _phase1[0] || [];
@@ -9201,7 +9529,7 @@ async function loadSupabaseData() {
     if (!budgets || !budgets.length) {
       /* Fallback: try without the projects join in case join is failing */
       console.warn('[Furnace] budgets with join returned empty — trying without join');
-      budgets = await sparkFetchAll('budgets', 'select=id,name,status,client_price,total_amount,has_discount,discount_percentage,reserve_percentage,oop_markup_percentage,no_oop,no_freelancers,project_id&visibility=eq.visible');
+      budgets = await sparkFetchAll('budgets', 'select=id,name,status,client_price,total_amount,has_discount,discount_percentage,reserve_percentage,oop_markup_percentage,no_oop,no_freelancers,project_id&visibility=eq.visible&status=neq.opportunity&status=neq.lost');
       if (!budgets || !budgets.length) { console.warn('[Furnace] No Supabase budgets found — check Supabase RLS policies and table data'); SUPA_LOADED = false; return; }
     }
 
