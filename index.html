@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.4 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 14, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.5 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 14, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -750,6 +750,7 @@ let openClients = {};
 let showFinalized = false;
 let showFlaggedAll = false; /* Needs Attention: false=active only, true=all projects */
 let showInactiveClients = false;
+let sidebarSearch = '';
 
 /* ── GLOBAL DATE FILTER ── */
 var globalDateFilter = 'all'; /* all | today | yesterday | current_week | last_week | current_month | last_month | current_year | last_year | custom */
@@ -1256,30 +1257,52 @@ function renderSidebar() {
   }
 
   function renderClientGroup(clients) {
+    var q = sidebarSearch.trim().toLowerCase();
     var out = '';
     for (var ci = 0; ci < clients.length; ci++) {
       var c = clients[ci];
-      var isOpen = openClients[c.id];
+      var sorted = c.projects.slice().sort(function(a,b){ return a.code < b.code ? -1 : a.code > b.code ? 1 : 0; });
+
+      /* Filter projects when search is active */
+      var visibleProjects = sorted.filter(function(p) {
+        if (isProjectCompleted(p)) return false;
+        if (!q) return true;
+        return (p.name && p.name.toLowerCase().indexOf(q) !== -1)
+          || (p.code && p.code.toLowerCase().indexOf(q) !== -1);
+      });
+
+      /* Hide entire client if search active and no matching projects */
+      if (q && !visibleProjects.length) continue;
+
+      var forceOpen = q && visibleProjects.length > 0;
+      var isOpen = forceOpen || openClients[c.id];
       var isClientView = currentView === 'client:' + c.id;
+
       out += '<div class="client-group">';
       out += '<div class="client-header" onclick="toggleClient(\'' + c.id + '\')"><span class="arrow ' + (isOpen ? 'open' : '') + '">&#9654;</span><span style="color:' + c.color + '">&#9679;</span> ' + c.code + ' ' + c.name + '</div>';
       out += '<div class="client-projects ' + (isOpen ? 'open' : '') + '">';
-      out += '<div class="nav-item ' + (isClientView ? 'active' : '') + '" onclick="navigate(\'client:' + c.id + '\')"><span class="icon">&#9635;</span> Overview</div>';
-      var sorted = c.projects.slice().sort(function(a,b){ return a.code < b.code ? -1 : a.code > b.code ? 1 : 0; });
-      for (var pi = 0; pi < sorted.length; pi++) {
-        var p = sorted[pi];
-        if (isProjectCompleted(p)) continue;
+      if (!q) out += '<div class="nav-item ' + (isClientView ? 'active' : '') + '" onclick="navigate(\'client:' + c.id + '\')"><span class="icon">&#9635;</span> Overview</div>';
+      for (var pi = 0; pi < visibleProjects.length; pi++) {
+        var p = visibleProjects[pi];
         var isActive = currentView === 'project:' + p.id;
-        out += '<div class="nav-item ' + (isActive ? 'active' : '') + '" onclick="navigate(\'project:' + p.id + '\')"><span class="icon">&mdash;</span> <span><span class="proj-code">' + p.code + '</span>' + p.name + '</span></div>';
+        var label = q ? ('<span class="proj-code">' + p.code + '</span>' + p.name) : ('<span><span class="proj-code">' + p.code + '</span>' + p.name + '</span>');
+        out += '<div class="nav-item ' + (isActive ? 'active' : '') + '" onclick="navigate(\'project:' + p.id + '\')"><span class="icon">&mdash;</span> ' + label + '</div>';
       }
       out += '</div></div>';
     }
     return out;
   }
 
-  /* Active Clients */
+  /* Active Clients + search */
   html += '<div style="padding:6px 16px 4px;font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:rgba(255,255,255,.35);font-weight:600">Active Clients</div>';
-  html += renderClientGroup(activeClients);
+  html += '<div style="padding:0 10px 6px">'
+    + '<input id="sidebarSearchInput" type="text" placeholder="Search projects…" value="' + sidebarSearch.replace(/"/g,'&quot;') + '"'
+    + ' oninput="sidebarSearch=this.value;renderSidebarClients()"'
+    + ' style="width:100%;box-sizing:border-box;padding:6px 10px;border-radius:6px;border:none;background:rgba(255,255,255,.1);color:rgba(255,255,255,.85);font-size:11px;font-family:inherit;outline:none"'
+    + ' onfocus="this.style.background=\'rgba(255,255,255,.18)\'" onblur="this.style.background=\'rgba(255,255,255,.1)\'"'
+    + ' placeholder="Search projects…">'
+    + '</div>';
+  html += '<div id="sidebarClientList">' + renderClientGroup(activeClients) + '</div>';
 
   /* Inactive Clients (collapsible) */
   if (inactiveClients.length) {
@@ -1295,7 +1318,25 @@ function renderSidebar() {
   document.getElementById('sidebarNav').innerHTML = html;
 }
 
-function toggleClient(id) { openClients[id] = !openClients[id]; renderSidebar(); }
+function toggleClient(id) { openClients[id] = !openClients[id]; renderSidebarClients(); }
+
+function renderSidebarClients() {
+  /* Re-render just the client list so the search input keeps focus */
+  var el = document.getElementById('sidebarClientList');
+  if (!el) { renderSidebar(); return; }
+  var activeClients = [], inactiveClients = [];
+  for (var ci = 0; ci < CLIENTS.length; ci++) {
+    if (CLIENTS[ci].status === 'inactive') inactiveClients.push(CLIENTS[ci]);
+    else activeClients.push(CLIENTS[ci]);
+  }
+  /* Rebuild renderClientGroup inline (same logic, captured in closure above) */
+  /* Easiest: just call renderSidebar but restore focus after */
+  var inp = document.getElementById('sidebarSearchInput');
+  var pos = inp ? inp.selectionStart : null;
+  renderSidebar();
+  inp = document.getElementById('sidebarSearchInput');
+  if (inp && pos !== null) { inp.focus(); try { inp.setSelectionRange(pos, pos); } catch(e){} }
+}
 
 /* ── HOUR TYPE HELPERS ── */
 function computeHourTypes(projects) {
@@ -3307,13 +3348,57 @@ async function renderOpportunities() {
   var mc = document.getElementById('mainContent');
   mc.innerHTML = '<h1 class="page-title">New Opportunities</h1>'
     + '<p class="page-subtitle">Build estimate snapshots before a project goes live. Convert to active when the deal closes.</p>'
-    + '<div style="margin-bottom:24px"><button onclick="oppCreateNew()" style="padding:9px 22px;border-radius:7px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-size:13px;font-weight:700">+ New Opportunity</button></div>'
+    + '<div id="oppSummaryBanner"><div style="color:var(--mid-gray);font-size:12px;padding:8px 0">Loading&#8230;</div></div>'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'
+    + '<button onclick="oppCreateNew()" style="padding:9px 22px;border-radius:7px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-size:13px;font-weight:700">+ New Opportunity</button>'
+    + '<input id="oppSearchInput" type="text" placeholder="Search opportunities…" oninput="oppFilterList(this.value)"'
+    + ' style="padding:8px 14px;border-radius:7px;border:1px solid var(--dm-border,var(--canvas));background:var(--dm-surface2,var(--white));color:var(--dm-text,var(--ink));font-size:13px;font-family:inherit;outline:none;width:240px">'
+    + '</div>'
     + '<div id="oppList"><div style="color:var(--mid-gray);font-size:13px;padding:12px 0">Loading&#8230;</div></div>';
 
+  /* Fetch opportunities + labor entries in parallel */
   var opps = await sparkFetch('budgets',
     'status=in.(opportunity,lost)&visibility=eq.visible'
     + '&select=id,name,status,client_price,has_discount,created_at,updated_at,project_id,projects(id,name,project_code,clients(id,name,client_number))'
     + '&order=updated_at.desc');
+
+  var activeOpps = (opps || []).filter(function(o) { return o.status === 'opportunity'; });
+  var activeBudgetIds = activeOpps.map(function(o) { return o.id; });
+
+  /* Fetch labor hours for all active opportunities */
+  var laborEntries = [];
+  if (activeBudgetIds.length) {
+    laborEntries = await sparkFetch('labor_budget_entries',
+      'budget_id=in.(' + activeBudgetIds.join(',') + ')&select=phase1,phase2,phase3_1,phase3_2,phase4,phase5') || [];
+  }
+
+  /* Build summary */
+  var totalPipeline = 0, totalHrs = 0;
+  for (var i = 0; i < activeOpps.length; i++) {
+    var p = activeOpps[i].client_price || 0;
+    totalPipeline += p - (activeOpps[i].has_discount ? p * 0.035 : 0);
+  }
+  var phaseKeys = ['phase1','phase2','phase3_1','phase3_2','phase4','phase5'];
+  for (var i = 0; i < laborEntries.length; i++) {
+    for (var k = 0; k < phaseKeys.length; k++) totalHrs += laborEntries[i][phaseKeys[k]] || 0;
+  }
+  var avgPrice = activeOpps.length ? totalPipeline / activeOpps.length : 0;
+
+  /* Render summary banner */
+  var sb = document.getElementById('oppSummaryBanner');
+  if (sb) {
+    var bh = '<div class="snapshot-banner" style="margin-bottom:20px">';
+    bh += '<div class="snap-header"><div class="snap-title">Pipeline Summary</div><div class="snap-version">' + activeOpps.length + ' active opportunit' + (activeOpps.length === 1 ? 'y' : 'ies') + '</div></div>';
+    bh += '<div class="snap-financials">';
+    bh += '<div class="snap-fin-item"><div class="sf-label">Total Pipeline</div><div class="sf-value sf-gold">$' + Math.round(totalPipeline).toLocaleString() + '</div></div>';
+    bh += '<div class="snap-fin-item"><div class="sf-label">Avg. Per Opportunity</div><div class="sf-value">$' + Math.round(avgPrice).toLocaleString() + '</div></div>';
+    bh += '<div class="snap-fin-item"><div class="sf-label">Total Hours Budgeted</div><div class="sf-value">' + totalHrs.toFixed(1) + ' hrs</div></div>';
+    bh += '<div class="snap-fin-item"><div class="sf-label">Avg. Hrs / Opportunity</div><div class="sf-value">' + (activeOpps.length ? (totalHrs / activeOpps.length).toFixed(1) : '0.0') + ' hrs</div></div>';
+    bh += '</div>';
+    bh += '</div>';
+    sb.innerHTML = bh;
+  }
+
   var el = document.getElementById('oppList');
   if (!el) return;
 
@@ -3390,6 +3475,49 @@ async function renderOpportunities() {
   }
 
   el.innerHTML = h;
+  /* Store raw data on list element for client-side search filtering */
+  el._oppData = opps || [];
+  el._oppCardFn = oppCard;
+}
+
+function oppFilterList(query) {
+  var el = document.getElementById('oppList');
+  if (!el || !el._oppData) return;
+  var q = (query || '').trim().toLowerCase();
+  var all = el._oppData;
+
+  function matches(o) {
+    if (!q) return true;
+    var proj = o.projects || {};
+    var client = proj.clients || {};
+    return ((client.name || '').toLowerCase().indexOf(q) !== -1)
+      || ((client.client_number || '').toLowerCase().indexOf(q) !== -1)
+      || ((proj.name || '').toLowerCase().indexOf(q) !== -1)
+      || ((o.name || '').toLowerCase().indexOf(q) !== -1);
+  }
+
+  var active = all.filter(function(o) { return o.status === 'opportunity' && matches(o); });
+  var lost   = all.filter(function(o) { return o.status === 'lost' && matches(o); });
+  var h = '';
+  if (!active.length && !lost.length) {
+    h = '<div style="padding:24px 0;color:var(--mid-gray);font-size:13px">No opportunities match "' + query + '"</div>';
+  } else {
+    /* Re-sort */
+    function sk(o) { var pr=o.projects||{},cl=pr.clients||{}; return ((cl.client_number||'999')+' '+(cl.name||'zzz')).toLowerCase()+'|'+(pr.name||o.name||'').toLowerCase(); }
+    active.sort(function(a,b){return sk(a)<sk(b)?-1:sk(a)>sk(b)?1:0;});
+    lost.sort(function(a,b){return sk(a)<sk(b)?-1:sk(a)>sk(b)?1:0;});
+    if (active.length) {
+      h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--mid-gray);margin-bottom:10px">Active Opportunities (' + active.length + ')</div>';
+      for (var i = 0; i < active.length; i++) h += el._oppCardFn(active[i]);
+    }
+    if (lost.length) {
+      h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--mid-gray);margin:24px 0 10px">Not Closed (' + lost.length + ')</div>';
+      for (var i = 0; i < lost.length; i++) h += el._oppCardFn(lost[i]);
+    }
+  }
+  el.innerHTML = h;
+  el._oppData = all; /* preserve data reference */
+  el._oppCardFn = el._oppCardFn;
 }
 
 async function renderOpportunityEditor(budgetId) {
