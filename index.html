@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.7 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 14, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.8 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 14, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -4098,7 +4098,7 @@ function renderSettings() {
         return (a.name || '').localeCompare(b.name || '');
       });
 
-      h += '<div style="background:var(--white);border-radius:10px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06);overflow-x:auto;margin-bottom:16px">';
+      h += '<div class="settings-card" style="overflow-x:auto;margin-bottom:16px">';
       h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px">';
       h += '<div style="display:flex;align-items:center;gap:10px">';
       h += '<span style="font-size:18px">' + sec.icon + '</span>';
@@ -4170,31 +4170,51 @@ async function settingsTestSlack() {
   var token = (inp && inp.value.trim()) || SLACK_BOT_TOKEN;
   if (!token) { if (status) { status.textContent = 'No token — enter one above first.'; status.style.color = 'var(--ember)'; } return; }
   if (status) { status.textContent = 'Sending test…'; status.style.color = 'var(--mid-gray)'; }
-  var ok = await slackNotifyNewProject('Test Project', '999_00_00', token);
+  var result = await slackNotifyNewProject('Test Project', '999_00_00', token);
   if (status) {
-    status.textContent = ok ? '✓ Test DMs sent to Evan and Richelle!' : '✗ Failed — check the token and try again.';
-    status.style.color = ok ? '#81C784' : 'var(--ember)';
+    if (result.ok) {
+      status.textContent = '✓ Test DMs sent to Evan and Richelle!';
+      status.style.color = '#81C784';
+    } else {
+      var errMsg = result.error || 'unknown_error';
+      var hint = errMsg === 'missing_scope' ? ' (bot needs chat:write + im:write scopes)'
+               : errMsg === 'not_authed' || errMsg === 'invalid_auth' ? ' (token is invalid)'
+               : errMsg === 'account_inactive' ? ' (workspace account inactive)'
+               : ' (' + errMsg + ')';
+      status.textContent = '✗ Failed' + hint;
+      status.style.color = 'var(--ember)';
+    }
   }
 }
 
 async function slackNotifyNewProject(projName, projCode, tokenOverride) {
   var token = tokenOverride || SLACK_BOT_TOKEN;
-  if (!token) return false;
+  if (!token) return { ok: false, error: 'no_token' };
   var text = '📋 *New Project Created*\n*' + projCode + '* — ' + projName;
   var targets = ['U0997RW6PAT', 'U01TVP5C94N']; /* Evan Figueroa, Richelle Butcher */
-  var allOk = true;
+  var lastError = null;
   for (var i = 0; i < targets.length; i++) {
     try {
+      /* Open (or reuse) the DM channel so postMessage always works */
+      var openResp = await fetch('https://slack.com/api/conversations.open', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ users: targets[i] })
+      });
+      var openData = await openResp.json();
+      if (!openData.ok) { console.warn('Slack conversations.open failed for', targets[i], openData.error); lastError = openData.error; continue; }
+      var channelId = openData.channel.id;
+
       var resp = await fetch('https://slack.com/api/chat.postMessage', {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channel: targets[i], text: text })
+        body: JSON.stringify({ channel: channelId, text: text })
       });
       var data = await resp.json();
-      if (!data.ok) { console.warn('Slack DM failed for', targets[i], data.error); allOk = false; }
-    } catch(e) { console.error('Slack notify error:', e); allOk = false; }
+      if (!data.ok) { console.warn('Slack DM failed for', targets[i], data.error); lastError = data.error; }
+    } catch(e) { console.error('Slack notify error:', e); lastError = e.message; }
   }
-  return allOk;
+  return lastError ? { ok: false, error: lastError } : { ok: true };
 }
 
 function updateRate(clientId, val) {
