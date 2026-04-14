@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.8 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 14, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.9 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 14, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -4195,24 +4195,15 @@ async function slackNotifyNewProject(projName, projCode, tokenOverride) {
   var lastError = null;
   for (var i = 0; i < targets.length; i++) {
     try {
-      /* Open (or reuse) the DM channel so postMessage always works */
-      var openResp = await fetch('https://slack.com/api/conversations.open', {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ users: targets[i] })
-      });
-      var openData = await openResp.json();
-      if (!openData.ok) { console.warn('Slack conversations.open failed for', targets[i], openData.error); lastError = openData.error; continue; }
-      var channelId = openData.channel.id;
-
+      /* Pass user ID directly as channel — Slack opens/reuses the DM automatically */
       var resp = await fetch('https://slack.com/api/chat.postMessage', {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channel: channelId, text: text })
+        body: JSON.stringify({ channel: targets[i], text: text })
       });
       var data = await resp.json();
       if (!data.ok) { console.warn('Slack DM failed for', targets[i], data.error); lastError = data.error; }
-    } catch(e) { console.error('Slack notify error:', e); lastError = e.message; }
+    } catch(e) { console.error('Slack notify error:', e); lastError = e.message || 'Failed to fetch'; }
   }
   return lastError ? { ok: false, error: lastError } : { ok: true };
 }
