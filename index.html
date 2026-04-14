@@ -532,6 +532,9 @@ html.dark .res-stat { background:var(--dm-surface); }
 html.dark .res-stat .rs-label { color:var(--dm-text-muted); }
 html.dark .res-stat .rs-detail { color:var(--dm-text-muted); }
 html.dark .alloc-proj-sidebar { background:var(--dm-surface); border-color:var(--dm-border); }
+html.dark .opp-card { background:var(--dm-surface) !important; }
+html.dark .opp-card-title { color:var(--dm-text) !important; }
+html.dark .opp-card-price { color:var(--dm-text) !important; }
 html.dark .aps-search { background:var(--dm-surface2); border-color:var(--dm-border); color:var(--dm-text); }
 html.dark .aps-item { color:var(--dm-text); }
 html.dark .aps-item:hover { background:var(--dm-surface2); }
@@ -698,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.2 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 14, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.3 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 14, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -3314,8 +3317,18 @@ async function renderOpportunities() {
   var el = document.getElementById('oppList');
   if (!el) return;
 
-  var active = (opps || []).filter(function(o) { return o.status === 'opportunity'; });
-  var lost   = (opps || []).filter(function(o) { return o.status === 'lost'; });
+  function oppSortKey(o) {
+    var proj = o.projects || {};
+    var client = proj.clients || {};
+    var cn = (client.client_number || '999') + ' ' + (client.name || 'zzz');
+    var pn = proj.name || o.name || '';
+    return cn.toLowerCase() + '|' + pn.toLowerCase();
+  }
+
+  var active = (opps || []).filter(function(o) { return o.status === 'opportunity'; })
+    .sort(function(a, b) { return oppSortKey(a) < oppSortKey(b) ? -1 : oppSortKey(a) > oppSortKey(b) ? 1 : 0; });
+  var lost   = (opps || []).filter(function(o) { return o.status === 'lost'; })
+    .sort(function(a, b) { return oppSortKey(a) < oppSortKey(b) ? -1 : oppSortKey(a) > oppSortKey(b) ? 1 : 0; });
 
   var h = '';
 
@@ -3338,25 +3351,25 @@ async function renderOpportunities() {
     var isLost = o.status === 'lost';
     var updated = o.updated_at ? new Date(o.updated_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '';
 
-    var c = '<div style="background:var(--white);border-radius:10px;padding:16px 20px;margin-bottom:10px;'
+    var c = '<div class="opp-card" style="border-radius:10px;padding:16px 20px;margin-bottom:10px;'
       + 'display:flex;align-items:center;gap:16px;'
-      + 'border:1px solid ' + (isLost ? 'var(--canvas)' : 'rgba(91,74,138,.2)') + ';'
-      + 'opacity:' + (isLost ? '.6' : '1') + ';'
-      + (isLost ? '' : 'cursor:pointer;" onclick="navigate(\'opportunity:' + o.id + '\')"') + '">';
+      + 'border:1px solid ' + (isLost ? 'var(--dm-border,var(--canvas))' : 'var(--dm-border,rgba(91,74,138,.2))') + ';'
+      + 'opacity:' + (isLost ? '.65' : '1') + ';'
+      + (isLost ? 'cursor:default;"' : 'cursor:pointer;" onclick="navigate(\'opportunity:' + o.id + '\')"') + '>';
     c += '<div style="flex:1;min-width:0">';
-    c += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:' + (isLost ? 'var(--mid-gray)' : '#5B4A8A') + ';margin-bottom:3px">' + clientNum + (clientNum && clientName ? ' · ' : '') + clientName + '</div>';
-    c += '<div style="font-size:15px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + projName + '</div>';
+    c += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:' + (isLost ? 'var(--mid-gray)' : '#7B68C8') + ';margin-bottom:3px">' + clientNum + (clientNum && clientName ? ' · ' : '') + clientName + '</div>';
+    c += '<div class="opp-card-title" style="font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + projName + '</div>';
     if (updated) c += '<div style="font-size:11px;color:var(--mid-gray);margin-top:4px">Updated ' + updated + '</div>';
     c += '</div>';
     c += '<div style="text-align:right;flex-shrink:0">';
     c += tcv > 0
-      ? '<div style="font-size:18px;font-weight:700;color:var(--ink)">' + sparkFmt(tcv) + '</div>'
+      ? '<div class="opp-card-price" style="font-size:18px;font-weight:700">' + sparkFmt(tcv) + '</div>'
       : '<div style="font-size:12px;color:var(--mid-gray);font-style:italic">No price set</div>';
     if (isLost) {
-      c += '<div style="margin-top:6px"><span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;background:#FFEBEE;color:#C62828;text-transform:uppercase;letter-spacing:.05em">Lost</span></div>';
+      c += '<div style="margin-top:6px"><span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;background:rgba(198,40,40,.15);color:#EF9A9A;text-transform:uppercase;letter-spacing:.05em">Lost</span></div>';
       c += '<button onclick="event.stopPropagation();oppReopen(\'' + o.id + '\')" style="margin-top:8px;padding:4px 12px;border-radius:5px;border:1px solid var(--mid-gray);background:transparent;color:var(--mid-gray);cursor:pointer;font-size:10px;font-weight:700">Reopen</button>';
     } else {
-      c += '<div style="margin-top:6px"><span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;background:rgba(91,74,138,.1);color:#5B4A8A;text-transform:uppercase;letter-spacing:.05em">In Progress</span></div>';
+      c += '<div style="margin-top:6px"><span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;background:rgba(91,74,138,.2);color:#A99FD8;text-transform:uppercase;letter-spacing:.05em">In Progress</span></div>';
     }
     c += '</div>';
     c += '</div>';
@@ -3378,7 +3391,7 @@ async function renderOpportunities() {
 async function renderOpportunityEditor(budgetId) {
   var mc = document.getElementById('mainContent');
   mc.innerHTML = '<div>'
-    + '<div style="margin-bottom:14px"><button onclick="navigate(\'opportunities\')" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--mid-gray);font-weight:600;padding:0;letter-spacing:.3px">&#8249; All Opportunities</button></div>'
+    + '<div style="margin-bottom:14px"><button onclick="navigate(\'opportunities\')" class="opp-back-btn" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--mid-gray);font-weight:600;padding:0;letter-spacing:.3px">&#8249; All Opportunities</button></div>'
     + '<div id="oppActionBar"></div>'
     + '<div id="sparkProjectOverview"></div>'
     + '<div id="sparkProjectBudget"><div style="padding:20px;color:var(--mid-gray)">Loading&#8230;</div></div>'
@@ -3463,31 +3476,40 @@ async function oppCreateNew() {
   }
   opts += '<option value="__new__">+ New client&#8230;</option>';
 
-  var m = '<div style="background:var(--white);border-radius:14px;padding:28px;width:460px;max-width:95vw;max-height:90vh;overflow-y:auto">';
-  m += '<div style="font-size:18px;font-weight:700;color:var(--ink);margin-bottom:6px">New Opportunity</div>';
+  var isDark = document.documentElement.classList.contains('dark');
+  var mBg = isDark ? 'var(--dm-surface)' : 'var(--white)';
+  var mText = isDark ? 'var(--dm-text)' : 'var(--ink)';
+  var mBorder = isDark ? 'var(--dm-border)' : 'rgba(0,0,0,.12)';
+  var mInput = isDark ? 'var(--dm-surface2)' : 'var(--white)';
+  var mSub = isDark ? 'var(--dm-surface2)' : 'var(--canvas)';
+
+  var m = '<div style="background:' + mBg + ';border-radius:14px;padding:28px;width:460px;max-width:95vw;max-height:90vh;overflow-y:auto">';
+  m += '<div style="font-size:18px;font-weight:700;color:' + mText + ';margin-bottom:6px">New Opportunity</div>';
   m += '<div style="font-size:12px;color:var(--mid-gray);margin-bottom:24px">Build an estimate snapshot before this becomes an active project.</div>';
+
+  var iStyle = 'width:100%;padding:9px 12px;border:1px solid ' + mBorder + ';border-radius:7px;font-size:13px;background:' + mInput + ';color:' + mText + ';box-sizing:border-box';
 
   m += '<div style="margin-bottom:16px">';
   m += '<label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid-gray);margin-bottom:6px">Client</label>';
-  m += '<select id="oppClientSel" onchange="oppToggleNewClient()" style="width:100%;padding:9px 12px;border:1px solid rgba(0,0,0,.12);border-radius:7px;font-size:13px;background:var(--white);color:var(--ink)">' + opts + '</select>';
+  m += '<select id="oppClientSel" onchange="oppToggleNewClient()" style="' + iStyle + '">' + opts + '</select>';
   m += '</div>';
 
-  m += '<div id="oppNewClientFields" style="display:none;margin-bottom:16px;padding:14px;background:var(--canvas);border-radius:8px">';
+  m += '<div id="oppNewClientFields" style="display:none;margin-bottom:16px;padding:14px;background:' + mSub + ';border-radius:8px">';
   m += '<label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid-gray);margin-bottom:6px">Client Name</label>';
-  m += '<input id="oppNewClientName" placeholder="e.g. Acme Corp" style="width:100%;padding:9px 12px;border:1px solid rgba(0,0,0,.12);border-radius:7px;font-size:13px;box-sizing:border-box;margin-bottom:10px">';
+  m += '<input id="oppNewClientName" placeholder="e.g. Acme Corp" style="' + iStyle + ';margin-bottom:10px">';
   m += '<label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid-gray);margin-bottom:6px">Client Number</label>';
-  m += '<input id="oppNewClientNum" placeholder="e.g. 399" style="width:100%;padding:9px 12px;border:1px solid rgba(0,0,0,.12);border-radius:7px;font-size:13px;box-sizing:border-box">';
+  m += '<input id="oppNewClientNum" placeholder="e.g. 399" style="' + iStyle + '">';
   m += '</div>';
 
   m += '<div style="margin-bottom:16px">';
   m += '<label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid-gray);margin-bottom:6px">Opportunity / Project Name</label>';
-  m += '<input id="oppProjName" placeholder="e.g. Brand Identity Redesign" style="width:100%;padding:9px 12px;border:1px solid rgba(0,0,0,.12);border-radius:7px;font-size:13px;box-sizing:border-box">';
+  m += '<input id="oppProjName" placeholder="e.g. Brand Identity Redesign" style="' + iStyle + '">';
   m += '</div>';
 
-  m += '<div id="oppCreateError" style="display:none;color:#C62828;font-size:12px;background:#FFEBEE;padding:8px 12px;border-radius:6px;margin-top:12px"></div>';
+  m += '<div id="oppCreateError" style="display:none;color:#EF9A9A;font-size:12px;background:rgba(198,40,40,.15);padding:8px 12px;border-radius:6px;margin-top:12px"></div>';
   m += '<div style="display:flex;gap:10px;margin-top:16px">';
   m += '<button onclick="oppSubmitCreate()" style="flex:1;padding:10px 0;border-radius:7px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-size:13px;font-weight:700">Create Opportunity</button>';
-  m += '<button onclick="document.getElementById(\'oppCreateOverlay\').remove()" style="padding:10px 18px;border-radius:7px;border:1px solid rgba(0,0,0,.12);background:transparent;cursor:pointer;font-size:13px;color:var(--mid-gray)">Cancel</button>';
+  m += '<button onclick="document.getElementById(\'oppCreateOverlay\').remove()" style="padding:10px 18px;border-radius:7px;border:1px solid ' + mBorder + ';background:transparent;cursor:pointer;font-size:13px;color:var(--mid-gray)">Cancel</button>';
   m += '</div>';
   m += '</div>';
 
