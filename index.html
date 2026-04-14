@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.9 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 14, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.10 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 14, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -4190,22 +4190,18 @@ async function settingsTestSlack() {
 async function slackNotifyNewProject(projName, projCode, tokenOverride) {
   var token = tokenOverride || SLACK_BOT_TOKEN;
   if (!token) return { ok: false, error: 'no_token' };
-  var text = '📋 *New Project Created*\n*' + projCode + '* — ' + projName;
-  var targets = ['U0997RW6PAT', 'U01TVP5C94N']; /* Evan Figueroa, Richelle Butcher */
-  var lastError = null;
-  for (var i = 0; i < targets.length; i++) {
-    try {
-      /* Pass user ID directly as channel — Slack opens/reuses the DM automatically */
-      var resp = await fetch('https://slack.com/api/chat.postMessage', {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channel: targets[i], text: text })
-      });
-      var data = await resp.json();
-      if (!data.ok) { console.warn('Slack DM failed for', targets[i], data.error); lastError = data.error; }
-    } catch(e) { console.error('Slack notify error:', e); lastError = e.message || 'Failed to fetch'; }
+  /* Route through Vercel serverless proxy — Slack Web API blocks direct browser calls (CORS) */
+  try {
+    var resp = await fetch('/api/slack-notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projName: projName, projCode: projCode, token: token })
+    });
+    return await resp.json();
+  } catch(e) {
+    console.error('Slack proxy error:', e);
+    return { ok: false, error: e.message || 'proxy_unreachable' };
   }
-  return lastError ? { ok: false, error: lastError } : { ok: true };
 }
 
 function updateRate(clientId, val) {
