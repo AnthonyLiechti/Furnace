@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.6 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 14, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.7 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 14, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -952,6 +952,7 @@ var SUPA_ACTUALS = {};   // project_code -> {totalHours, phases: {phase_key: hou
 var SUPA_ACTUALS_ALL = []; // raw labor_actuals array
 var SUPA_LOADED = false;
 var FURNACE_TEAM_MEMBERS = [];
+var SLACK_BOT_TOKEN = ''; /* loaded from agency_settings on init */
 
 /* ── NATIVE ALLOCATION DATA ── */
 var ALLOCATIONS = { version: 1, allocations: [], team: [], weeklyCapacity: 40 };
@@ -4130,7 +4131,70 @@ function renderSettings() {
     }
   }
 
+  /* ── Slack Integration ── */
+  h += '<div class="section-title" style="margin-top:32px">💬 Slack Integration</div>';
+  h += '<div class="settings-card" style="max-width:520px">';
+  h += '<h3>Bot Token</h3>';
+  h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">When a new project is created, Furnace will automatically DM <strong>Evan Figueroa</strong> and <strong>Richelle</strong> with the project number and name. Requires a Slack bot token with <code>chat:write</code> scope.</p>';
+  h += '<div style="display:flex;gap:8px;align-items:center">';
+  h += '<input type="password" id="slackTokenInput" value="' + (SLACK_BOT_TOKEN || '') + '" placeholder="xoxb-…" style="flex:1;padding:8px 12px;border:1px solid rgba(0,0,0,.12);border-radius:6px;font-size:13px;font-family:monospace;background:var(--dm-surface2,var(--light-gray));color:var(--dm-text,var(--ink))">';
+  h += '<button onclick="settingsSaveSlackToken()" style="padding:8px 16px;border-radius:6px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-size:13px;font-weight:600">Save</button>';
+  h += '<button onclick="settingsTestSlack()" style="padding:8px 14px;border-radius:6px;border:1px solid rgba(0,0,0,.12);background:transparent;color:var(--mid-gray);cursor:pointer;font-size:13px">Test</button>';
+  h += '</div>';
+  h += '<div id="slackTokenStatus" style="font-size:11px;margin-top:8px;color:var(--mid-gray)"></div>';
+  h += '</div>';
+
   document.getElementById('mainContent').innerHTML = h;
+}
+
+async function settingsSaveSlackToken() {
+  var inp = document.getElementById('slackTokenInput');
+  var status = document.getElementById('slackTokenStatus');
+  if (!inp) return;
+  var token = inp.value.trim();
+  sparkShowSaving();
+  var existing = await sparkFetch('agency_settings', 'key=eq.slack_bot_token&select=id');
+  if (existing && existing.length) {
+    await sparkFetch('agency_settings?key=eq.slack_bot_token', '', 'PATCH', { value: token });
+  } else {
+    await sparkFetch('agency_settings', '', 'POST', { category: 'integrations', key: 'slack_bot_token', value: token, sort_order: 1 });
+  }
+  SLACK_BOT_TOKEN = token;
+  sparkHideSaving();
+  if (status) { status.textContent = '✓ Saved'; status.style.color = '#81C784'; setTimeout(function(){ if(status) status.textContent=''; }, 2500); }
+}
+
+async function settingsTestSlack() {
+  var inp = document.getElementById('slackTokenInput');
+  var status = document.getElementById('slackTokenStatus');
+  var token = (inp && inp.value.trim()) || SLACK_BOT_TOKEN;
+  if (!token) { if (status) { status.textContent = 'No token — enter one above first.'; status.style.color = 'var(--ember)'; } return; }
+  if (status) { status.textContent = 'Sending test…'; status.style.color = 'var(--mid-gray)'; }
+  var ok = await slackNotifyNewProject('Test Project', '999_00_00', token);
+  if (status) {
+    status.textContent = ok ? '✓ Test DMs sent to Evan and Richelle!' : '✗ Failed — check the token and try again.';
+    status.style.color = ok ? '#81C784' : 'var(--ember)';
+  }
+}
+
+async function slackNotifyNewProject(projName, projCode, tokenOverride) {
+  var token = tokenOverride || SLACK_BOT_TOKEN;
+  if (!token) return false;
+  var text = '📋 *New Project Created*\n*' + projCode + '* — ' + projName;
+  var targets = ['U0997RW6PAT', 'U01TVP5C94N']; /* Evan Figueroa, Richelle Butcher */
+  var allOk = true;
+  for (var i = 0; i < targets.length; i++) {
+    try {
+      var resp = await fetch('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel: targets[i], text: text })
+      });
+      var data = await resp.json();
+      if (!data.ok) { console.warn('Slack DM failed for', targets[i], data.error); allOk = false; }
+    } catch(e) { console.error('Slack notify error:', e); allOk = false; }
+  }
+  return allOk;
 }
 
 function updateRate(clientId, val) {
@@ -4488,7 +4552,10 @@ async function sparkCreateBudgetForProject(projectCode) {
     }
     renderSidebar();
 
-    /* 5. Reload the budget view */
+    /* 5. Notify Slack */
+    slackNotifyNewProject(proj.name, projectCode);
+
+    /* 6. Reload the budget view */
     await sparkLoadBudgetForProject(projectCode);
   } catch (err) {
     console.error('Failed to create budget:', err);
@@ -9964,6 +10031,14 @@ async function loadSupabaseData() {
 
     SUPA_LOADED = true;
     console.log('Supabase data loaded:', Object.keys(SUPA_BUDGETS).length, 'budgets,', SUPA_ACTUALS_ALL.length, 'actuals');
+
+    /* Load Slack bot token from agency_settings */
+    (async function() {
+      try {
+        var slackSetting = await sparkFetch('agency_settings', 'key=eq.slack_bot_token&select=value');
+        if (slackSetting && slackSetting[0] && slackSetting[0].value) SLACK_BOT_TOKEN = slackSetting[0].value;
+      } catch(e) {}
+    })();
 
     /* Save fresh data to cache for next load */
     furnaceSaveCache({
