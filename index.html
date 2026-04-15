@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.20 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.21 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -4247,6 +4247,25 @@ function renderYTD() {
     h += '<div class="snap-fin-item"><div class="sf-label">Hours Remaining</div><div class="sf-value">' + Math.round(hrsRem) + '</div></div>';
     var billedPct = totalBudget > 0 ? Math.round(totalPO / totalBudget * 100) : 0;
     h += '<div class="snap-fin-item"><div class="sf-label">Remaining to Bill</div><div class="sf-value ' + (totalBudget - totalPO >= 0 ? 'sf-green' : '') + '">' + sparkFmt(totalBudget - totalPO) + '</div><div class="sf-sub">' + billedPct + '% billed</div></div>';
+    h += '</div>';
+  }
+  /* Row 3: OOP + Freelancers detail */
+  if (totalOOPBudget > 0 || totalFLBudget > 0) {
+    var oopRem = Math.max(0, totalOOPBudget - totalOOPSpent);
+    var oopPct = totalOOPBudget > 0 ? Math.round(totalOOPSpent / totalOOPBudget * 100) : 0;
+    var flRem  = Math.max(0, totalFLBudget - totalFLSpent);
+    var flPct  = totalFLBudget  > 0 ? Math.round(totalFLSpent  / totalFLBudget  * 100) : 0;
+    h += '<div class="snap-financials" style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1)">';
+    if (totalOOPBudget > 0) {
+      h += '<div class="snap-fin-item"><div class="sf-label">OOP Budget</div><div class="sf-value">' + sparkFmt(totalOOPBudget) + '</div></div>';
+      h += '<div class="snap-fin-item"><div class="sf-label">OOP Spent</div><div class="sf-value" style="color:var(--ember)">' + sparkFmt(totalOOPSpent) + '</div><div class="sf-sub">' + oopPct + '% of budget</div></div>';
+      h += '<div class="snap-fin-item"><div class="sf-label">OOP Remaining</div><div class="sf-value">' + sparkFmt(oopRem) + '</div></div>';
+    }
+    if (totalFLBudget > 0) {
+      h += '<div class="snap-fin-item"><div class="sf-label">Freelancer Budget</div><div class="sf-value">' + sparkFmt(totalFLBudget) + '</div></div>';
+      h += '<div class="snap-fin-item"><div class="sf-label">Freelancer Paid</div><div class="sf-value" style="color:var(--ember)">' + sparkFmt(totalFLSpent) + '</div><div class="sf-sub">' + flPct + '% of budget</div></div>';
+      h += '<div class="snap-fin-item"><div class="sf-label">FL Remaining</div><div class="sf-value">' + sparkFmt(flRem) + '</div></div>';
+    }
     h += '</div>';
   }
   /* Budget breakdown bar */
