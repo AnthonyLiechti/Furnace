@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.19 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.20 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -4176,7 +4176,7 @@ function renderYTD() {
 
   /* Aggregate portfolio financials across matched projects */
   var totalBudget = 0, totalLaborMU = 0, totalSpentD = 0, totalHrsBudget = 0, totalHrsSpent = 0;
-  var totalOOPBudget = 0, totalFLBudget = 0, totalReserve = 0;
+  var totalOOPBudget = 0, totalOOPSpent = 0, totalFLBudget = 0, totalFLSpent = 0, totalReserve = 0;
   for (var i = 0; i < projCodesWithPOs.length; i++) {
     var lk = projByCode[projCodesWithPOs[i]];
     if (!lk) continue;
@@ -4189,11 +4189,13 @@ function renderYTD() {
     totalLaborMU   += pLaborMU;
     totalHrsBudget += pHrs;
     totalHrsSpent  += pSpentHrs;
-    totalSpentD    += pSpentHrs * pBlended;  /* dollar-accurate labor spent */
+    totalSpentD    += pSpentHrs * pBlended;
     totalReserve   += effReserve(p);
     if (sb) {
       totalOOPBudget += sb.oopEffective || sb.oopTotal || 0;
-      totalFLBudget  += sb.flTotal || 0;
+      totalOOPSpent  += sb.oopSpent  || 0;
+      totalFLBudget  += sb.flTotal   || 0;
+      totalFLSpent   += sb.flSpent   || 0;
     }
   }
 
@@ -4229,9 +4231,9 @@ function renderYTD() {
   /* Row 1: Dollar stats */
   h += '<div class="snap-financials">';
   h += '<div class="snap-fin-item"><div class="sf-label">Total Billed YTD</div><div class="sf-value sf-gold">' + sparkFmt(totalPO) + '</div><div class="sf-sub">of ' + sparkFmt(totalBudget) + ' budget</div></div>';
-  h += '<div class="snap-fin-item"><div class="sf-label">FMG Labor</div><div class="sf-value">' + sparkFmt(totalLaborMU) + '</div></div>';
-  if (totalOOPBudget > 0) h += '<div class="snap-fin-item"><div class="sf-label">Out of Pocket</div><div class="sf-value">' + sparkFmt(totalOOPBudget) + '</div></div>';
-  if (totalFLBudget  > 0) h += '<div class="snap-fin-item"><div class="sf-label">Freelancers</div><div class="sf-value">' + sparkFmt(totalFLBudget) + '</div></div>';
+  h += '<div class="snap-fin-item"><div class="sf-label">FMG Labor</div><div class="sf-value">' + sparkFmt(totalLaborMU) + '</div><div class="sf-sub">Spent: ' + sparkFmt(totalSpentD) + '</div></div>';
+  if (totalOOPBudget > 0) h += '<div class="snap-fin-item"><div class="sf-label">Out of Pocket</div><div class="sf-value">' + sparkFmt(totalOOPBudget) + '</div><div class="sf-sub">Spent: ' + sparkFmt(totalOOPSpent) + '</div></div>';
+  if (totalFLBudget  > 0) h += '<div class="snap-fin-item"><div class="sf-label">Freelancers</div><div class="sf-value">' + sparkFmt(totalFLBudget) + '</div><div class="sf-sub">Paid: ' + sparkFmt(totalFLSpent) + '</div></div>';
   h += '<div class="snap-fin-item"><div class="sf-label">Portfolio Reserve</div><div class="sf-value ' + (totalReserve >= 0 ? 'sf-green' : '') + '">' + sparkFmt(totalReserve) + '</div>';
   if (totalBudget > 0) h += '<div class="sf-sub">' + Math.round(totalReserve / totalBudget * 100) + '% margin</div>';
   h += '</div></div>';
