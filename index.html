@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.16 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.17 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -4236,18 +4236,56 @@ function renderYTD() {
     var isCollapsed = !!YTD_COLLAPSED[clientCode];
     var chevron     = isCollapsed ? '▶' : '▼';
 
-    /* Compute client-level billed total for the header summary */
-    var headerBilled = 0;
+    /* Compute client-level aggregates for header summary + collapsed overview */
+    var headerBilled = 0, hdrBudget = 0, hdrLaborMU = 0, hdrSpentD = 0;
+    var hdrHrsBudget = 0, hdrHrsSpent = 0;
+    var hdrOOP = 0, hdrFL = 0, hdrReserve = 0;
     for (var hpi = 0; hpi < cs.projects.length; hpi++) {
-      headerBilled += cs.projects[hpi].pos.reduce(function(s,p){ return s + (parseFloat(p.amount)||0); }, 0);
+      var hpEntry = cs.projects[hpi];
+      var hp = hpEntry.proj, hpsb = hp._supabudget;
+      headerBilled  += hpEntry.pos.reduce(function(s,p){ return s + (parseFloat(p.amount)||0); }, 0);
+      hdrBudget     += effTCV(hp);
+      hdrLaborMU    += hp.laborCost   || 0;
+      hdrHrsBudget  += hp.totalBudget || 0;
+      var hpSpentHrs = filteredProjectSpent(hp);
+      hdrHrsSpent   += hpSpentHrs;
+      hdrSpentD     += hpSpentHrs * (hp.totalBudget > 0 ? (hp.laborCost || 0) / hp.totalBudget : 0);
+      hdrReserve    += effReserve(hp);
+      if (hpsb) {
+        hdrOOP += hpsb.oopEffective || hpsb.oopTotal || 0;
+        hdrFL  += hpsb.flTotal || 0;
+      }
     }
 
-    h += '<div style="margin-bottom:' + (isCollapsed ? '16px' : '10px') + ';display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none" onclick="toggleYTDClient(\'' + clientCode + '\')">';
+    h += '<div style="margin-bottom:' + (isCollapsed ? '4px' : '10px') + ';display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none" onclick="toggleYTDClient(\'' + clientCode + '\')">';
     h += '<span style="font-size:10px;color:var(--mid-gray);width:10px;text-align:center;flex-shrink:0">' + chevron + '</span>';
     h += '<span style="width:10px;height:10px;border-radius:50%;background:' + (cs.client.color||'#888') + ';display:inline-block;flex-shrink:0"></span>';
     h += '<div style="font-size:13px;font-weight:700;flex:1">' + (cs.client.code||'') + ' ' + cs.client.name + '</div>';
-    h += '<div style="font-size:12px;color:var(--mid-gray)">' + sparkFmt(headerBilled) + ' · ' + cs.projects.length + ' project' + (cs.projects.length !== 1 ? 's' : '') + '</div>';
+    h += '<div style="font-size:12px;color:var(--mid-gray)">' + sparkFmt(headerBilled) + ' billed · ' + cs.projects.length + ' project' + (cs.projects.length !== 1 ? 's' : '') + '</div>';
     h += '</div>';
+
+    /* ── Collapsed client overview card ── */
+    if (isCollapsed && hdrBudget > 0) {
+      h += '<div class="snapshot-banner" style="margin-bottom:20px;border-radius:8px">';
+      h += '<div class="snap-financials">';
+      h += '<div class="snap-fin-item"><div class="sf-label">Total Budget</div><div class="sf-value sf-gold">' + sparkFmt(hdrBudget) + '</div><div class="sf-sub">' + sparkFmt(headerBilled) + ' billed</div></div>';
+      h += '<div class="snap-fin-item"><div class="sf-label">FMG Labor</div><div class="sf-value">' + sparkFmt(hdrLaborMU) + '</div></div>';
+      if (hdrOOP > 0) h += '<div class="snap-fin-item"><div class="sf-label">Out of Pocket</div><div class="sf-value">' + sparkFmt(hdrOOP) + '</div></div>';
+      if (hdrFL  > 0) h += '<div class="snap-fin-item"><div class="sf-label">Freelancers</div><div class="sf-value">' + sparkFmt(hdrFL) + '</div></div>';
+      var hdrResPct = Math.round(hdrReserve / hdrBudget * 100);
+      h += '<div class="snap-fin-item"><div class="sf-label">Reserve</div><div class="sf-value ' + (hdrReserve >= 0 ? 'sf-green' : '') + '">' + sparkFmt(hdrReserve) + '</div><div class="sf-sub">' + hdrResPct + '%</div></div>';
+      h += '</div>';
+      if (hdrHrsBudget > 0) {
+        var hdrHrsPct = Math.round(hdrHrsSpent / hdrHrsBudget * 100);
+        h += '<div class="snap-financials" style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1)">';
+        h += '<div class="snap-fin-item"><div class="sf-label">Hours Budget</div><div class="sf-value">' + Math.round(hdrHrsBudget) + '</div></div>';
+        h += '<div class="snap-fin-item"><div class="sf-label">Hours Spent</div><div class="sf-value" style="color:var(--ember)">' + Math.round(hdrHrsSpent) + '</div><div class="sf-sub">' + hdrHrsPct + '%</div></div>';
+        h += '<div class="snap-fin-item"><div class="sf-label">Hours Remaining</div><div class="sf-value">' + Math.round(Math.max(0, hdrHrsBudget - hdrHrsSpent)) + '</div></div>';
+        h += '</div>';
+      }
+      h += lobBar(hdrSpentD, Math.max(0, hdrLaborMU - hdrSpentD), hdrOOP, hdrFL, hdrReserve);
+      h += '</div>';
+    }
 
     if (!isCollapsed) {
     for (var pi = 0; pi < cs.projects.length; pi++) {
