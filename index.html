@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.15 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.16 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -4145,16 +4145,21 @@ function renderYTD() {
   for (var i = 0; i < yearPOs.length; i++) totalPO += parseFloat(yearPOs[i].amount) || 0;
 
   /* Aggregate portfolio financials across matched projects */
-  var totalBudget = 0, totalLaborMU = 0, totalHrsBudget = 0, totalHrsSpent = 0;
+  var totalBudget = 0, totalLaborMU = 0, totalSpentD = 0, totalHrsBudget = 0, totalHrsSpent = 0;
   var totalOOPBudget = 0, totalFLBudget = 0, totalReserve = 0;
   for (var i = 0; i < projCodesWithPOs.length; i++) {
     var lk = projByCode[projCodesWithPOs[i]];
     if (!lk) continue;
     var p = lk.proj, sb = p._supabudget;
+    var pHrs    = p.totalBudget || 0;
+    var pLaborMU = p.laborCost  || 0;
+    var pSpentHrs = filteredProjectSpent(p);
+    var pBlended  = pHrs > 0 ? pLaborMU / pHrs : 0;
     totalBudget    += effTCV(p);
-    totalLaborMU   += p.laborCost   || 0;
-    totalHrsBudget += p.totalBudget || 0;
-    totalHrsSpent  += filteredProjectSpent(p);
+    totalLaborMU   += pLaborMU;
+    totalHrsBudget += pHrs;
+    totalHrsSpent  += pSpentHrs;
+    totalSpentD    += pSpentHrs * pBlended;  /* dollar-accurate labor spent */
     totalReserve   += effReserve(p);
     if (sb) {
       totalOOPBudget += sb.oopEffective || sb.oopTotal || 0;
@@ -4210,9 +4215,7 @@ function renderYTD() {
     h += '</div>';
   }
   /* Budget breakdown bar */
-  var ptSpentD   = totalHrsSpent * 200;
-  var ptLaborRem = Math.max(0, totalLaborMU - ptSpentD);
-  h += lobBar(ptSpentD, ptLaborRem, totalOOPBudget, totalFLBudget, totalReserve);
+  h += lobBar(totalSpentD, Math.max(0, totalLaborMU - totalSpentD), totalOOPBudget, totalFLBudget, totalReserve);
   h += '</div>';
 
   if (projCodesWithPOs.length === 0) {
@@ -4260,7 +4263,8 @@ function renderYTD() {
       var spentHrs   = filteredProjectSpent(proj);
       var budgHrs    = proj.totalBudget || 0;
       var laborMU    = proj.laborCost   || 0;
-      var spentD     = spentHrs * 200; /* labor dollars spent */
+      var blendedRate = budgHrs > 0 ? laborMU / budgHrs : 0;
+      var spentD     = spentHrs * blendedRate; /* labor dollars spent at project blended rate */
       var oopBudg    = sb ? (sb.oopEffective || sb.oopTotal || 0) : 0;
       var oopSpent   = sb ? (sb.oopSpent || 0) : 0;
       var flBudg     = sb ? (sb.flTotal  || 0) : 0;
