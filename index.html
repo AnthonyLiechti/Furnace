@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.12 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.13 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -4076,26 +4076,32 @@ function renderYTD() {
     var sb = proj._supabudget;
     return effTCV(proj) - (proj.laborCost || 0) - (sb ? (sb.oopEffective || sb.oopTotal || 0) : 0) - (sb ? (sb.flTotal || 0) : 0);
   }
-
-  /* spend bar color: green pacing, yellow getting close, red nearly out */
-  function spendClr(p) {
-    if (p >= 95) return 'var(--ember)';
-    if (p >= 80) return 'var(--honey)';
-    return 'var(--ocean)';
-  }
-  function spendBar(spent, budget, label, unitFn) {
-    if (!budget) return '';
-    var p = Math.min(Math.round(spent / budget * 100), 100);
-    var actualPct = budget > 0 ? Math.round(spent / budget * 100) : 0;
-    var spentStr = unitFn ? unitFn(spent) : sparkFmt(spent);
-    var budgStr  = unitFn ? unitFn(budget) : sparkFmt(budget);
-    var s = '<div style="margin-bottom:12px">';
-    s += '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">';
-    s += '<span style="font-size:11px;font-weight:600;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.4px">' + label + '</span>';
-    s += '<span style="font-size:11px;color:var(--mid-gray)">' + spentStr + ' <span style="opacity:.6">of</span> ' + budgStr + ' <span style="opacity:.5">(' + actualPct + '%)</span></span>';
+  /* Budget breakdown bar — matches master dashboard style */
+  function lobBar(spentD, laborRemD, oopD, flD, reserveD) {
+    var barTotal = spentD + laborRemD + oopD + flD + Math.max(0, reserveD);
+    if (barTotal <= 0) return '';
+    function seg(val, color, textColor, label) {
+      var p = Math.round(val / barTotal * 100);
+      if (p <= 0) return '';
+      return '<div class="lob-seg" style="width:' + p + '%;background:' + color + (textColor ? ';color:' + textColor : '') + '">'
+        + (p >= 7 ? label : '') + '</div>';
+    }
+    var s = '<div class="labor-oop-bar" style="margin-top:14px">';
+    s += '<div class="lob-title">Budget Breakdown</div>';
+    s += '<div class="lob-bar">';
+    s += seg(spentD,    'var(--ember)', null, '$' + Math.round(spentD).toLocaleString());
+    s += seg(laborRemD, 'var(--ocean)', null, '$' + Math.round(laborRemD).toLocaleString());
+    if (flD > 0) s += seg(flD, '#9B8EC2', null, '$' + Math.round(flD).toLocaleString());
+    s += seg(oopD,    'var(--sand)',  'var(--abyss)', '$' + Math.round(oopD).toLocaleString());
+    s += seg(Math.max(0, reserveD), '#81C784', null, '$' + Math.round(reserveD).toLocaleString());
     s += '</div>';
-    s += '<div class="progress-bar-wrap" style="height:8px;margin:0"><div class="progress-bar-fill" style="width:' + p + '%;background:' + spendClr(actualPct) + '"></div></div>';
-    s += '</div>';
+    s += '<div class="lob-legend">';
+    s += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ember)"></div>Labor Spent</div>';
+    s += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ocean)"></div>Labor Remaining</div>';
+    if (flD > 0) s += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#9B8EC2"></div>Freelancers</div>';
+    s += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--sand)"></div>Out of Pocket</div>';
+    s += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Reserve</div>';
+    s += '</div></div>';
     return s;
   }
 
@@ -4126,22 +4132,20 @@ function renderYTD() {
   for (var i = 0; i < yearPOs.length; i++) totalPO += parseFloat(yearPOs[i].amount) || 0;
 
   /* Aggregate portfolio financials across matched projects */
-  var totalBudget = 0, totalHrsBudget = 0, totalHrsSpent = 0;
-  var totalOOPBudget = 0, totalOOPSpent = 0;
-  var totalFLBudget = 0, totalFLSpent = 0, totalReserve = 0;
+  var totalBudget = 0, totalLaborMU = 0, totalHrsBudget = 0, totalHrsSpent = 0;
+  var totalOOPBudget = 0, totalFLBudget = 0, totalReserve = 0;
   for (var i = 0; i < projCodesWithPOs.length; i++) {
     var lk = projByCode[projCodesWithPOs[i]];
     if (!lk) continue;
     var p = lk.proj, sb = p._supabudget;
     totalBudget    += effTCV(p);
-    totalHrsBudget += p.totalBudget  || 0;
+    totalLaborMU   += p.laborCost   || 0;
+    totalHrsBudget += p.totalBudget || 0;
     totalHrsSpent  += filteredProjectSpent(p);
     totalReserve   += effReserve(p);
     if (sb) {
       totalOOPBudget += sb.oopEffective || sb.oopTotal || 0;
-      totalOOPSpent  += sb.oopSpent || 0;
-      totalFLBudget  += sb.flTotal  || 0;
-      totalFLSpent   += sb.flSpent  || 0;
+      totalFLBudget  += sb.flTotal || 0;
     }
   }
 
@@ -4167,34 +4171,35 @@ function renderYTD() {
   h += '<button onclick="openPOModal(null)" style="padding:8px 18px;border-radius:7px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-size:13px;font-weight:600">+ Log PO</button>';
   h += '</div>';
 
-  /* ── Portfolio Summary Banner ── */
+  /* ── Portfolio Overview Banner (matches master dashboard style) ── */
   h += '<div class="snapshot-banner" style="margin-bottom:28px">';
   h += '<div class="snap-header"><div class="snap-title">2026 Portfolio Overview</div>';
   h += '<div class="snap-version">' + yearPOs.length + ' PO' + (yearPOs.length !== 1 ? 's' : '') + ' · ' + projCodesWithPOs.length + ' project' + (projCodesWithPOs.length !== 1 ? 's' : '') + '</div></div>';
-  h += '<div class="snap-financials" style="margin-bottom:16px">';
+  /* Row 1: Dollar stats */
+  h += '<div class="snap-financials">';
   h += '<div class="snap-fin-item"><div class="sf-label">Total Billed YTD</div><div class="sf-value sf-gold">' + sparkFmt(totalPO) + '</div><div class="sf-sub">of ' + sparkFmt(totalBudget) + ' budget</div></div>';
-  var billedPct = totalBudget > 0 ? Math.round(totalPO / totalBudget * 100) : 0;
-  h += '<div class="snap-fin-item"><div class="sf-label">Remaining to Bill</div><div class="sf-value ' + (totalBudget - totalPO >= 0 ? 'sf-green' : '') + '">' + sparkFmt(totalBudget - totalPO) + '</div><div class="sf-sub">' + billedPct + '% billed</div></div>';
-  if (totalHrsBudget > 0) {
-    var hrsPct = totalHrsBudget > 0 ? Math.round(totalHrsSpent / totalHrsBudget * 100) : 0;
-    h += '<div class="snap-fin-item"><div class="sf-label">Hours</div><div class="sf-value">' + Math.round(totalHrsSpent) + ' <span style="font-size:13px;opacity:.5">/ ' + Math.round(totalHrsBudget) + '</span></div><div class="sf-sub">' + hrsPct + '% spent</div></div>';
-  }
-  if (totalFLBudget > 0) {
-    var flPct = Math.round(totalFLSpent / totalFLBudget * 100);
-    h += '<div class="snap-fin-item"><div class="sf-label">Freelancers</div><div class="sf-value">' + sparkFmt(totalFLSpent) + ' <span style="font-size:13px;opacity:.5">/ ' + sparkFmt(totalFLBudget) + '</span></div><div class="sf-sub">' + flPct + '% paid</div></div>';
-  }
-  if (totalOOPBudget > 0) {
-    var oopPct = Math.round(totalOOPSpent / totalOOPBudget * 100);
-    h += '<div class="snap-fin-item"><div class="sf-label">Out of Pocket</div><div class="sf-value">' + sparkFmt(totalOOPSpent) + ' <span style="font-size:13px;opacity:.5">/ ' + sparkFmt(totalOOPBudget) + '</span></div><div class="sf-sub">' + oopPct + '% spent</div></div>';
-  }
+  h += '<div class="snap-fin-item"><div class="sf-label">FMG Labor</div><div class="sf-value">' + sparkFmt(totalLaborMU) + '</div></div>';
+  if (totalOOPBudget > 0) h += '<div class="snap-fin-item"><div class="sf-label">Out of Pocket</div><div class="sf-value">' + sparkFmt(totalOOPBudget) + '</div></div>';
+  if (totalFLBudget  > 0) h += '<div class="snap-fin-item"><div class="sf-label">Freelancers</div><div class="sf-value">' + sparkFmt(totalFLBudget) + '</div></div>';
   h += '<div class="snap-fin-item"><div class="sf-label">Portfolio Reserve</div><div class="sf-value ' + (totalReserve >= 0 ? 'sf-green' : '') + '">' + sparkFmt(totalReserve) + '</div>';
   if (totalBudget > 0) h += '<div class="sf-sub">' + Math.round(totalReserve / totalBudget * 100) + '% margin</div>';
-  h += '</div>';
-  h += '</div>';
-  /* Portfolio-level progress bars */
-  if (totalHrsBudget > 0) h += spendBar(totalHrsSpent, totalHrsBudget, 'Hours Spent', function(v){ return Math.round(v) + ' hrs'; });
-  if (totalFLBudget  > 0) h += spendBar(totalFLSpent,  totalFLBudget,  'Freelancers', null);
-  if (totalOOPBudget > 0) h += spendBar(totalOOPSpent, totalOOPBudget, 'Out of Pocket', null);
+  h += '</div></div>';
+  /* Row 2: Hours */
+  if (totalHrsBudget > 0) {
+    var hrsRem = Math.max(0, totalHrsBudget - totalHrsSpent);
+    var hrsPct = Math.round(totalHrsSpent / totalHrsBudget * 100);
+    h += '<div class="snap-financials" style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1)">';
+    h += '<div class="snap-fin-item"><div class="sf-label">Hours Budget</div><div class="sf-value">' + Math.round(totalHrsBudget) + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Hours Spent</div><div class="sf-value" style="color:var(--ember)">' + Math.round(totalHrsSpent) + '</div><div class="sf-sub">' + hrsPct + '% of budget</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Hours Remaining</div><div class="sf-value">' + Math.round(hrsRem) + '</div></div>';
+    var billedPct = totalBudget > 0 ? Math.round(totalPO / totalBudget * 100) : 0;
+    h += '<div class="snap-fin-item"><div class="sf-label">Remaining to Bill</div><div class="sf-value ' + (totalBudget - totalPO >= 0 ? 'sf-green' : '') + '">' + sparkFmt(totalBudget - totalPO) + '</div><div class="sf-sub">' + billedPct + '% billed</div></div>';
+    h += '</div>';
+  }
+  /* Budget breakdown bar */
+  var ptSpentD   = totalHrsSpent * 200;
+  var ptLaborRem = Math.max(0, totalLaborMU - ptSpentD);
+  h += lobBar(ptSpentD, ptLaborRem, totalOOPBudget, totalFLBudget, totalReserve);
   h += '</div>';
 
   if (projCodesWithPOs.length === 0) {
@@ -4217,88 +4222,95 @@ function renderYTD() {
     h += '</div>';
 
     for (var pi = 0; pi < cs.projects.length; pi++) {
-      var entry = cs.projects[pi];
-      var proj  = entry.proj;
-      var sb    = proj._supabudget;
+      var entry   = cs.projects[pi];
+      var proj    = entry.proj;
+      var sb      = proj._supabudget;
       var projPOs = entry.pos.slice().sort(function(a,b){ return (a.date_sent||'').localeCompare(b.date_sent||''); });
       var projBilled = projPOs.reduce(function(s,p){ return s + (parseFloat(p.amount)||0); }, 0);
       var budget     = effTCV(proj);
       var billRem    = budget - projBilled;
       clientBilled  += projBilled;
 
-      /* Financials from supabase budget */
       var spentHrs   = filteredProjectSpent(proj);
       var budgHrs    = proj.totalBudget || 0;
+      var laborMU    = proj.laborCost   || 0;
       var oopBudg    = sb ? (sb.oopEffective || sb.oopTotal || 0) : 0;
       var oopSpent   = sb ? (sb.oopSpent || 0) : 0;
-      var flBudg     = sb ? (sb.flTotal || 0) : 0;
+      var flBudg     = sb ? (sb.flTotal  || 0) : 0;
       var flSpent    = sb ? (sb.flSpent  || 0) : 0;
       var reserve    = effReserve(proj);
       var reservePct = budget > 0 ? Math.round(reserve / budget * 100) : 0;
       var hasFinData = proj.dataSource === 'supabase' || proj.dataSource === 'snapshot';
 
-      h += '<div class="settings-card" style="margin-bottom:16px">';
+      /* ── Dark financial banner (matches project page) ── */
+      h += '<div style="margin-bottom:20px">';
+      h += '<div class="snapshot-banner" style="border-radius:10px 10px 0 0;margin-bottom:0">';
 
-      /* Card header */
-      h += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:' + (hasFinData ? '18px' : '0') + '">';
-      h += '<div>';
-      h += '<div style="font-size:14px;font-weight:700">' + proj.code + '</div>';
-      h += '<div style="font-size:12px;color:var(--mid-gray);margin-top:2px">' + proj.name + '</div>';
-      h += '</div>';
+      /* Banner header: project name + billing */
+      h += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:' + (hasFinData ? '16px' : '8px') + '">';
+      h += '<div><div style="font-size:15px;font-weight:700">' + proj.code + '</div>';
+      h += '<div style="font-size:12px;opacity:.6;margin-top:2px">' + proj.name + '</div></div>';
       h += '<div style="text-align:right">';
       h += '<div style="font-size:14px;font-weight:700;color:var(--sand)">Billed ' + sparkFmt(projBilled) + '</div>';
       if (budget) {
-        h += '<div style="font-size:11px;color:var(--mid-gray);margin-top:2px">' + sparkFmt(budget) + ' budget · <span style="color:' + (billRem < 0 ? 'var(--ember)' : '#81C784') + '">' + sparkFmt(billRem) + ' remaining</span></div>';
+        var remClr = billRem < 0 ? 'var(--ember)' : '#81C784';
+        h += '<div style="font-size:11px;opacity:.65;margin-top:3px">' + sparkFmt(budget) + ' budget · <span style="color:' + remClr + '">' + sparkFmt(billRem) + ' remaining</span></div>';
       }
-      h += '</div>';
-      h += '</div>';
+      h += '</div></div>';
 
-      /* Progress bars — only if we have budget data */
       if (hasFinData) {
-        h += '<div style="margin-bottom:14px">';
-        if (budgHrs > 0) h += spendBar(spentHrs, budgHrs, 'Hours Spent', function(v){ return Math.round(v) + ' hrs'; });
-        if (flBudg  > 0) h += spendBar(flSpent,  flBudg,  'Freelancers', null);
-        if (oopBudg > 0) h += spendBar(oopSpent, oopBudg, 'Out of Pocket', null);
+        /* Row 1: dollar stats */
+        h += '<div class="snap-financials">';
+        h += '<div class="snap-fin-item"><div class="sf-label">Client Budget</div><div class="sf-value sf-gold">' + sparkFmt(budget) + '</div></div>';
+        h += '<div class="snap-fin-item"><div class="sf-label">FMG Labor</div><div class="sf-value">' + sparkFmt(laborMU) + '</div></div>';
+        if (oopBudg > 0) h += '<div class="snap-fin-item"><div class="sf-label">Out-of-Pocket</div><div class="sf-value">' + sparkFmt(oopBudg) + '</div><div class="sf-sub">Spent: ' + sparkFmt(oopSpent) + '</div></div>';
+        if (flBudg  > 0) h += '<div class="snap-fin-item"><div class="sf-label">Freelancers</div><div class="sf-value">' + sparkFmt(flBudg) + '</div><div class="sf-sub">Paid: ' + sparkFmt(flSpent) + '</div></div>';
+        h += '<div class="snap-fin-item"><div class="sf-label">Reserve</div><div class="sf-value ' + (reserve >= 0 ? 'sf-green' : '') + '">' + sparkFmt(reserve) + '</div><div class="sf-sub">' + reservePct + '%</div></div>';
         h += '</div>';
 
-        /* Reserve chip */
-        h += '<div style="display:flex;align-items:center;gap:16px;padding:10px 14px;border-radius:7px;background:' + (reserve >= 0 ? 'rgba(129,199,132,.12)' : 'rgba(229,57,53,.1)') + ';margin-bottom:16px">';
-        h += '<div><div style="font-size:10px;font-weight:600;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px">Reserve</div>';
-        h += '<div style="font-size:18px;font-weight:700;color:' + (reserve >= 0 ? '#81C784' : 'var(--ember)') + '">' + sparkFmt(reserve) + '</div></div>';
-        h += '<div style="font-size:12px;color:var(--mid-gray)">' + reservePct + '% margin</div>';
-        if (budget > 0) {
-          var laborMU = proj.laborCost || 0;
-          h += '<div style="font-size:12px;color:var(--mid-gray);margin-left:auto">Labor ' + sparkFmt(laborMU) + (oopBudg ? ' · OOP ' + sparkFmt(oopBudg) : '') + (flBudg ? ' · FL ' + sparkFmt(flBudg) : '') + '</div>';
+        /* Row 2: hours */
+        if (budgHrs > 0) {
+          var hrsRem2  = Math.max(0, budgHrs - spentHrs);
+          var hrsPct2  = Math.round(spentHrs / budgHrs * 100);
+          var spentD2  = spentHrs * 200;
+          h += '<div class="snap-financials" style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1)">';
+          h += '<div class="snap-fin-item"><div class="sf-label">Labor Hours Budget</div><div class="sf-value">' + budgHrs.toFixed(1) + '</div></div>';
+          h += '<div class="snap-fin-item"><div class="sf-label">Hours Spent</div><div class="sf-value" style="color:var(--ember)">' + spentHrs.toFixed(1) + '</div><div class="sf-sub">' + hrsPct2 + '% of budget</div></div>';
+          h += '<div class="snap-fin-item"><div class="sf-label">Hours Remaining</div><div class="sf-value">' + hrsRem2.toFixed(1) + '</div></div>';
+          h += '<div class="snap-fin-item"><div class="sf-label">Labor $ Spent</div><div class="sf-value" style="color:var(--ember)">$' + Math.round(spentD2).toLocaleString() + '</div></div>';
+          h += '<div class="snap-fin-item"><div class="sf-label">Labor $ Remaining</div><div class="sf-value">$' + Math.round(Math.max(0, laborMU - spentD2)).toLocaleString() + '</div></div>';
+          h += '</div>';
+          /* Budget breakdown bar */
+          h += lobBar(spentD2, Math.max(0, laborMU - spentD2), oopBudg, flBudg, reserve);
         }
-        h += '</div>';
       }
 
-      /* PO entries */
-      h += '<div style="border-top:1px solid var(--canvas);padding-top:10px">';
+      h += '</div>'; /* snapshot-banner */
+
+      /* ── Light PO section below dark banner ── */
+      h += '<div class="settings-card" style="border-radius:0 0 10px 10px;box-shadow:none;border-top:none;padding:12px 16px">';
       for (var poi = 0; poi < projPOs.length; poi++) {
         var po = projPOs[poi];
         var dateStr = po.date_sent ? new Date(po.date_sent + 'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
-        h += '<div style="display:flex;align-items:center;padding:5px 0;border-bottom:1px solid var(--canvas)">';
+        h += '<div style="display:flex;align-items:center;padding:6px 0;border-bottom:1px solid var(--canvas)">';
         h += '<div style="flex:1;font-size:12px;color:var(--mid-gray)">▸ ';
         if (po.po_number) h += '<strong style="color:var(--abyss)">' + po.po_number + '</strong> · ';
         h += dateStr;
         if (po.notes) h += ' · <em>' + po.notes + '</em>';
         h += '</div>';
-        h += '<div style="font-size:12px;font-weight:600;margin-right:12px">' + sparkFmt(parseFloat(po.amount)||0) + '</div>';
+        h += '<div style="font-size:12px;font-weight:600;margin-right:10px">' + sparkFmt(parseFloat(po.amount)||0) + '</div>';
         h += '<button onclick="openEditPOModal(\'' + po.id + '\')" title="Edit" style="background:none;border:none;cursor:pointer;color:var(--mid-gray);font-size:13px;padding:2px 4px">✎</button>';
         h += '<button onclick="deletePO(\'' + po.id + '\')" title="Delete" style="background:none;border:none;cursor:pointer;color:var(--mid-gray);font-size:13px;padding:2px 4px">✕</button>';
         h += '</div>';
       }
-      h += '<div style="padding-top:8px">';
-      h += '<button onclick="openPOModal(\'' + proj.code + '\')" style="padding:4px 12px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer;font-size:11px;color:var(--mid-gray)">+ Log PO</button>';
-      h += '</div>';
-      h += '</div>'; /* PO section */
-
+      h += '<div style="padding-top:8px"><button onclick="openPOModal(\'' + proj.code + '\')" style="padding:4px 12px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer;font-size:11px;color:var(--mid-gray)">+ Log PO</button></div>';
       h += '</div>'; /* settings-card */
+
+      h += '</div>'; /* project wrapper */
     }
 
     /* Client billed total */
-    h += '<div style="text-align:right;font-size:12px;color:var(--mid-gray);margin-bottom:28px">Client total billed: <strong style="font-size:13px;color:var(--abyss)">' + sparkFmt(clientBilled) + '</strong></div>';
+    h += '<div style="text-align:right;font-size:12px;color:var(--mid-gray);margin-bottom:28px">Client total billed: <strong style="font-size:13px">' + sparkFmt(clientBilled) + '</strong></div>';
   }
 
   /* ── Unlinked codes ── */
