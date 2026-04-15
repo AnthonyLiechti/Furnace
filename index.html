@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.18 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.19 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -955,7 +955,6 @@ var FURNACE_TEAM_MEMBERS = [];
 var SLACK_BOT_TOKEN = ''; /* loaded from agency_settings on init */
 var SUPA_POS = [];        /* purchase orders sent to clients, loaded from pos table */
 var YTD_COLLAPSED = {};   /* client codes that are collapsed in YTD view */
-var YTD_CLOSED    = JSON.parse(localStorage.getItem('ytd_closed') || '{}'); /* project codes marked complete in YTD */
 
 /* ── NATIVE ALLOCATION DATA ── */
 var ALLOCATIONS = { version: 1, allocations: [], team: [], weeklyCapacity: 40 };
@@ -4084,9 +4083,25 @@ function ytdSearch(val) {
   renderYTD();
 }
 
-function toggleYTDProjectClosed(code) {
-  YTD_CLOSED[code] = !YTD_CLOSED[code];
-  localStorage.setItem('ytd_closed', JSON.stringify(YTD_CLOSED));
+async function toggleYTDProjectClosed(code) {
+  /* Find the live project object */
+  var proj = null;
+  for (var ci = 0; ci < CLIENTS.length && !proj; ci++) {
+    for (var pi = 0; pi < CLIENTS[ci].projects.length && !proj; pi++) {
+      if (CLIENTS[ci].projects[pi].code === code) proj = CLIENTS[ci].projects[pi];
+    }
+  }
+  if (!proj || !proj._supaId) return;
+
+  var isClosed   = proj.status === 'complete' || proj.status === 'finished';
+  var newStatus  = isClosed ? 'active' : 'complete';
+
+  /* Persist to Supabase */
+  await sparkFetch('projects?id=eq.' + proj._supaId, '', 'PATCH', { project_status: newStatus });
+
+  /* Update in-memory so the render is instant */
+  proj.status = newStatus;
+
   renderYTD();
 }
 
@@ -4361,7 +4376,7 @@ function renderYTD() {
       var hasFinData = proj.dataSource === 'supabase' || proj.dataSource === 'snapshot';
 
       /* Closed-project adjustments: fold unspent labor/OOP/FL into reserve */
-      var isClosed      = !!YTD_CLOSED[proj.code];
+      var isClosed      = proj.status === 'complete' || proj.status === 'finished';
       var closedReserve = budget - spentD - oopSpent - flSpent;
       var closedResPct  = budget > 0 ? Math.round(closedReserve / budget * 100) : 0;
 
