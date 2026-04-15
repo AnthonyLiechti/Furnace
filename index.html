@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.10 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 14, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.11 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -953,6 +953,7 @@ var SUPA_ACTUALS_ALL = []; // raw labor_actuals array
 var SUPA_LOADED = false;
 var FURNACE_TEAM_MEMBERS = [];
 var SLACK_BOT_TOKEN = ''; /* loaded from agency_settings on init */
+var SUPA_POS = [];        /* purchase orders sent to clients, loaded from pos table */
 
 /* ── NATIVE ALLOCATION DATA ── */
 var ALLOCATIONS = { version: 1, allocations: [], team: [], weeklyCapacity: 40 };
@@ -1241,6 +1242,7 @@ function projectById(id) {
 function renderSidebar() {
   var html = '';
   html += '<div class="nav-item ' + (currentView === 'master' ? 'active' : '') + '" onclick="navigate(\'master\')"><span class="icon">&#9673;</span> Master Dashboard</div>';
+  html += '<div class="nav-item ' + (currentView === 'ytd' ? 'active' : '') + '" onclick="navigate(\'ytd\')"><span class="icon">&#128200;</span> 2026 Year to Date</div>';
   html += '<div class="nav-item ' + (currentView === 'flagged' ? 'active' : '') + '" onclick="navigate(\'flagged\')"><span class="icon">&#9888;</span> Needs Attention</div>';
   html += '<div class="nav-item ' + (currentView === 'importTime' ? 'active' : '') + '" onclick="navigate(\'importTime\')"><span class="icon">&#128337;</span> Import Time</div>';
   html += '<div class="nav-item ' + (currentView === 'allocations' ? 'active' : '') + '" onclick="navigate(\'allocations\')"><span class="icon">&#9881;</span> Manage Resources</div>';
@@ -4047,6 +4049,327 @@ async function sparkFetch(table, query, method, body) {
     var text = await resp.text();
     return text ? JSON.parse(text) : true;
   } catch (err) { console.error('Spark fetch exception', err); throw err; }
+}
+
+/* ══════════════════════════════════════════════════════════
+   2026 YEAR TO DATE — PO TRACKER
+   ══════════════════════════════════════════════════════════ */
+
+async function loadPOs() {
+  try {
+    var rows = await sparkFetchAll('pos', 'select=*&order=date_sent.desc,created_at.desc');
+    SUPA_POS = rows || [];
+  } catch(e) { console.warn('Could not load POs:', e.message); SUPA_POS = []; }
+}
+
+function renderYTD() {
+  var mc = document.getElementById('mainContent');
+  if (!mc) return;
+
+  /* Filter to 2026; undated POs always included */
+  var yearPOs = SUPA_POS.filter(function(p) {
+    return !p.date_sent || p.date_sent.slice(0,4) === '2026';
+  });
+
+  /* Group by project_code */
+  var byProject = {};
+  for (var i = 0; i < yearPOs.length; i++) {
+    var po = yearPOs[i];
+    if (!byProject[po.project_code]) byProject[po.project_code] = [];
+    byProject[po.project_code].push(po);
+  }
+
+  /* Project lookup from CLIENTS */
+  var projByCode = {};
+  for (var ci = 0; ci < CLIENTS.length; ci++) {
+    for (var pi = 0; pi < CLIENTS[ci].projects.length; pi++) {
+      var pr = CLIENTS[ci].projects[pi];
+      projByCode[pr.code] = { proj: pr, client: CLIENTS[ci] };
+    }
+  }
+
+  var projCodesWithPOs = Object.keys(byProject);
+  var totalPO = 0;
+  for (var i = 0; i < yearPOs.length; i++) totalPO += parseFloat(yearPOs[i].amount) || 0;
+
+  /* Budget total for matched PO'd projects */
+  var totalBudget = 0;
+  for (var i = 0; i < projCodesWithPOs.length; i++) {
+    var lk = projByCode[projCodesWithPOs[i]];
+    if (lk) totalBudget += lk.proj.dollarBudget || 0;
+  }
+
+  /* Build client sections + unmatched bucket */
+  var clientMap = {}, unmatched = [];
+  for (var i = 0; i < projCodesWithPOs.length; i++) {
+    var code = projCodesWithPOs[i];
+    var lk = projByCode[code];
+    if (lk) {
+      var cid = lk.client.id;
+      if (!clientMap[cid]) clientMap[cid] = { client: lk.client, projects: [] };
+      clientMap[cid].projects.push({ proj: lk.proj, pos: byProject[code] });
+    } else {
+      unmatched.push({ code: code, pos: byProject[code] });
+    }
+  }
+  var sections = Object.values(clientMap).sort(function(a,b){ return (a.client.code||'').localeCompare(b.client.code||''); });
+
+  /* ── Header ── */
+  var h = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">';
+  h += '<div><h1 class="page-title">2026 Year to Date</h1>';
+  h += '<p class="page-subtitle">Purchase orders invoiced to clients · Jan 1 – present</p></div>';
+  h += '<button onclick="openPOModal(null)" style="padding:8px 18px;border-radius:7px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-size:13px;font-weight:600">+ Log PO</button>';
+  h += '</div>';
+
+  /* ── Summary Banner ── */
+  h += '<div class="snapshot-banner" style="margin-bottom:24px">';
+  h += '<div class="snap-header"><div class="snap-title">2026 YTD Billings</div>';
+  h += '<div class="snap-version">' + yearPOs.length + ' PO' + (yearPOs.length !== 1 ? 's' : '') + ' across ' + projCodesWithPOs.length + ' project' + (projCodesWithPOs.length !== 1 ? 's' : '') + '</div></div>';
+  h += '<div class="snap-financials">';
+  h += '<div class="snap-fin-item"><div class="sf-label">Total Billed YTD</div><div class="sf-value sf-gold">' + sparkFmt(totalPO) + '</div></div>';
+  h += '<div class="snap-fin-item"><div class="sf-label">Projects Billed</div><div class="sf-value">' + projCodesWithPOs.length + '</div></div>';
+  if (totalBudget > 0) {
+    var rem = totalBudget - totalPO;
+    var pct = Math.round(totalPO / totalBudget * 100);
+    h += '<div class="snap-fin-item"><div class="sf-label">Total Budget</div><div class="sf-value">' + sparkFmt(totalBudget) + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Remaining to Bill</div><div class="sf-value ' + (rem >= 0 ? 'sf-green' : '') + '">' + sparkFmt(rem) + '</div><div class="sf-sub">' + pct + '% billed</div></div>';
+  }
+  h += '</div></div>';
+
+  if (projCodesWithPOs.length === 0) {
+    h += '<div style="text-align:center;color:var(--mid-gray);padding:80px 0"><div style="font-size:48px;margin-bottom:16px">📄</div>';
+    h += '<div style="font-size:15px;font-weight:600;margin-bottom:8px">No POs logged yet</div>';
+    h += '<div style="font-size:13px">Click <strong>+ Log PO</strong> to record your first purchase order.</div></div>';
+    mc.innerHTML = h;
+    return;
+  }
+
+  /* ── Client Sections ── */
+  for (var si = 0; si < sections.length; si++) {
+    var cs = sections[si];
+    var clientTotal = 0;
+    cs.projects.sort(function(a,b){ return (a.proj.code||'').localeCompare(b.proj.code||''); });
+
+    h += '<div style="margin-bottom:28px">';
+    h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
+    h += '<span style="width:10px;height:10px;border-radius:50%;background:' + (cs.client.color||'#888') + ';display:inline-block;flex-shrink:0"></span>';
+    h += '<div style="font-size:13px;font-weight:700">' + (cs.client.code||'') + ' ' + cs.client.name + '</div>';
+    h += '</div>';
+    h += '<div class="settings-card" style="padding:0;overflow:hidden">';
+    h += '<table style="width:100%;border-collapse:collapse">';
+    h += '<thead><tr style="border-bottom:1px solid var(--canvas)">';
+    h += '<th style="text-align:left;padding:10px 16px;font-size:11px;font-weight:600;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px">Project</th>';
+    h += '<th style="text-align:right;padding:10px 16px;font-size:11px;font-weight:600;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px">Budget</th>';
+    h += '<th style="text-align:right;padding:10px 16px;font-size:11px;font-weight:600;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px">Billed</th>';
+    h += '<th style="text-align:right;padding:10px 16px;font-size:11px;font-weight:600;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px">Remaining</th>';
+    h += '<th style="padding:10px 8px"></th>';
+    h += '</tr></thead><tbody>';
+
+    for (var pi = 0; pi < cs.projects.length; pi++) {
+      var entry = cs.projects[pi];
+      var proj = entry.proj;
+      var projPOs = entry.pos.slice().sort(function(a,b){ return (a.date_sent||'').localeCompare(b.date_sent||''); });
+      var projTotal = projPOs.reduce(function(s,p){ return s + (parseFloat(p.amount)||0); }, 0);
+      var budget = proj.dollarBudget || 0;
+      var remaining = budget - projTotal;
+      clientTotal += projTotal;
+
+      h += '<tr style="border-bottom:1px solid var(--canvas)">';
+      h += '<td style="padding:10px 16px"><div style="font-size:13px;font-weight:600">' + proj.code + '</div>';
+      h += '<div style="font-size:11px;color:var(--mid-gray)">' + proj.name + '</div></td>';
+      h += '<td style="text-align:right;padding:10px 16px;font-size:13px">' + (budget ? sparkFmt(budget) : '<span style="color:var(--mid-gray)">—</span>') + '</td>';
+      h += '<td style="text-align:right;padding:10px 16px;font-size:13px;font-weight:600">' + sparkFmt(projTotal) + '</td>';
+      h += '<td style="text-align:right;padding:10px 16px;font-size:13px;color:' + (!budget ? 'var(--mid-gray)' : remaining < 0 ? 'var(--ember)' : '#81C784') + '">' + (budget ? sparkFmt(remaining) : '—') + '</td>';
+      h += '<td style="padding:10px 8px;text-align:right"><button onclick="openPOModal(\'' + proj.code + '\')" style="padding:3px 10px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer;font-size:11px;color:var(--mid-gray)">+ PO</button></td>';
+      h += '</tr>';
+
+      for (var poi = 0; poi < projPOs.length; poi++) {
+        var po = projPOs[poi];
+        var dateStr = po.date_sent ? new Date(po.date_sent + 'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+        h += '<tr style="border-bottom:1px solid var(--canvas)">';
+        h += '<td colspan="2" style="padding:6px 16px 6px 28px"><span style="font-size:12px;color:var(--mid-gray)">▸ ';
+        if (po.po_number) h += '<strong>' + po.po_number + '</strong> · ';
+        h += dateStr;
+        if (po.notes) h += ' · <em>' + po.notes + '</em>';
+        h += '</span></td>';
+        h += '<td style="text-align:right;padding:6px 16px;font-size:12px;color:var(--mid-gray)">' + sparkFmt(parseFloat(po.amount)||0) + '</td>';
+        h += '<td colspan="2" style="padding:6px 8px;text-align:right">';
+        h += '<button onclick="openEditPOModal(\'' + po.id + '\')" title="Edit" style="background:none;border:none;cursor:pointer;color:var(--mid-gray);font-size:13px;padding:2px 4px">✎</button>';
+        h += '<button onclick="deletePO(\'' + po.id + '\')" title="Delete" style="background:none;border:none;cursor:pointer;color:var(--mid-gray);font-size:13px;padding:2px 4px">✕</button>';
+        h += '</td></tr>';
+      }
+    }
+
+    /* Client total row */
+    h += '<tr><td colspan="2" style="padding:10px 16px;font-size:12px;font-weight:600;color:var(--mid-gray);border-top:2px solid var(--canvas)">Client Total</td>';
+    h += '<td style="text-align:right;padding:10px 16px;font-size:13px;font-weight:700;border-top:2px solid var(--canvas)">' + sparkFmt(clientTotal) + '</td>';
+    h += '<td colspan="2" style="border-top:2px solid var(--canvas)"></td></tr>';
+    h += '</tbody></table></div></div>';
+  }
+
+  /* ── Unlinked codes (not in Furnace) ── */
+  if (unmatched.length > 0) {
+    unmatched.sort(function(a,b){ return a.code.localeCompare(b.code); });
+    h += '<div style="margin-bottom:28px">';
+    h += '<div style="font-size:13px;font-weight:700;color:var(--mid-gray);margin-bottom:10px">⚠ Unlinked Project Codes — not found in Furnace</div>';
+    h += '<div class="settings-card" style="padding:0;overflow:hidden">';
+    h += '<table style="width:100%;border-collapse:collapse"><thead><tr style="border-bottom:1px solid var(--canvas)">';
+    h += '<th style="text-align:left;padding:10px 16px;font-size:11px;font-weight:600;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px">Code</th>';
+    h += '<th style="text-align:right;padding:10px 16px;font-size:11px;font-weight:600;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px">Billed</th>';
+    h += '<th style="padding:10px 8px"></th></tr></thead><tbody>';
+    for (var ui = 0; ui < unmatched.length; ui++) {
+      var ue = unmatched[ui];
+      var uTotal = ue.pos.reduce(function(s,p){ return s + (parseFloat(p.amount)||0); }, 0);
+      h += '<tr style="border-bottom:1px solid var(--canvas)">';
+      h += '<td style="padding:10px 16px;font-size:13px;font-weight:600;color:var(--mid-gray)">' + ue.code + '</td>';
+      h += '<td style="text-align:right;padding:10px 16px;font-size:13px;font-weight:600">' + sparkFmt(uTotal) + '</td>';
+      h += '<td style="padding:10px 8px;text-align:right"><button onclick="openPOModal(\'' + ue.code + '\')" style="padding:3px 10px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer;font-size:11px;color:var(--mid-gray)">+ PO</button></td></tr>';
+      var uPOs = ue.pos.slice().sort(function(a,b){ return (a.date_sent||'').localeCompare(b.date_sent||''); });
+      for (var upi = 0; upi < uPOs.length; upi++) {
+        var upo = uPOs[upi];
+        var udate = upo.date_sent ? new Date(upo.date_sent + 'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+        h += '<tr style="border-bottom:1px solid var(--canvas)">';
+        h += '<td colspan="1" style="padding:6px 16px 6px 28px"><span style="font-size:12px;color:var(--mid-gray)">▸ ';
+        if (upo.po_number) h += '<strong>' + upo.po_number + '</strong> · ';
+        h += udate;
+        if (upo.notes) h += ' · <em>' + upo.notes + '</em>';
+        h += '</span></td>';
+        h += '<td style="text-align:right;padding:6px 16px;font-size:12px;color:var(--mid-gray)">' + sparkFmt(parseFloat(upo.amount)||0) + '</td>';
+        h += '<td style="padding:6px 8px;text-align:right">';
+        h += '<button onclick="openEditPOModal(\'' + upo.id + '\')" title="Edit" style="background:none;border:none;cursor:pointer;color:var(--mid-gray);font-size:13px;padding:2px 4px">✎</button>';
+        h += '<button onclick="deletePO(\'' + upo.id + '\')" title="Delete" style="background:none;border:none;cursor:pointer;color:var(--mid-gray);font-size:13px;padding:2px 4px">✕</button>';
+        h += '</td></tr>';
+      }
+    }
+    h += '</tbody></table></div></div>';
+  }
+
+  mc.innerHTML = h;
+}
+
+function _poProjectOptions(selectedCode) {
+  var opts = '<option value="">— Select project —</option>';
+  var sorted = CLIENTS.slice().sort(function(a,b){ return (a.code||'').localeCompare(b.code||''); });
+  for (var ci = 0; ci < sorted.length; ci++) {
+    var c = sorted[ci];
+    var ps = c.projects.slice().sort(function(a,b){ return (a.code||'').localeCompare(b.code||''); });
+    if (!ps.length) continue;
+    opts += '<optgroup label="' + c.code + ' ' + c.name + '">';
+    for (var pi = 0; pi < ps.length; pi++) {
+      var p = ps[pi];
+      opts += '<option value="' + p.code + '"' + (p.code === selectedCode ? ' selected' : '') + '>' + p.code + ' — ' + p.name + '</option>';
+    }
+    opts += '</optgroup>';
+  }
+  return opts;
+}
+
+function openPOModal(projectCode) {
+  var existing = document.getElementById('poModalOverlay');
+  if (existing) existing.remove();
+  var today = new Date().toISOString().slice(0,10);
+  var ov = document.createElement('div');
+  ov.id = 'poModalOverlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;display:flex;align-items:center;justify-content:center';
+  ov.innerHTML = '<div style="background:var(--white);border-radius:12px;padding:28px;width:460px;max-width:95vw;box-shadow:0 8px 40px rgba(0,0,0,.2)">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">'
+    + '<h2 style="font-size:16px;font-weight:700;margin:0">Log Purchase Order</h2>'
+    + '<button onclick="document.getElementById(\'poModalOverlay\').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--mid-gray);line-height:1">×</button>'
+    + '</div>'
+    + '<div style="margin-bottom:14px"><label style="font-size:11px;font-weight:600;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Project</label>'
+    + '<select id="poProjectCode" style="width:100%;padding:8px 10px;border:1px solid var(--canvas);border-radius:6px;font-size:13px">' + _poProjectOptions(projectCode) + '</select></div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">'
+    + '<div><label style="font-size:11px;font-weight:600;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">PO / Invoice #</label>'
+    + '<input id="poPONumber" type="text" placeholder="e.g. INV-1042" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--canvas);border-radius:6px;font-size:13px"></div>'
+    + '<div><label style="font-size:11px;font-weight:600;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Amount</label>'
+    + '<input id="poAmount" type="number" step="0.01" min="0" placeholder="0.00" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--canvas);border-radius:6px;font-size:13px"></div>'
+    + '</div>'
+    + '<div style="margin-bottom:14px"><label style="font-size:11px;font-weight:600;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Date Sent</label>'
+    + '<input id="poDateSent" type="date" value="' + today + '" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--canvas);border-radius:6px;font-size:13px"></div>'
+    + '<div style="margin-bottom:20px"><label style="font-size:11px;font-weight:600;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Notes</label>'
+    + '<input id="poNotes" type="text" placeholder="Optional" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--canvas);border-radius:6px;font-size:13px"></div>'
+    + '<div id="poModalError" style="display:none;color:var(--ember);font-size:12px;margin-bottom:10px"></div>'
+    + '<div style="display:flex;gap:10px;justify-content:flex-end">'
+    + '<button onclick="document.getElementById(\'poModalOverlay\').remove()" style="padding:8px 18px;border-radius:6px;border:1px solid var(--canvas);background:transparent;cursor:pointer;font-size:13px">Cancel</button>'
+    + '<button id="poSubmitBtn" onclick="submitPO(null)" style="padding:8px 18px;border-radius:6px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-size:13px;font-weight:600">Save PO</button>'
+    + '</div></div>';
+  document.body.appendChild(ov);
+}
+
+function openEditPOModal(poId) {
+  var po = null;
+  for (var i = 0; i < SUPA_POS.length; i++) { if (SUPA_POS[i].id === poId) { po = SUPA_POS[i]; break; } }
+  if (!po) return;
+  openPOModal(po.project_code);
+  document.querySelector('#poModalOverlay h2').textContent = 'Edit Purchase Order';
+  if (po.po_number) document.getElementById('poPONumber').value = po.po_number;
+  if (po.amount)    document.getElementById('poAmount').value   = po.amount;
+  if (po.date_sent) document.getElementById('poDateSent').value = po.date_sent;
+  if (po.notes)     document.getElementById('poNotes').value    = po.notes;
+  var btn = document.getElementById('poSubmitBtn');
+  btn.textContent = 'Update PO';
+  btn.setAttribute('onclick', 'submitPO(\'' + poId + '\')');
+}
+
+async function submitPO(editId) {
+  var code   = document.getElementById('poProjectCode').value.trim();
+  var amount = parseFloat(document.getElementById('poAmount').value);
+  var poNum  = document.getElementById('poPONumber').value.trim();
+  var date   = document.getElementById('poDateSent').value;
+  var notes  = document.getElementById('poNotes').value.trim();
+  var errEl  = document.getElementById('poModalError');
+  var btn    = document.getElementById('poSubmitBtn');
+
+  if (!code) { errEl.textContent = 'Select a project.'; errEl.style.display = 'block'; return; }
+  if (!amount || isNaN(amount) || amount <= 0) { errEl.textContent = 'Enter a valid amount greater than $0.'; errEl.style.display = 'block'; return; }
+
+  btn.disabled = true; btn.textContent = 'Saving…';
+  errEl.style.display = 'none';
+  try {
+    var payload = { project_code: code, amount: amount };
+    if (poNum) payload.po_number = poNum;
+    if (date)  payload.date_sent = date;
+    if (notes) payload.notes = notes;
+    if (editId) {
+      await sparkFetch('pos?id=eq.' + editId, '', 'PATCH', payload);
+    } else {
+      await sparkFetch('pos', '', 'POST', payload);
+    }
+    await loadPOs();
+    document.getElementById('poModalOverlay').remove();
+    renderYTD();
+  } catch(e) {
+    errEl.textContent = 'Error: ' + (e.message || 'Could not save.');
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = editId ? 'Update PO' : 'Save PO';
+  }
+}
+
+function deletePO(poId) {
+  var ex = document.getElementById('poDeleteOverlay');
+  if (ex) ex.remove();
+  var ov = document.createElement('div');
+  ov.id = 'poDeleteOverlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9001;display:flex;align-items:center;justify-content:center';
+  ov.innerHTML = '<div style="background:var(--white);border-radius:12px;padding:28px;width:340px;max-width:95vw;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.2)">'
+    + '<div style="font-size:36px;margin-bottom:12px">🗑</div>'
+    + '<div style="font-size:15px;font-weight:700;margin-bottom:8px">Delete this PO?</div>'
+    + '<div style="font-size:13px;color:var(--mid-gray);margin-bottom:24px">This cannot be undone.</div>'
+    + '<div style="display:flex;gap:10px;justify-content:center">'
+    + '<button onclick="document.getElementById(\'poDeleteOverlay\').remove()" style="padding:8px 20px;border-radius:6px;border:1px solid var(--canvas);background:transparent;cursor:pointer;font-size:13px">Cancel</button>'
+    + '<button onclick="confirmDeletePO(\'' + poId + '\')" style="padding:8px 20px;border-radius:6px;border:none;background:var(--ember);color:#fff;cursor:pointer;font-size:13px;font-weight:600">Delete</button>'
+    + '</div></div>';
+  document.body.appendChild(ov);
+}
+
+async function confirmDeletePO(poId) {
+  try {
+    await sparkFetch('pos?id=eq.' + poId, '', 'DELETE');
+    await loadPOs();
+    document.getElementById('poDeleteOverlay').remove();
+    renderYTD();
+  } catch(e) { alert('Could not delete: ' + (e.message || 'Unknown error')); }
 }
 
 function renderSettings() {
@@ -9404,6 +9727,7 @@ function navigate(view) {
   }
   renderSidebar();
   if (view === 'master') renderMaster();
+  else if (view === 'ytd') renderYTD();
   else if (view === 'flagged') renderFlagged();
   else if (view === 'importTime') renderImportTime();
   else if (view === 'completed') renderCompleted();
@@ -10046,6 +10370,9 @@ async function loadSupabaseData() {
         if (slackSetting && slackSetting[0] && slackSetting[0].value) SLACK_BOT_TOKEN = slackSetting[0].value;
       } catch(e) {}
     })();
+
+    /* Load purchase orders (pos table) */
+    loadPOs();
 
     /* Save fresh data to cache for next load */
     furnaceSaveCache({
