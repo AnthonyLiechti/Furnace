@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.23 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.24 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -4417,6 +4417,19 @@ function renderYTD() {
       if (budget) {
         var remClr = billRem < 0 ? 'var(--ember)' : '#81C784';
         h += '<div style="font-size:11px;opacity:.65;margin-top:3px">' + sparkFmt(budget) + ' budget · <span style="color:' + remClr + '">' + sparkFmt(billRem) + ' remaining</span></div>';
+      }
+      if (!isClosed) {
+        var _tags = [];
+        if (budgHrs === 0)  _tags.push('No Hours');
+        if (oopBudg === 0)  _tags.push('No OOP');
+        if (flBudg  === 0)  _tags.push('No FL');
+        if (_tags.length) {
+          h += '<div style="margin-top:6px;display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap">';
+          for (var _ti = 0; _ti < _tags.length; _ti++) {
+            h += '<span style="font-size:9px;font-weight:700;background:rgba(255,183,77,.15);color:rgba(255,183,77,.75);padding:2px 7px;border-radius:20px;letter-spacing:.4px">' + _tags[_ti] + '</span>';
+          }
+          h += '</div>';
+        }
       }
       h += '</div></div>';
 
