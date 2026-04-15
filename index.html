@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.21 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.22 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -4468,6 +4468,26 @@ function renderYTD() {
           } else {
             h += lobBar(spentD, Math.max(0, laborMU - spentD), oopBudg, flBudg, reserve);
           }
+        }
+
+        /* Row 3: OOP + Freelancer detail (open projects only — closed shows these in Row 1) */
+        if (!isClosed && (oopBudg > 0 || flBudg > 0)) {
+          h += '<div class="snap-financials" style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1)">';
+          if (oopBudg > 0) {
+            var oopRem2 = Math.max(0, oopBudg - oopSpent);
+            var oopPct2 = Math.round(oopSpent / oopBudg * 100);
+            h += '<div class="snap-fin-item"><div class="sf-label">OOP Budget</div><div class="sf-value">' + sparkFmt(oopBudg) + '</div></div>';
+            h += '<div class="snap-fin-item"><div class="sf-label">OOP Spent</div><div class="sf-value" style="color:var(--ember)">' + sparkFmt(oopSpent) + '</div><div class="sf-sub">' + oopPct2 + '% of budget</div></div>';
+            h += '<div class="snap-fin-item"><div class="sf-label">OOP Remaining</div><div class="sf-value">' + sparkFmt(oopRem2) + '</div></div>';
+          }
+          if (flBudg > 0) {
+            var flRem2  = Math.max(0, flBudg - flSpent);
+            var flPct2  = Math.round(flSpent / flBudg * 100);
+            h += '<div class="snap-fin-item"><div class="sf-label">Freelancer Budget</div><div class="sf-value">' + sparkFmt(flBudg) + '</div></div>';
+            h += '<div class="snap-fin-item"><div class="sf-label">Freelancer Paid</div><div class="sf-value" style="color:var(--ember)">' + sparkFmt(flSpent) + '</div><div class="sf-sub">' + flPct2 + '% of budget</div></div>';
+            h += '<div class="snap-fin-item"><div class="sf-label">FL Remaining</div><div class="sf-value">' + sparkFmt(flRem2) + '</div></div>';
+          }
+          h += '</div>';
         }
       }
 
