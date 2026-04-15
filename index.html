@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.17 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.18 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -4069,6 +4069,21 @@ function toggleYTDClient(code) {
   renderYTD();
 }
 
+function toggleAllYTDClients(collapse) {
+  /* collapse=true → collapse all; collapse=false → expand all */
+  var flags = document.querySelectorAll('[data-ytd-client]');
+  for (var i = 0; i < flags.length; i++) {
+    YTD_COLLAPSED[flags[i].dataset.ytdClient] = collapse;
+  }
+  renderYTD();
+}
+
+var YTD_SEARCH = '';  /* live search filter for YTD client/project names */
+function ytdSearch(val) {
+  YTD_SEARCH = val.toLowerCase().trim();
+  renderYTD();
+}
+
 function toggleYTDProjectClosed(code) {
   YTD_CLOSED[code] = !YTD_CLOSED[code];
   localStorage.setItem('ytd_closed', JSON.stringify(YTD_CLOSED));
@@ -4183,10 +4198,13 @@ function renderYTD() {
   var sections = Object.values(clientMap).sort(function(a,b){ return (a.client.code||'').localeCompare(b.client.code||''); });
 
   /* ── Header ── */
-  var h = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">';
+  var h = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">';
   h += '<div><h1 class="page-title">2026 Year to Date</h1>';
   h += '<p class="page-subtitle">Purchase orders invoiced to clients · Jan 1 – present</p></div>';
   h += '<button onclick="openPOModal(null)" style="padding:8px 18px;border-radius:7px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-size:13px;font-weight:600">+ Log PO</button>';
+  h += '</div>';
+  h += '<div style="margin-bottom:20px">';
+  h += '<input type="text" value="' + (YTD_SEARCH || '') + '" oninput="ytdSearch(this.value)" placeholder="Search clients or projects…" style="width:100%;box-sizing:border-box;padding:8px 14px;border-radius:7px;border:1px solid var(--canvas);background:var(--surface);color:var(--abyss);font-size:13px;outline:none">';
   h += '</div>';
 
   /* ── Portfolio Overview Banner (matches master dashboard style) ── */
@@ -4226,9 +4244,40 @@ function renderYTD() {
     return;
   }
 
+  /* Apply search filter to sections */
+  var filteredSections = sections;
+  if (YTD_SEARCH) {
+    filteredSections = [];
+    for (var fsi = 0; fsi < sections.length; fsi++) {
+      var fs = sections[fsi];
+      var clientMatch = (fs.client.name || '').toLowerCase().indexOf(YTD_SEARCH) >= 0
+                     || (fs.client.code || '').toLowerCase().indexOf(YTD_SEARCH) >= 0;
+      var matchedProjects = fs.projects.filter(function(e){
+        return (e.proj.name || '').toLowerCase().indexOf(YTD_SEARCH) >= 0
+            || (e.proj.code || '').toLowerCase().indexOf(YTD_SEARCH) >= 0;
+      });
+      if (clientMatch) {
+        filteredSections.push(fs); /* show full client */
+      } else if (matchedProjects.length > 0) {
+        filteredSections.push({ client: fs.client, projects: matchedProjects }); /* show only matching projects */
+      }
+    }
+  }
+
+  /* ── Client Sections header bar ── */
+  var allCollapsed = filteredSections.length > 0 && filteredSections.every(function(s){ return !!YTD_COLLAPSED[s.client.code || '']; });
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">';
+  h += '<div style="font-size:12px;font-weight:600;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px">' + filteredSections.length + ' Client' + (filteredSections.length !== 1 ? 's' : '') + '</div>';
+  if (filteredSections.length > 0) {
+    h += '<button onclick="toggleAllYTDClients(' + (allCollapsed ? 'false' : 'true') + ')" style="padding:4px 12px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer;font-size:11px;color:var(--mid-gray)">';
+    h += allCollapsed ? '▼ Expand All' : '▲ Collapse All';
+    h += '</button>';
+  }
+  h += '</div>';
+
   /* ── Client Sections ── */
-  for (var si = 0; si < sections.length; si++) {
-    var cs = sections[si];
+  for (var si = 0; si < filteredSections.length; si++) {
+    var cs = filteredSections[si];
     var clientBilled = 0;
     cs.projects.sort(function(a,b){ return (a.proj.code||'').localeCompare(b.proj.code||''); });
 
@@ -4257,7 +4306,7 @@ function renderYTD() {
       }
     }
 
-    h += '<div style="margin-bottom:' + (isCollapsed ? '4px' : '10px') + ';display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none" onclick="toggleYTDClient(\'' + clientCode + '\')">';
+    h += '<div data-ytd-client="' + clientCode + '" style="margin-bottom:' + (isCollapsed ? '4px' : '10px') + ';display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none" onclick="toggleYTDClient(\'' + clientCode + '\')">';
     h += '<span style="font-size:10px;color:var(--mid-gray);width:10px;text-align:center;flex-shrink:0">' + chevron + '</span>';
     h += '<span style="width:10px;height:10px;border-radius:50%;background:' + (cs.client.color||'#888') + ';display:inline-block;flex-shrink:0"></span>';
     h += '<div style="font-size:13px;font-weight:700;flex:1">' + (cs.client.code||'') + ' ' + cs.client.name + '</div>';
