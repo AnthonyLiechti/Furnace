@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.13 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.14 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -954,6 +954,7 @@ var SUPA_LOADED = false;
 var FURNACE_TEAM_MEMBERS = [];
 var SLACK_BOT_TOKEN = ''; /* loaded from agency_settings on init */
 var SUPA_POS = [];        /* purchase orders sent to clients, loaded from pos table */
+var YTD_COLLAPSED = {};   /* client codes that are collapsed in YTD view */
 
 /* ── NATIVE ALLOCATION DATA ── */
 var ALLOCATIONS = { version: 1, allocations: [], team: [], weeklyCapacity: 40 };
@@ -4062,6 +4063,11 @@ async function loadPOs() {
   } catch(e) { console.warn('Could not load POs:', e.message); SUPA_POS = []; }
 }
 
+function toggleYTDClient(code) {
+  YTD_COLLAPSED[code] = !YTD_COLLAPSED[code];
+  renderYTD();
+}
+
 function renderYTD() {
   var mc = document.getElementById('mainContent');
   if (!mc) return;
@@ -4216,11 +4222,24 @@ function renderYTD() {
     var clientBilled = 0;
     cs.projects.sort(function(a,b){ return (a.proj.code||'').localeCompare(b.proj.code||''); });
 
-    h += '<div style="margin-bottom:10px;display:flex;align-items:center;gap:8px">';
+    var clientCode  = cs.client.code || ('__c' + si);
+    var isCollapsed = !!YTD_COLLAPSED[clientCode];
+    var chevron     = isCollapsed ? '▶' : '▼';
+
+    /* Compute client-level billed total for the header summary */
+    var headerBilled = 0;
+    for (var hpi = 0; hpi < cs.projects.length; hpi++) {
+      headerBilled += cs.projects[hpi].pos.reduce(function(s,p){ return s + (parseFloat(p.amount)||0); }, 0);
+    }
+
+    h += '<div style="margin-bottom:' + (isCollapsed ? '16px' : '10px') + ';display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none" onclick="toggleYTDClient(\'' + clientCode + '\')">';
+    h += '<span style="font-size:10px;color:var(--mid-gray);width:10px;text-align:center;flex-shrink:0">' + chevron + '</span>';
     h += '<span style="width:10px;height:10px;border-radius:50%;background:' + (cs.client.color||'#888') + ';display:inline-block;flex-shrink:0"></span>';
-    h += '<div style="font-size:13px;font-weight:700">' + (cs.client.code||'') + ' ' + cs.client.name + '</div>';
+    h += '<div style="font-size:13px;font-weight:700;flex:1">' + (cs.client.code||'') + ' ' + cs.client.name + '</div>';
+    h += '<div style="font-size:12px;color:var(--mid-gray)">' + sparkFmt(headerBilled) + ' · ' + cs.projects.length + ' project' + (cs.projects.length !== 1 ? 's' : '') + '</div>';
     h += '</div>';
 
+    if (!isCollapsed) {
     for (var pi = 0; pi < cs.projects.length; pi++) {
       var entry   = cs.projects[pi];
       var proj    = entry.proj;
@@ -4311,6 +4330,7 @@ function renderYTD() {
 
     /* Client billed total */
     h += '<div style="text-align:right;font-size:12px;color:var(--mid-gray);margin-bottom:28px">Client total billed: <strong style="font-size:13px">' + sparkFmt(clientBilled) + '</strong></div>';
+    } /* end if (!isCollapsed) */
   }
 
   /* ── Unlinked codes ── */
