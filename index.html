@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.38 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 16, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.39 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 16, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -6461,12 +6461,15 @@ function sparkRenderLaborContent() {
       : PROJ_CODE_MAP[sparkCurrentData.budget.project_id];
   }
   var _actByPersonPhase = {}; /* name -> phase_key -> hours */
+  var _actPrimaryNames  = {}; /* full person_name -> total hours (for outside-budget detection) */
   if (_projCode && SUPA_ACTUALS_ALL) {
     for (var _ai = 0; _ai < SUPA_ACTUALS_ALL.length; _ai++) {
       var _ae = SUPA_ACTUALS_ALL[_ai];
       if (_ae.project_code !== _projCode || !_ae.person_name) continue;
       var _pn = _ae.person_name;
       var _pk2 = _ae.phase_key || '_none';
+      /* Track primary name totals for outside-budget detection */
+      _actPrimaryNames[_pn] = (_actPrimaryNames[_pn] || 0) + (_ae.hours || 0);
       /* Index by full name */
       if (!_actByPersonPhase[_pn]) _actByPersonPhase[_pn] = { _total: 0 };
       _actByPersonPhase[_pn][_pk2] = (_actByPersonPhase[_pn][_pk2] || 0) + (_ae.hours || 0);
@@ -6479,6 +6482,23 @@ function sparkRenderLaborContent() {
         _actByPersonPhase[_firstName]._total = (_actByPersonPhase[_firstName]._total || 0) + (_ae.hours || 0);
       }
     }
+  }
+
+  /* Build set of names already covered by any labor budget entry (forge + freelancers) */
+  var _budgetedNames = {};
+  for (var _bi = 0; _bi < labor.length; _bi++) {
+    var _bName = (labor[_bi].team_member && labor[_bi].team_member.name) || '';
+    if (_bName) _budgetedNames[_bName] = true;
+  }
+
+  /* Find people who tracked hours but have no budget entry */
+  var _outsideBudget = [], _outsideBudgetTotal = 0;
+  var _obKeys = Object.keys(_actPrimaryNames).sort();
+  for (var _obi = 0; _obi < _obKeys.length; _obi++) {
+    var _obn = _obKeys[_obi];
+    if (_budgetedNames[_obn]) continue;
+    var _obHrs = _actPrimaryNames[_obn];
+    if (_obHrs > 0) { _outsideBudget.push({ name: _obn, hours: _obHrs }); _outsideBudgetTotal += _obHrs; }
   }
 
   /* Helper: render a table for a set of entries */
@@ -6620,6 +6640,37 @@ function sparkRenderLaborContent() {
     th += '<td class="num" style="font-weight:700;padding:8px 10px">' + sparkFmt(_totCostAll) + '</td>';
     th += '<td class="num" style="font-weight:700;padding:8px 10px;' + usedColour(_totActCostAll, _totCostAll) + '">' + (_totActCostAll > 0 ? sparkFmt(_totActCostAll) : '<span style="opacity:.2">—</span>') + '</td>';
     th += '</tr>';
+
+    /* ── Outside-budget rows: people who tracked time but have no budget entry ── */
+    if (_outsideBudget && _outsideBudget.length > 0) {
+      _outsideBudget.sort(function(a, b) { return b.hours - a.hours; });
+      th += '<tr><td colspan="' + colCount + '" style="padding:5px 10px 3px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,138,101,.6);border-top:1px dashed rgba(255,138,101,.3)">Tracked · Not Budgeted</td></tr>';
+      for (var _obi3 = 0; _obi3 < _outsideBudget.length; _obi3++) {
+        var _obr = _outsideBudget[_obi3];
+        var _obrAct = _actByPersonPhase[_obr.name] || null;
+        th += '<tr class="spark-person-row" style="opacity:.8">';
+        th += '<td style="font-style:italic">' + _obr.name + '</td>';
+        th += '<td class="num" style="color:var(--mid-gray)">—</td>';
+        if (phaseKey === 'all') {
+          for (var _obrp = 0; _obrp < SPARK_PHASES.length; _obrp++) {
+            var _obrpk = SPARK_PHASES[_obrp].key;
+            var _obrActPh = _obrAct ? (_obrAct[_obrpk] || 0) : 0;
+            th += '<td class="num" style="color:var(--mid-gray)">—</td>';
+            th += '<td class="num" style="font-size:12px;color:rgba(255,138,101,.8)">' + (_obrActPh > 0 ? _obrActPh.toFixed(1) : '<span style="opacity:.18">—</span>') + '</td>';
+          }
+          th += '<td class="num" style="color:var(--mid-gray)">—</td>';
+          th += '<td class="num" style="font-weight:600;color:rgba(255,138,101,.85)">' + _obr.hours.toFixed(1) + '</td>';
+        } else {
+          var _obrActPhSingle = _obrAct ? (_obrAct[phaseKey] || 0) : 0;
+          th += '<td class="num" style="color:var(--mid-gray)">—</td>';
+          th += '<td class="num" style="font-size:12px;color:rgba(255,138,101,.8)">' + (_obrActPhSingle > 0 ? _obrActPhSingle.toFixed(1) : '<span style="opacity:.18">—</span>') + '</td>';
+          th += '<td class="num" style="color:var(--mid-gray)">—</td>';
+        }
+        th += '<td class="num" style="color:var(--mid-gray)">—</td>';
+        th += '<td class="num" style="color:var(--mid-gray)">—</td>';
+        th += '</tr>';
+      }
+    }
 
     th += '</tbody></table>';
     return th;
