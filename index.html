@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.39 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 16, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.40 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 16, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -3847,23 +3847,89 @@ async function oppConvertToActive(budgetId) {
   if (!sparkCurrentData || !sparkCurrentData.budget) return;
   var proj     = sparkCurrentData.budget.projects || {};
   var projName = proj.name || sparkCurrentData.budget.name || 'this project';
+  var projId   = proj.id || sparkCurrentData.budget.project_id || '';
   var projCode = proj.project_code || '';
+  /* Strip auto-generated OPP_ codes so the field starts blank */
+  var defaultCode = projCode.indexOf('OPP_') === 0 ? '' : projCode;
 
-  if (!confirm('Convert "' + projName + '" to an active project?\n\nThis will mark the budget as active. You\'ll need to add the project to portfolio.js to see it in the main dashboard.')) return;
+  /* Show a modal to collect the project number before converting */
+  var existingOverlay = document.getElementById('oppConvertOverlay');
+  if (existingOverlay) existingOverlay.remove();
 
-  sparkShowSaving();
-  await sparkFetch('budgets?id=eq.' + budgetId, '', 'PATCH', { status: 'active' });
-  sparkHideSaving();
+  var isDark  = document.body.classList.contains('dark-mode');
+  var mBg     = isDark ? '#1E1E2E' : '#fff';
+  var mText   = isDark ? '#E8E8F0' : '#1a1a2e';
+  var mBorder = isDark ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.12)';
+  var iStyle  = 'width:100%;box-sizing:border-box;padding:9px 12px;border-radius:7px;border:1px solid ' + mBorder + ';background:' + (isDark ? '#2A2A3E' : '#F8F8FC') + ';color:' + mText + ';font-size:13px;font-family:inherit;outline:none';
 
-  var mc = document.getElementById('mainContent');
-  if (mc) {
-    mc.innerHTML = '<div style="text-align:center;padding:80px 24px">'
-      + '<div style="font-size:48px;margin-bottom:16px">&#127881;</div>'
-      + '<div style="font-size:22px;font-weight:700;color:var(--ink);margin-bottom:10px">Project Activated!</div>'
-      + '<div style="font-size:14px;color:var(--mid-gray);max-width:420px;margin:0 auto 8px">"' + projName + '" is now an active budget.</div>'
-      + (projCode ? '<div style="font-size:12px;color:var(--mid-gray);max-width:420px;margin:0 auto 24px">Add project code <code style="background:var(--canvas);padding:2px 6px;border-radius:4px">' + projCode + '</code> to portfolio.js to track it in the main dashboard.</div>' : '<div style="margin-bottom:24px"></div>')
-      + '<button onclick="navigate(\'opportunities\')" style="padding:10px 24px;border-radius:7px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-size:13px;font-weight:700">&#8592; Back to Opportunities</button>'
-      + '</div>';
+  var overlay = document.createElement('div');
+  overlay.id = 'oppConvertOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999';
+
+  overlay.innerHTML = '<div style="background:' + mBg + ';border-radius:14px;padding:28px;width:420px;max-width:94vw">'
+    + '<div style="font-size:18px;font-weight:700;color:' + mText + ';margin-bottom:6px">&#10003; Convert to Active Project</div>'
+    + '<div style="font-size:12px;color:var(--mid-gray);margin-bottom:22px">Assign a project number and activate the budget.</div>'
+    + '<div style="margin-bottom:8px">'
+    + '<label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid-gray);margin-bottom:6px">Project Name</label>'
+    + '<div style="font-size:14px;font-weight:600;color:' + mText + ';padding:8px 12px;background:' + (isDark ? '#2A2A3E' : '#F0F0F8') + ';border-radius:7px">' + projName + '</div>'
+    + '</div>'
+    + '<div style="margin-bottom:20px">'
+    + '<label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid-gray);margin-bottom:6px">Project Number <span style="color:#EF9A9A">*</span></label>'
+    + '<input id="oppConvertCode" placeholder="e.g. 322_16_02" value="' + defaultCode + '" style="' + iStyle + '">'
+    + '<div style="font-size:11px;color:var(--mid-gray);margin-top:5px">Use the format <code style="background:var(--canvas);padding:1px 5px;border-radius:3px">client_seq_proj</code> (e.g. 322_16_02)</div>'
+    + '</div>'
+    + '<div id="oppConvertError" style="display:none;color:#EF9A9A;font-size:12px;background:rgba(198,40,40,.15);padding:8px 12px;border-radius:6px;margin-bottom:14px"></div>'
+    + '<div style="display:flex;gap:10px">'
+    + '<button id="oppConvertBtn" onclick="oppConvertSubmit(\'' + budgetId + '\',\'' + projId + '\')" style="flex:1;padding:10px 0;border-radius:7px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-size:13px;font-weight:700">Activate Project</button>'
+    + '<button onclick="document.getElementById(\'oppConvertOverlay\').remove()" style="padding:10px 18px;border-radius:7px;border:1px solid ' + mBorder + ';background:transparent;cursor:pointer;font-size:13px;color:var(--mid-gray)">Cancel</button>'
+    + '</div>'
+    + '</div>';
+
+  document.body.appendChild(overlay);
+  setTimeout(function() { var f = document.getElementById('oppConvertCode'); if (f) { f.focus(); f.select(); } }, 50);
+}
+
+async function oppConvertSubmit(budgetId, projId) {
+  var codeEl = document.getElementById('oppConvertCode');
+  var errEl  = document.getElementById('oppConvertError');
+  var btn    = document.getElementById('oppConvertBtn');
+  if (!codeEl) return;
+
+  var code = codeEl.value.trim();
+  if (!code) {
+    if (errEl) { errEl.textContent = 'Please enter a project number.'; errEl.style.display = 'block'; }
+    codeEl.focus();
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Activating…'; }
+  if (errEl) errEl.style.display = 'none';
+
+  try {
+    /* Update project_code and project_status on the projects row */
+    if (projId) {
+      await sparkFetch('projects?id=eq.' + projId, '', 'PATCH', { project_code: code, project_status: 'active' });
+    }
+    /* Mark budget as active */
+    await sparkFetch('budgets?id=eq.' + budgetId, '', 'PATCH', { status: 'active' });
+
+    var overlay = document.getElementById('oppConvertOverlay');
+    if (overlay) overlay.remove();
+
+    var mc = document.getElementById('mainContent');
+    if (mc) {
+      mc.innerHTML = '<div style="text-align:center;padding:80px 24px">'
+        + '<div style="font-size:48px;margin-bottom:16px">&#127881;</div>'
+        + '<div style="font-size:22px;font-weight:700;color:var(--ink);margin-bottom:10px">Project Activated!</div>'
+        + '<div style="font-size:14px;color:var(--mid-gray);max-width:420px;margin:0 auto 8px">Budget is now active under project code <code style="background:var(--canvas);padding:2px 6px;border-radius:4px">' + code + '</code>.</div>'
+        + '<div style="font-size:12px;color:var(--mid-gray);max-width:420px;margin:12px auto 24px">Add <code style="background:var(--canvas);padding:2px 6px;border-radius:4px">' + code + '</code> to portfolio.js to track it in the main dashboard.</div>'
+        + '<button onclick="navigate(\'opportunities\')" style="padding:10px 24px;border-radius:7px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-size:13px;font-weight:700">&#8592; Back to Opportunities</button>'
+        + '</div>';
+    }
+  } catch(err) {
+    var msg = err && err.message ? err.message : String(err);
+    if (errEl) { errEl.textContent = 'Error: ' + msg; errEl.style.display = 'block'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Activate Project'; }
   }
 }
 
