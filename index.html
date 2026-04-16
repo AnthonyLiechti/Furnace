@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.36 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 16, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.37 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 16, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -3744,12 +3744,13 @@ async function oppSubmitCreate() {
     if (!newBudget || !newBudget[0]) throw new Error('Failed to create budget record');
     var budgetId = newBudget[0].id;
 
-    /* Pre-fill all active team members with 0 hours */
+    /* Pre-fill all active team members with 0 hours (skip Former Employees) */
     var allTeam = await sparkFetch('team_members', 'select=id,name,department,employment_type&is_active=eq.true&order=name.asc');
     if (allTeam && allTeam.length) {
       var lb = [];
       for (var ti = 0; ti < allTeam.length; ti++) {
         var tm = allTeam[ti];
+        if (tm.department === 'Former Employees') continue;
         var dept = tm.department;
         if (dept && dept !== 'Executive/Admin' && dept !== 'Account' && dept !== 'Creative' && dept !== 'Post') dept = null;
         lb.push({ budget_id: budgetId, team_member_id: tm.id, department: dept,
@@ -5197,12 +5198,13 @@ async function sparkCreateBudgetForProject(projectCode) {
     if (!newBudget || !newBudget[0]) throw new Error('Failed to create budget');
     var budgetId = newBudget[0].id;
 
-    /* 2b. Pre-fill all active team members with 0 hours */
+    /* 2b. Pre-fill all active team members with 0 hours (skip Former Employees) */
     var allTeam = await sparkFetch('team_members', 'select=id,name,department,employment_type&is_active=eq.true&order=name.asc');
     if (allTeam && allTeam.length) {
       var laborBatch = [];
       for (var ti = 0; ti < allTeam.length; ti++) {
         var tm = allTeam[ti];
+        if (tm.department === 'Former Employees') continue;
         var dept = tm.department;
         if (dept && dept !== 'Executive/Admin' && dept !== 'Account' && dept !== 'Creative' && dept !== 'Post') dept = null;
         laborBatch.push({
@@ -5511,12 +5513,13 @@ async function sparkCreateSmallSnapshot(projectCode) {
     if (!newBudget || !newBudget[0]) throw new Error('Failed to create budget');
     var budgetId = newBudget[0].id;
 
-    /* Pre-fill active team members */
+    /* Pre-fill active team members (skip Former Employees) */
     var allTeam = await sparkFetch('team_members', 'select=id,name,department,employment_type&is_active=eq.true&order=name.asc');
     if (allTeam && allTeam.length) {
       var lb = [];
       for (var ti = 0; ti < allTeam.length; ti++) {
         var tm = allTeam[ti];
+        if (tm.department === 'Former Employees') continue;
         lb.push({ budget_id: budgetId, team_member_id: tm.id, department: tm.department,
           employment_type: tm.employment_type || 'Employee',
           phase1: 0, phase2: 0, phase3_1: 0, phase3_2: 0, phase4: 0, phase5: 0, display_order: ti });
@@ -5872,13 +5875,14 @@ var PROJ_PHASE_COLORS = {
 var sparkFlExpanded = {};
 
 var SPARK_DEPT_COLORS = {
-  'Executive/Admin': 'var(--ember)',
-  'Account': 'var(--ocean)',
-  'Creative': 'var(--sand)',
-  'Post': 'var(--honey)'
+  'Executive/Admin':  'var(--ember)',
+  'Account':          'var(--ocean)',
+  'Creative':         'var(--sand)',
+  'Post':             'var(--honey)',
+  'Former Employees': 'var(--mid-gray)'
 };
 
-var SPARK_DEPT_ORDER = ['Executive/Admin', 'Account', 'Creative', 'Post'];
+var SPARK_DEPT_ORDER = ['Executive/Admin', 'Account', 'Creative', 'Post', 'Former Employees'];
 
 function sparkFmt(n) {
   if (n == null || isNaN(n)) return '$0';
@@ -6651,7 +6655,7 @@ async function sparkShowAddTeamMember() {
       if (tmId) existingIds[tmId] = true;
     }
   }
-  var available = allMembers.filter(function(m) { return !existingIds[m.id] && m.employment_type !== 'Freelancer'; });
+  var available = allMembers.filter(function(m) { return !existingIds[m.id] && m.employment_type !== 'Freelancer' && m.department !== 'Former Employees'; });
 
   if (!available.length) { alert('All active team members are already assigned.'); return; }
 
