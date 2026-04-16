@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.26 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.27 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -6279,17 +6279,9 @@ function syncProjFinancialsFromCurrent() {
   sb.laborTotal        = laborCost;
   sb.laborCostInternal = laborInternal;
 
-  /* Recompute freelancer totals */
-  var flTotal = 0, flSpent = 0;
-  var flEntries = sparkCurrentData.freelancerEntries || [];
-  for (var j = 0; j < flEntries.length; j++) {
-    var feCost = (flEntries[j].hours || 0) * (flEntries[j].rate || 0);
-    flTotal += feCost;
-    if (flEntries[j].paid) flSpent += feCost;
-  }
-  sb.flTotal    = flTotal;
-  sb.flSpent    = flSpent;
-  sb._flEntries = flEntries;
+  /* Recompute freelancer totals (respects __budget__ sentinels) */
+  sb._flEntries = sparkCurrentData.freelancerEntries || [];
+  flRecomputeTotals(sb);
 
   /* Recompute OOP totals */
   var oopEffective = 0, oopSpent = 0;
@@ -6573,6 +6565,31 @@ async function sparkAddSelectedMembers() {
 
 /* ── Freelancers Section (OOP-style, per-week line items) ── */
 
+/* Recompute flTotal / flSpent on a cached SUPA_BUDGETS object.
+   Budget sentinel entries (week_label === '__budget__') define the budget;
+   regular week entries count only toward flSpent (when paid).
+   If no sentinel exists, falls back to summing all entries (old behaviour). */
+function flRecomputeTotals(sb) {
+  var entries = sb._flEntries || [];
+  var hasSentinel = false;
+  for (var _i = 0; _i < entries.length; _i++) {
+    if (entries[_i].week_label === '__budget__') { hasSentinel = true; break; }
+  }
+  var flTot = 0, flSp = 0;
+  for (var _i = 0; _i < entries.length; _i++) {
+    var _fe = entries[_i];
+    var _cost = (_fe.hours || 0) * (_fe.rate || 0);
+    if (_fe.week_label === '__budget__') {
+      flTot += _cost;
+    } else {
+      if (!hasSentinel) flTot += _cost;
+      if (_fe.paid) flSp += _cost;
+    }
+  }
+  sb.flTotal = flTot;
+  sb.flSpent = flSp;
+}
+
 function sparkToggleFlSection(tmId) {
   sparkFlExpanded[tmId] = (sparkFlExpanded[tmId] === false) ? true : false;
   sparkRenderFreelancersContent();
@@ -6608,6 +6625,14 @@ async function sparkPatchFlAndRefresh(entryId, field, val) {
       if (sparkCurrentData.freelancerEntries[i].id === entryId) {
         sparkCurrentData.freelancerEntries[i][field] = patch[field]; break;
       }
+    }
+  }
+  /* Sync flTotal/flSpent on the cached budget object */
+  if (sparkCurrentData && sparkCurrentData.budget && SUPA_BUDGETS) {
+    var _pCode = (sparkCurrentData.budget.projects && sparkCurrentData.budget.projects.project_code) ? sparkCurrentData.budget.projects.project_code : PROJ_CODE_MAP[sparkCurrentData.budget.project_id];
+    if (_pCode && SUPA_BUDGETS[_pCode]) {
+      SUPA_BUDGETS[_pCode]._flEntries = sparkCurrentData.freelancerEntries;
+      flRecomputeTotals(SUPA_BUDGETS[_pCode]);
     }
   }
   sparkHideSaving();
@@ -6704,31 +6729,41 @@ function sparkRenderFreelancersContent() {
   }
 
   var h = '';
-  var grandHrs = 0, grandCost = 0, grandPaidHrs = 0, grandPaidCost = 0;
+  var grandBudgHrs = 0, grandBudgCost = 0, grandPaidHrs = 0, grandPaidCost = 0;
 
   for (var g = 0; g < tmOrder.length; g++) {
     var tmId = tmOrder[g];
     var grp = groups[tmId];
     var name = (grp.member && grp.member.name) || 'Unknown';
     var grpEntries = grp.entries;
-    var grpHrs = 0, grpCost = 0, grpPaidHrs = 0, grpPaidCost = 0, grpRate = 0;
-    var allPaid = true;
-    for (var i = 0; i < grpEntries.length; i++) {
-      var hrs = grpEntries[i].hours || 0;
-      var rate = grpEntries[i].rate || 0;
-      grpRate = rate; /* use last seen rate (all entries share the same rate) */
-      grpHrs += hrs;
-      grpCost += hrs * rate;
-      if (grpEntries[i].paid) { grpPaidHrs += hrs; grpPaidCost += hrs * rate; }
-      else if (hrs > 0) allPaid = false;
-    }
-    grandHrs += grpHrs;
-    grandCost += grpCost;
-    grandPaidHrs += grpPaidHrs;
-    grandPaidCost += grpPaidCost;
 
-    var unpaidHrs = grpHrs - grpPaidHrs;
-    var unpaidCost = grpCost - grpPaidCost;
+    /* Separate the budget sentinel from the payment-tracking week entries */
+    var budgetEntry = null, weekEntries = [];
+    var grpRate = 0;
+    for (var i = 0; i < grpEntries.length; i++) {
+      grpRate = grpEntries[i].rate || grpRate;
+      if (grpEntries[i].week_label === '__budget__') budgetEntry = grpEntries[i];
+      else weekEntries.push(grpEntries[i]);
+    }
+
+    /* Budget figures come from the sentinel (or sum of weeks if no sentinel) */
+    var budgHrs  = budgetEntry ? (budgetEntry.hours || 0) : weekEntries.reduce(function(s,e){ return s + (e.hours||0); }, 0);
+    var budgCost = budgHrs * grpRate;
+
+    /* Paid/unpaid come from week entries only */
+    var grpPaidHrs = 0, grpPaidCost = 0, grpWeekHrs = 0;
+    for (var i = 0; i < weekEntries.length; i++) {
+      var wh = weekEntries[i].hours || 0;
+      grpWeekHrs += wh;
+      if (weekEntries[i].paid) { grpPaidHrs += wh; grpPaidCost += wh * grpRate; }
+    }
+    var unpaidHrs  = Math.max(0, grpWeekHrs - grpPaidHrs);
+    var unpaidCost = unpaidHrs * grpRate;
+
+    grandBudgHrs  += budgHrs;
+    grandBudgCost += budgCost;
+    grandPaidHrs  += grpPaidHrs;
+    grandPaidCost += grpPaidCost;
 
     h += '<div style="border:1px solid rgba(91,74,138,.25);border-radius:8px;margin-top:8px;overflow:hidden">';
 
@@ -6741,14 +6776,28 @@ function sparkRenderFreelancersContent() {
     h += '<button onclick="sparkRemoveFreelancerFromProject(\'' + tmId + '\')" title="Remove freelancer" style="background:none;border:none;color:rgba(255,255,255,.45);cursor:pointer;font-size:20px;line-height:1;padding:0 4px" onmouseenter="this.style.color=\'#fff\'" onmouseleave="this.style.color=\'rgba(255,255,255,.45)\'">×</button>';
     h += '</div>';
 
+    /* Budget bucket row (snapshot total) */
+    h += '<div style="padding:8px 12px;background:rgba(91,74,138,.08);display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(91,74,138,.12)">';
+    h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#5B4A8A;white-space:nowrap">Budget</div>';
+    if (budgetEntry) {
+      h += '<input type="number" min="0" step="0.5" value="' + budgHrs + '" onchange="sparkPatchFlAndRefresh(\'' + budgetEntry.id + '\',\'hours\',parseFloat(this.value)||0)" style="width:60px;padding:3px 6px;border-radius:5px;border:1px solid rgba(91,74,138,.3);font-size:13px;font-weight:700;text-align:right;color:#5B4A8A;background:var(--white)">';
+      h += '<span style="font-size:12px;color:var(--mid-gray)">hrs</span>';
+      h += '<span style="font-size:12px;font-weight:600;color:#5B4A8A;margin-left:4px">' + sparkFmt(budgCost) + '</span>';
+    } else {
+      /* Legacy: no sentinel, show computed total as read-only */
+      h += '<span style="font-size:13px;font-weight:700;color:#5B4A8A">' + budgHrs.toFixed(1) + ' hrs · ' + sparkFmt(budgCost) + '</span>';
+      h += '<span style="font-size:10px;color:var(--mid-gray);margin-left:4px">(from week entries)</span>';
+    }
+    h += '</div>';
+
     /* Stats row */
     h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;padding:10px 12px;gap:8px;background:rgba(91,74,138,.04)">';
 
-    /* Planned */
+    /* Planned (weeks total) */
     h += '<div>';
-    h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mid-gray);margin-bottom:3px">Planned</div>';
-    h += '<div style="font-size:15px;font-weight:700;color:#5B4A8A">' + grpHrs.toFixed(1) + ' hrs</div>';
-    h += '<div style="font-size:11px;color:var(--mid-gray)">' + sparkFmt(grpCost) + '</div>';
+    h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mid-gray);margin-bottom:3px">Weeks Planned</div>';
+    h += '<div style="font-size:15px;font-weight:700;color:#5B4A8A">' + grpWeekHrs.toFixed(1) + ' hrs</div>';
+    h += '<div style="font-size:11px;color:var(--mid-gray)">' + sparkFmt(grpWeekHrs * grpRate) + '</div>';
     h += '</div>';
 
     /* Paid */
@@ -6767,7 +6816,7 @@ function sparkRenderFreelancersContent() {
       h += '<div style="font-size:11px;color:var(--mid-gray)">' + sparkFmt(unpaidCost) + '</div>';
       h += '</div>';
       h += '<button onclick="sparkMarkAllFlPaid(\'' + tmId + '\')" style="margin-top:6px;padding:4px 10px;border-radius:5px;border:none;background:#81C784;color:#1B5E20;cursor:pointer;font-size:10px;font-weight:700">Mark All Paid</button>';
-    } else if (grpHrs > 0) {
+    } else if (grpWeekHrs > 0) {
       h += '<div style="display:flex;align-items:center;gap:4px;margin-top:auto">';
       h += '<span style="font-size:18px">✓</span>';
       h += '<span style="font-size:11px;font-weight:600;color:#81C784">All Paid</span>';
@@ -6780,7 +6829,7 @@ function sparkRenderFreelancersContent() {
     /* Week-by-week entry rows */
     h += '<div style="border-top:1px solid rgba(91,74,138,.15)">';
     /* Column headers */
-    if (grpEntries.length > 0) {
+    if (weekEntries.length > 0) {
       h += '<div style="display:grid;grid-template-columns:1fr 90px 36px auto;gap:8px;padding:5px 12px 3px;background:rgba(91,74,138,.05)">';
       h += '<div style="font-size:9px;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Week</div>';
       h += '<div style="font-size:9px;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px;font-weight:700;text-align:right">Hrs · Cost</div>';
@@ -6788,8 +6837,8 @@ function sparkRenderFreelancersContent() {
       h += '<div></div>';
       h += '</div>';
     }
-    for (var wi = 0; wi < grpEntries.length; wi++) {
-      var we = grpEntries[wi];
+    for (var wi = 0; wi < weekEntries.length; wi++) {
+      var we = weekEntries[wi];
       var weHrs  = we.hours || 0;
       var weCost = weHrs * (we.rate || 0);
       var rowBg  = we.paid ? 'rgba(129,199,132,.07)' : (wi % 2 === 0 ? 'transparent' : 'rgba(0,0,0,.02)');
@@ -6818,8 +6867,8 @@ function sparkRenderFreelancersContent() {
 
   /* Grand total */
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 14px;margin-top:10px;background:rgba(91,74,138,.09);border-radius:8px">';
-  h += '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#5B4A8A;opacity:.8;margin-bottom:2px">Total Planned</div>';
-  h += '<span style="font-weight:700;color:#5B4A8A">' + grandHrs.toFixed(1) + ' hrs · ' + sparkFmt(grandCost) + '</span></div>';
+  h += '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#5B4A8A;opacity:.8;margin-bottom:2px">Total Budget</div>';
+  h += '<span style="font-weight:700;color:#5B4A8A">' + grandBudgHrs.toFixed(1) + ' hrs · ' + sparkFmt(grandBudgCost) + '</span></div>';
   h += '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#81C784;opacity:.8;margin-bottom:2px">Total Paid</div>';
   h += '<span style="font-weight:700;color:#81C784">' + grandPaidHrs.toFixed(1) + ' hrs · ' + sparkFmt(grandPaidCost) + '</span></div>';
   h += '</div>';
@@ -6836,25 +6885,18 @@ async function sparkMarkAllFlPaid(tmId) {
   sparkShowSaving();
   for (var i = 0; i < sparkCurrentData.freelancerEntries.length; i++) {
     var e = sparkCurrentData.freelancerEntries[i];
+    if (e.week_label === '__budget__') continue; /* skip budget sentinel */
     if (e.team_member_id === tmId && !e.paid) {
       await sparkFetch('freelancer_budget_entries?id=eq.' + e.id, '', 'PATCH', { paid: true, paid_date: today });
       sparkCurrentData.freelancerEntries[i].paid = true;
       sparkCurrentData.freelancerEntries[i].paid_date = today;
     }
   }
-  /* Sync flSpent in SUPA_BUDGETS */
+  /* Sync fl totals in SUPA_BUDGETS */
   if (sparkCurrentData.budget && SUPA_BUDGETS) {
-    var sb = SUPA_BUDGETS[sparkCurrentData.budget.project_code];
-    if (sb && sb._flEntries) {
-      for (var fi = 0; fi < sb._flEntries.length; fi++) {
-        if (sb._flEntries[fi].team_member_id === tmId) sb._flEntries[fi].paid = true;
-      }
-      var newFlSpent = 0;
-      for (var fk = 0; fk < sb._flEntries.length; fk++) {
-        if (sb._flEntries[fk].paid) newFlSpent += (sb._flEntries[fk].hours || 0) * (sb._flEntries[fk].rate || 0);
-      }
-      sb.flSpent = newFlSpent;
-    }
+    var _mCode = (sparkCurrentData.budget.projects && sparkCurrentData.budget.projects.project_code) ? sparkCurrentData.budget.projects.project_code : PROJ_CODE_MAP[sparkCurrentData.budget.project_id];
+    var sb = _mCode && SUPA_BUDGETS[_mCode];
+    if (sb) { sb._flEntries = sparkCurrentData.freelancerEntries; flRecomputeTotals(sb); }
   }
   sparkHideSaving();
   sparkRenderFreelancersContent();
@@ -6909,8 +6951,8 @@ async function sparkAddSelectedFreelancers() {
     var mName = checkboxes[i].getAttribute('data-name') || '';
     var result = await sparkFetch('freelancer_budget_entries', '', 'POST', {
       budget_id: budgetId, team_member_id: tmId,
-      week_label: 'Week 1', hours: 0, rate: rate, paid: false,
-      display_order: (sparkCurrentData.freelancerEntries || []).length + i
+      week_label: '__budget__', hours: 0, rate: rate, paid: false,
+      display_order: -1
     });
     if (result && result.length) {
       result[0].team_member = { id: tmId, name: mName };
@@ -10443,12 +10485,7 @@ function furnaceGlobalHandleEntryChange(type, payload) {
     var v = sparkOopItemEffective(oe); oopEff += v; if (oe.paid) oopSpent += v;
   }
   sb.oopEffective = oopEff; sb.oopSpent = oopSpent;
-  var flTot = 0, flSp = 0;
-  for (var i = 0; i < (sb._flEntries || []).length; i++) {
-    var cost = (sb._flEntries[i].hours||0)*(sb._flEntries[i].rate||0);
-    flTot += cost; if (sb._flEntries[i].paid) flSp += cost;
-  }
-  sb.flTotal = flTot; sb.flSpent = flSp;
+  flRecomputeTotals(sb);
 
   /* Re-render project financials banner and portfolio card */
   if (CLIENTS) {
@@ -10577,15 +10614,8 @@ async function loadSupabaseData() {
         }
       }
 
-      /* Compute freelancer totals */
-      var flTot = 0, flSpent = 0;
-      for (var k = 0; k < b._flEntries.length; k++) {
-        var feCost = (b._flEntries[k].hours || 0) * (b._flEntries[k].rate || 0);
-        flTot += feCost;
-        if (b._flEntries[k].paid) flSpent += feCost;
-      }
-      b.flTotal = flTot;
-      b.flSpent = flSpent;
+      /* Compute freelancer totals (respects __budget__ sentinels) */
+      flRecomputeTotals(b);
 
       /* Compute labor totals — flat $200/hr agency rate for everything */
       var laborHours = 0;
