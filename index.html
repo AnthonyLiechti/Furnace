@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.37 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 16, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.38 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 16, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -6467,9 +6467,17 @@ function sparkRenderLaborContent() {
       if (_ae.project_code !== _projCode || !_ae.person_name) continue;
       var _pn = _ae.person_name;
       var _pk2 = _ae.phase_key || '_none';
+      /* Index by full name */
       if (!_actByPersonPhase[_pn]) _actByPersonPhase[_pn] = { _total: 0 };
       _actByPersonPhase[_pn][_pk2] = (_actByPersonPhase[_pn][_pk2] || 0) + (_ae.hours || 0);
       _actByPersonPhase[_pn]._total = (_actByPersonPhase[_pn]._total || 0) + (_ae.hours || 0);
+      /* Also index by first name only as a fallback (handles truncated 7pace display names) */
+      var _firstName = _pn.split(' ')[0];
+      if (_firstName && _firstName !== _pn) {
+        if (!_actByPersonPhase[_firstName]) _actByPersonPhase[_firstName] = { _total: 0 };
+        _actByPersonPhase[_firstName][_pk2] = (_actByPersonPhase[_firstName][_pk2] || 0) + (_ae.hours || 0);
+        _actByPersonPhase[_firstName]._total = (_actByPersonPhase[_firstName]._total || 0) + (_ae.hours || 0);
+      }
     }
   }
 
@@ -6550,9 +6558,15 @@ function sparkRenderLaborContent() {
         var totalCost = totalHrs * rate;
         var empType = entry.employment_type || (entry.team_member && entry.team_member.employment_type) || '';
         var tag = empType === 'Contractor' ? ' <span style="font-size:9px;color:var(--mid-gray)">(C)</span>' : '';
-        var _personAct = _actByPersonPhase[name] || null;
-        var _actTotal = _personAct ? (_personAct._total || 0) : 0;
-        var _actCost  = _actTotal * rate;
+        /* Full-name match first; fall back to first name for truncated 7pace display names */
+        var _firstName = name.split(' ')[0];
+        var _personAct = _actByPersonPhase[name] || _actByPersonPhase[_firstName] || null;
+        var _actTotal  = _personAct ? (_personAct._total || 0) : 0;
+        var _actCost   = _actTotal * rate;
+        /* True if person has hours but none are phase-tagged */
+        var _allUnphased = _actTotal > 0 && !Object.keys(_personAct).some(function(k) {
+          return k !== '_total' && k !== '_none' && (_personAct[k] > 0);
+        });
 
         th += '<tr class="spark-person-row">';
         th += '<td>' + name + tag + '</td>';
@@ -6567,7 +6581,8 @@ function sparkRenderLaborContent() {
             th += '<td class="num" style="font-size:12px;' + usedColour(_actPh, phVal) + '">' + (_actPh > 0 ? _actPh.toFixed(1) : '<span style="opacity:.18">—</span>') + '</td>';
           }
           th += '<td class="num" style="font-weight:600">' + totalHrs.toFixed(1) + '</td>';
-          th += '<td class="num" style="font-weight:600;' + usedColour(_actTotal, totalHrs) + '">' + (_actTotal > 0 ? _actTotal.toFixed(1) : '<span style="opacity:.18">—</span>') + '</td>';
+          var _actTotalCell = _actTotal > 0 ? _actTotal.toFixed(1) + (_allUnphased ? '<div style="font-size:9px;opacity:.5;line-height:1;margin-top:1px">unphased</div>' : '') : '<span style="opacity:.18">—</span>';
+          th += '<td class="num" style="font-weight:600;' + usedColour(_actTotal, totalHrs) + '">' + _actTotalCell + '</td>';
         } else {
           var phVal = entry[phaseKey] || 0;
           var _actPh = _personAct ? (_personAct[phaseKey] || 0) : 0;
