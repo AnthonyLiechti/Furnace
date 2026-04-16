@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.27 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.28 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -6320,10 +6320,15 @@ function sparkRenderSummary() {
     totalLaborCost += hrs * sparkGetRate(e);
   }
   var totalFlHrs = 0, totalFlCost = 0;
-  for (var i = 0; i < (data.freelancerEntries || []).length; i++) {
-    var fe = data.freelancerEntries[i];
-    totalFlHrs += fe.hours || 0;
-    totalFlCost += (fe.hours || 0) * (fe.rate || 0);
+  var _flAll = data.freelancerEntries || [];
+  var _hasSentinel = _flAll.some(function(e) { return e.week_label === '__budget__'; });
+  for (var i = 0; i < _flAll.length; i++) {
+    var fe = _flAll[i];
+    var isSentinel = fe.week_label === '__budget__';
+    if (_hasSentinel ? isSentinel : !isSentinel) {
+      totalFlHrs  += fe.hours || 0;
+      totalFlCost += (fe.hours || 0) * (fe.rate || 0);
+    }
   }
   var totalOop = 0;
   for (var i = 0; i < data.oop.length; i++) {
