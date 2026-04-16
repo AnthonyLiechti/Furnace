@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.33 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 16, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.34 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 16, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -6423,15 +6423,46 @@ function sparkRenderLaborContent() {
     var allDepts = SPARK_DEPT_ORDER.slice();
     if (grouped.other.length) allDepts.push('Other');
 
+    /* Pre-compute totals across all entries for the footer row */
+    var _totBudgByPhase = {}, _totActByPhase = {};
+    var _totBudgAll = 0, _totActAll = 0, _totCostAll = 0;
+    for (var _ti = 0; _ti < entries.length; _ti++) {
+      var _te = entries[_ti];
+      var _tName = (_te.team_member && _te.team_member.name) || 'Unknown';
+      var _tAct = _actByPersonPhase[_tName] || null;
+      for (var _tp = 0; _tp < SPARK_PHASES.length; _tp++) {
+        var _tpk = SPARK_PHASES[_tp].key;
+        _totBudgByPhase[_tpk] = (_totBudgByPhase[_tpk] || 0) + (_te[_tpk] || 0);
+        _totActByPhase[_tpk]  = (_totActByPhase[_tpk]  || 0) + (_tAct ? (_tAct[_tpk] || 0) : 0);
+      }
+      _totBudgAll += sparkEntryHours(_te, 'all');
+      _totActAll  += _tAct ? (_tAct._total || 0) : 0;
+      _totCostAll += sparkEntryTotal(_te);
+    }
+
+    /* Column counts:
+       all-phases : Name + Rate + (phase budget + phase used)*N + Total Hrs + Total Used + Total $
+       single     : Name + Rate + Budget + Used + Total Hrs + Total $                           */
+    var colCount = phaseKey === 'all' ? SPARK_PHASES.length * 2 + 5 : 6;
+
+    /* ── Header ── */
     var th = '<table class="spark-labor-table">';
     th += '<thead><tr><th>Name</th><th class="num">Rate</th>';
     if (phaseKey === 'all') {
-      for (var p = 0; p < SPARK_PHASES.length; p++) th += '<th class="num">' + SPARK_PHASES[p].label + '</th>';
+      for (var p = 0; p < SPARK_PHASES.length; p++) {
+        th += '<th class="num">' + SPARK_PHASES[p].label + '</th>';
+        th += '<th class="num" style="color:rgba(255,138,101,.75);font-size:10px;font-weight:600;padding-left:2px">Used</th>';
+      }
+      th += '<th class="num">Total Hrs</th>';
+      th += '<th class="num" style="color:rgba(255,138,101,.75);font-size:10px;font-weight:600">Used</th>';
     } else {
-      th += '<th class="num">Hours</th>';
+      th += '<th class="num">Budget</th>';
+      th += '<th class="num" style="color:rgba(255,138,101,.75);font-size:10px;font-weight:600">Used</th>';
+      th += '<th class="num">Total Hrs</th>';
     }
-    th += '<th class="num">Total Hrs</th><th class="num">Total $</th></tr></thead><tbody>';
+    th += '<th class="num">Total $</th></tr></thead><tbody>';
 
+    /* ── Dept + person rows ── */
     for (var d = 0; d < allDepts.length; d++) {
       var deptName = allDepts[d];
       var members = deptName === 'Other' ? grouped.other : grouped.groups[deptName];
@@ -6444,7 +6475,6 @@ function sparkRenderLaborContent() {
         deptCost += sparkEntryTotal(members[m]);
       }
 
-      var colCount = phaseKey === 'all' ? SPARK_PHASES.length + 4 : 5;
       th += '<tr class="spark-dept-row"><td colspan="' + colCount + '"><div class="spark-dept-label"><div class="spark-dept-bar" style="background:' + deptColor + '"></div>' + deptName + '<span style="font-weight:400;font-size:11px;color:var(--mid-gray);margin-left:8px">' + deptHrs.toFixed(1) + ' hrs / ' + sparkFmt(deptCost) + '</span></div></td></tr>';
 
       for (var m = 0; m < members.length; m++) {
@@ -6466,24 +6496,48 @@ function sparkRenderLaborContent() {
             var pk = SPARK_PHASES[p].key;
             var phVal = entry[pk] || 0;
             var _actPh = _personAct ? (_personAct[pk] || 0) : 0;
-            var _actLabel = _actPh > 0 ? '<div style="font-size:9px;color:rgba(255,138,101,.8);margin-top:2px;line-height:1">' + _actPh.toFixed(1) + ' used</div>' : '';
-            th += '<td class="num"><input type="number" class="spark-input" value="' + phVal + '" min="0" step="0.5" onchange="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + pk + '\',this.value)" oninput="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + pk + '\',this.value)">' + _actLabel + '</td>';
+            th += '<td class="num"><input type="number" class="spark-input" value="' + phVal + '" min="0" step="0.5" onchange="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + pk + '\',this.value)" oninput="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + pk + '\',this.value)"></td>';
+            th += '<td class="num" style="color:rgba(255,138,101,.85);font-size:12px">' + (_actPh > 0 ? _actPh.toFixed(1) : '<span style="opacity:.18">—</span>') + '</td>';
           }
+          var _actTotal = _personAct ? (_personAct._total || 0) : 0;
+          th += '<td class="num" style="font-weight:600">' + totalHrs.toFixed(1) + '</td>';
+          th += '<td class="num" style="color:rgba(255,138,101,.85);font-weight:600">' + (_actTotal > 0 ? _actTotal.toFixed(1) : '<span style="opacity:.18">—</span>') + '</td>';
         } else {
           var phVal = entry[phaseKey] || 0;
           var _actPh = _personAct ? (_personAct[phaseKey] || 0) : 0;
-          var _actLabel = _actPh > 0 ? '<div style="font-size:9px;color:rgba(255,138,101,.8);margin-top:2px;line-height:1">' + _actPh.toFixed(1) + ' used</div>' : '';
-          th += '<td class="num"><input type="number" class="spark-input" value="' + phVal + '" min="0" step="0.5" onchange="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + phaseKey + '\',this.value)" oninput="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + phaseKey + '\',this.value)">' + _actLabel + '</td>';
+          th += '<td class="num"><input type="number" class="spark-input" value="' + phVal + '" min="0" step="0.5" onchange="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + phaseKey + '\',this.value)" oninput="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + phaseKey + '\',this.value)"></td>';
+          th += '<td class="num" style="color:rgba(255,138,101,.85);font-size:12px">' + (_actPh > 0 ? _actPh.toFixed(1) : '<span style="opacity:.18">—</span>') + '</td>';
+          th += '<td class="num" style="font-weight:600">' + totalHrs.toFixed(1) + '</td>';
         }
 
-        /* Total Hrs: show actual total alongside budget total */
-        var _actTotal = _personAct ? (_personAct._total || 0) : 0;
-        var _totalLabel = _actTotal > 0 ? '<div style="font-size:9px;color:rgba(255,138,101,.8);margin-top:1px;line-height:1">' + _actTotal.toFixed(1) + ' used</div>' : '';
-        th += '<td class="num" style="font-weight:600">' + totalHrs.toFixed(1) + _totalLabel + '</td>';
         th += '<td class="num" style="font-weight:600">' + sparkFmt(totalCost) + '</td>';
         th += '</tr>';
       }
     }
+
+    /* ── Totals footer row ── */
+    th += '<tr style="border-top:2px solid var(--canvas)">';
+    th += '<td colspan="2" style="padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--mid-gray)">Totals</td>';
+    if (phaseKey === 'all') {
+      for (var p = 0; p < SPARK_PHASES.length; p++) {
+        var _fpk = SPARK_PHASES[p].key;
+        var _fBudg = _totBudgByPhase[_fpk] || 0;
+        var _fAct  = _totActByPhase[_fpk]  || 0;
+        th += '<td class="num" style="font-weight:700;padding:8px 10px">' + (_fBudg > 0 ? _fBudg.toFixed(1) : '<span style="opacity:.2">—</span>') + '</td>';
+        th += '<td class="num" style="color:rgba(255,138,101,.9);font-weight:700;padding:8px 10px">' + (_fAct > 0 ? _fAct.toFixed(1) : '<span style="opacity:.2">—</span>') + '</td>';
+      }
+      th += '<td class="num" style="font-weight:700;padding:8px 10px">' + _totBudgAll.toFixed(1) + '</td>';
+      th += '<td class="num" style="color:rgba(255,138,101,.9);font-weight:700;padding:8px 10px">' + (_totActAll > 0 ? _totActAll.toFixed(1) : '<span style="opacity:.2">—</span>') + '</td>';
+    } else {
+      var _fBudgPh = _totBudgByPhase[phaseKey] || 0;
+      var _fActPh  = _totActByPhase[phaseKey]  || 0;
+      th += '<td class="num" style="font-weight:700;padding:8px 10px">' + (_fBudgPh > 0 ? _fBudgPh.toFixed(1) : '<span style="opacity:.2">—</span>') + '</td>';
+      th += '<td class="num" style="color:rgba(255,138,101,.9);font-weight:700;padding:8px 10px">' + (_fActPh > 0 ? _fActPh.toFixed(1) : '<span style="opacity:.2">—</span>') + '</td>';
+      th += '<td class="num" style="font-weight:700;padding:8px 10px">' + _totBudgAll.toFixed(1) + '</td>';
+    }
+    th += '<td class="num" style="font-weight:700;padding:8px 10px">' + sparkFmt(_totCostAll) + '</td>';
+    th += '</tr>';
+
     th += '</tbody></table>';
     return th;
   }
