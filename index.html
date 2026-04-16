@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.31 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.32 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 16, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -1147,25 +1147,33 @@ function computeCascade(project) {
 }
 
 /* ── AGGREGATE HELPERS ── */
-/* Lazy-load actuals for a specific project if not in cache (covers pre-2025 data) */
+/* Per-project actuals refresh — runs once per session per project code.
+   Always replaces cached data with a complete, no-date-cutoff fetch so the
+   project page always shows the true total regardless of what the bulk load captured. */
 var _lazyLoadedProjects = {};
-async function ensureProjectActuals(projCode) {
+async function ensureProjectActuals(projCode, proj) {
   if (!SUPA_LOADED || !sparkAuth.connected) return;
-  if (SUPA_ACTUALS[projCode] || _lazyLoadedProjects[projCode]) return;
+  if (_lazyLoadedProjects[projCode]) return; /* already fetched or in-flight this session */
   _lazyLoadedProjects[projCode] = true;
-  /* Fetch ALL actuals for this project (no date filter) */
+  /* Fetch ALL actuals for this project — no date filter, authoritative total */
   var entries = await sparkFetchAll('labor_actuals',
     'select=id,hours,work_date,person_name,project_code,phase_key,is_billable,is_bizdev,is_timeoff,board_name&source=eq.timetracker&project_code=eq.' + projCode + '&order=work_date.desc');
   if (entries && entries.length > 0) {
-    if (!SUPA_ACTUALS[projCode]) SUPA_ACTUALS[projCode] = { totalHours: 0, phases: {}, people: {}, byDate: {} };
+    /* Replace (not add to) any stale bulk-load entry for this project */
+    SUPA_ACTUALS[projCode] = { totalHours: 0, phases: {}, people: {}, byDate: {} };
     var sa = SUPA_ACTUALS[projCode];
     for (var i = 0; i < entries.length; i++) {
       var a = entries[i];
       sa.totalHours += a.hours || 0;
       if (a.phase_key) sa.phases[a.phase_key] = (sa.phases[a.phase_key] || 0) + (a.hours || 0);
       if (a.person_name) sa.people[a.person_name] = (sa.people[a.person_name] || 0) + (a.hours || 0);
+      if (a.work_date) { if (!sa.byDate[a.work_date]) sa.byDate[a.work_date] = 0; sa.byDate[a.work_date] += a.hours || 0; }
     }
-    SUPA_ACTUALS_ALL = (SUPA_ACTUALS_ALL || []).concat(entries);
+    /* Sync SUPA_ACTUALS_ALL: drop stale entries for this code, append fresh ones */
+    SUPA_ACTUALS_ALL = (SUPA_ACTUALS_ALL || []).filter(function(a) { return a.project_code !== projCode; });
+    SUPA_ACTUALS_ALL = SUPA_ACTUALS_ALL.concat(entries);
+    /* Re-render the project financials card if still on that project's page */
+    if (proj) renderProjFinancials(proj);
   }
 }
 
@@ -2141,8 +2149,8 @@ async function sparkToggleBudgetSection(budgetId, projCode, field) {
 function renderProject(projectId) {
   var p = projectById(projectId);
   if (!p) return;
-  /* Lazy-load actuals for this project if not already in cache */
-  ensureProjectActuals(p.code);
+  /* Fetch authoritative actuals for this project (replaces bulk-load cache, once per session) */
+  ensureProjectActuals(p.code, p);
   var cascaded = computeCascade(p);
   var spent = filteredProjectSpent(p);
   var prog = pct(spent, p.totalBudget);
