@@ -295,7 +295,7 @@ body { font-family: Arial, 'TT Hoves Pro', sans-serif; background: var(--light-g
 .spark-phase-tab:hover:not(.active) { background:var(--light-gray); }
 .spark-labor-table { width:100%; border-collapse:collapse; }
 .spark-labor-table th { text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:var(--mid-gray); padding:8px 10px; border-bottom:2px solid var(--canvas); font-weight:500; }
-.spark-labor-table th.num { text-align:right; }
+.spark-labor-table th.num { text-align:center; }
 .spark-dept-row td { padding:10px 10px; font-size:13px; font-weight:700; border-bottom:1px solid var(--canvas); }
 .spark-dept-row .spark-dept-label { display:flex; align-items:center; gap:8px; }
 .spark-dept-bar { width:4px; height:18px; border-radius:2px; flex-shrink:0; }
@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.34 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 16, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.35 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 16, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -6425,7 +6425,7 @@ function sparkRenderLaborContent() {
 
     /* Pre-compute totals across all entries for the footer row */
     var _totBudgByPhase = {}, _totActByPhase = {};
-    var _totBudgAll = 0, _totActAll = 0, _totCostAll = 0;
+    var _totBudgAll = 0, _totActAll = 0, _totCostAll = 0, _totActCostAll = 0;
     for (var _ti = 0; _ti < entries.length; _ti++) {
       var _te = entries[_ti];
       var _tName = (_te.team_member && _te.team_member.name) || 'Unknown';
@@ -6435,15 +6435,22 @@ function sparkRenderLaborContent() {
         _totBudgByPhase[_tpk] = (_totBudgByPhase[_tpk] || 0) + (_te[_tpk] || 0);
         _totActByPhase[_tpk]  = (_totActByPhase[_tpk]  || 0) + (_tAct ? (_tAct[_tpk] || 0) : 0);
       }
-      _totBudgAll += sparkEntryHours(_te, 'all');
-      _totActAll  += _tAct ? (_tAct._total || 0) : 0;
-      _totCostAll += sparkEntryTotal(_te);
+      _totBudgAll    += sparkEntryHours(_te, 'all');
+      _totActAll     += _tAct ? (_tAct._total || 0) : 0;
+      _totCostAll    += sparkEntryTotal(_te);
+      _totActCostAll += _tAct ? ((_tAct._total || 0) * sparkGetRate(_te)) : 0;
+    }
+
+    /* Helper: colour a "used" value green if under budget, orange if over, dim if zero */
+    function usedColour(used, budget) {
+      if (used <= 0) return 'opacity:.18';
+      return used > budget ? 'color:rgba(255,138,101,.9)' : 'color:rgba(129,199,132,.9)';
     }
 
     /* Column counts:
-       all-phases : Name + Rate + (phase budget + phase used)*N + Total Hrs + Total Used + Total $
-       single     : Name + Rate + Budget + Used + Total Hrs + Total $                           */
-    var colCount = phaseKey === 'all' ? SPARK_PHASES.length * 2 + 5 : 6;
+       all-phases : Name + Rate + (budget + used)*N phases + Budgeted Hrs + Total Hrs Used + Total $ Budgeted + Total $ Used
+       single     : Name + Rate + Budget + Used + Budgeted Hrs + Total $ Budgeted + Total $ Used                             */
+    var colCount = phaseKey === 'all' ? SPARK_PHASES.length * 2 + 6 : 7;
 
     /* ── Header ── */
     var th = '<table class="spark-labor-table">';
@@ -6451,16 +6458,18 @@ function sparkRenderLaborContent() {
     if (phaseKey === 'all') {
       for (var p = 0; p < SPARK_PHASES.length; p++) {
         th += '<th class="num">' + SPARK_PHASES[p].label + '</th>';
-        th += '<th class="num" style="color:rgba(255,138,101,.75);font-size:10px;font-weight:600;padding-left:2px">Used</th>';
+        th += '<th class="num" style="font-size:10px;font-weight:600;padding-left:2px">Used</th>';
       }
-      th += '<th class="num">Total Hrs</th>';
-      th += '<th class="num" style="color:rgba(255,138,101,.75);font-size:10px;font-weight:600">Used</th>';
+      th += '<th class="num">Budgeted Hrs</th>';
+      th += '<th class="num" style="font-size:10px;font-weight:600">Total Hrs Used</th>';
     } else {
       th += '<th class="num">Budget</th>';
-      th += '<th class="num" style="color:rgba(255,138,101,.75);font-size:10px;font-weight:600">Used</th>';
-      th += '<th class="num">Total Hrs</th>';
+      th += '<th class="num" style="font-size:10px;font-weight:600">Used</th>';
+      th += '<th class="num">Budgeted Hrs</th>';
     }
-    th += '<th class="num">Total $</th></tr></thead><tbody>';
+    th += '<th class="num">Total $ Budgeted</th>';
+    th += '<th class="num" style="font-size:10px;font-weight:600">Total $ Used</th>';
+    th += '</tr></thead><tbody>';
 
     /* ── Dept + person rows ── */
     for (var d = 0; d < allDepts.length; d++) {
@@ -6486,6 +6495,8 @@ function sparkRenderLaborContent() {
         var empType = entry.employment_type || (entry.team_member && entry.team_member.employment_type) || '';
         var tag = empType === 'Contractor' ? ' <span style="font-size:9px;color:var(--mid-gray)">(C)</span>' : '';
         var _personAct = _actByPersonPhase[name] || null;
+        var _actTotal = _personAct ? (_personAct._total || 0) : 0;
+        var _actCost  = _actTotal * rate;
 
         th += '<tr class="spark-person-row">';
         th += '<td>' + name + tag + '</td>';
@@ -6497,20 +6508,20 @@ function sparkRenderLaborContent() {
             var phVal = entry[pk] || 0;
             var _actPh = _personAct ? (_personAct[pk] || 0) : 0;
             th += '<td class="num"><input type="number" class="spark-input" value="' + phVal + '" min="0" step="0.5" onchange="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + pk + '\',this.value)" oninput="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + pk + '\',this.value)"></td>';
-            th += '<td class="num" style="color:rgba(255,138,101,.85);font-size:12px">' + (_actPh > 0 ? _actPh.toFixed(1) : '<span style="opacity:.18">—</span>') + '</td>';
+            th += '<td class="num" style="font-size:12px;' + usedColour(_actPh, phVal) + '">' + (_actPh > 0 ? _actPh.toFixed(1) : '<span style="opacity:.18">—</span>') + '</td>';
           }
-          var _actTotal = _personAct ? (_personAct._total || 0) : 0;
           th += '<td class="num" style="font-weight:600">' + totalHrs.toFixed(1) + '</td>';
-          th += '<td class="num" style="color:rgba(255,138,101,.85);font-weight:600">' + (_actTotal > 0 ? _actTotal.toFixed(1) : '<span style="opacity:.18">—</span>') + '</td>';
+          th += '<td class="num" style="font-weight:600;' + usedColour(_actTotal, totalHrs) + '">' + (_actTotal > 0 ? _actTotal.toFixed(1) : '<span style="opacity:.18">—</span>') + '</td>';
         } else {
           var phVal = entry[phaseKey] || 0;
           var _actPh = _personAct ? (_personAct[phaseKey] || 0) : 0;
           th += '<td class="num"><input type="number" class="spark-input" value="' + phVal + '" min="0" step="0.5" onchange="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + phaseKey + '\',this.value)" oninput="sparkDebouncedPatchLabor(\'' + entry.id + '\',\'' + phaseKey + '\',this.value)"></td>';
-          th += '<td class="num" style="color:rgba(255,138,101,.85);font-size:12px">' + (_actPh > 0 ? _actPh.toFixed(1) : '<span style="opacity:.18">—</span>') + '</td>';
+          th += '<td class="num" style="font-size:12px;' + usedColour(_actPh, phVal) + '">' + (_actPh > 0 ? _actPh.toFixed(1) : '<span style="opacity:.18">—</span>') + '</td>';
           th += '<td class="num" style="font-weight:600">' + totalHrs.toFixed(1) + '</td>';
         }
 
         th += '<td class="num" style="font-weight:600">' + sparkFmt(totalCost) + '</td>';
+        th += '<td class="num" style="font-weight:600;' + usedColour(_actCost, totalCost) + '">' + (_actCost > 0 ? sparkFmt(_actCost) : '<span style="opacity:.18">—</span>') + '</td>';
         th += '</tr>';
       }
     }
@@ -6524,18 +6535,19 @@ function sparkRenderLaborContent() {
         var _fBudg = _totBudgByPhase[_fpk] || 0;
         var _fAct  = _totActByPhase[_fpk]  || 0;
         th += '<td class="num" style="font-weight:700;padding:8px 10px">' + (_fBudg > 0 ? _fBudg.toFixed(1) : '<span style="opacity:.2">—</span>') + '</td>';
-        th += '<td class="num" style="color:rgba(255,138,101,.9);font-weight:700;padding:8px 10px">' + (_fAct > 0 ? _fAct.toFixed(1) : '<span style="opacity:.2">—</span>') + '</td>';
+        th += '<td class="num" style="font-weight:700;padding:8px 10px;' + usedColour(_fAct, _fBudg) + '">' + (_fAct > 0 ? _fAct.toFixed(1) : '<span style="opacity:.2">—</span>') + '</td>';
       }
       th += '<td class="num" style="font-weight:700;padding:8px 10px">' + _totBudgAll.toFixed(1) + '</td>';
-      th += '<td class="num" style="color:rgba(255,138,101,.9);font-weight:700;padding:8px 10px">' + (_totActAll > 0 ? _totActAll.toFixed(1) : '<span style="opacity:.2">—</span>') + '</td>';
+      th += '<td class="num" style="font-weight:700;padding:8px 10px;' + usedColour(_totActAll, _totBudgAll) + '">' + (_totActAll > 0 ? _totActAll.toFixed(1) : '<span style="opacity:.2">—</span>') + '</td>';
     } else {
       var _fBudgPh = _totBudgByPhase[phaseKey] || 0;
       var _fActPh  = _totActByPhase[phaseKey]  || 0;
       th += '<td class="num" style="font-weight:700;padding:8px 10px">' + (_fBudgPh > 0 ? _fBudgPh.toFixed(1) : '<span style="opacity:.2">—</span>') + '</td>';
-      th += '<td class="num" style="color:rgba(255,138,101,.9);font-weight:700;padding:8px 10px">' + (_fActPh > 0 ? _fActPh.toFixed(1) : '<span style="opacity:.2">—</span>') + '</td>';
+      th += '<td class="num" style="font-weight:700;padding:8px 10px;' + usedColour(_fActPh, _fBudgPh) + '">' + (_fActPh > 0 ? _fActPh.toFixed(1) : '<span style="opacity:.2">—</span>') + '</td>';
       th += '<td class="num" style="font-weight:700;padding:8px 10px">' + _totBudgAll.toFixed(1) + '</td>';
     }
     th += '<td class="num" style="font-weight:700;padding:8px 10px">' + sparkFmt(_totCostAll) + '</td>';
+    th += '<td class="num" style="font-weight:700;padding:8px 10px;' + usedColour(_totActCostAll, _totCostAll) + '">' + (_totActCostAll > 0 ? sparkFmt(_totActCostAll) : '<span style="opacity:.2">—</span>') + '</td>';
     th += '</tr>';
 
     th += '</tbody></table>';
