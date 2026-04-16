@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.29 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.30 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -6960,6 +6960,13 @@ async function sparkAddSelectedFreelancers() {
   if (!checkboxes.length) { overlay.remove(); return; }
   var budgetId = sparkCurrentData.budget.id;
   sparkShowSaving();
+  /* If the budget was flagged no_freelancers, clear it now */
+  if (sparkCurrentData.budget.no_freelancers) {
+    await sparkFetch('budgets?id=eq.' + budgetId, '', 'PATCH', { no_freelancers: false });
+    sparkCurrentData.budget.no_freelancers = false;
+    var _pfCode = (sparkCurrentData.budget.projects && sparkCurrentData.budget.projects.project_code) ? sparkCurrentData.budget.projects.project_code : PROJ_CODE_MAP[sparkCurrentData.budget.project_id];
+    if (_pfCode && SUPA_BUDGETS && SUPA_BUDGETS[_pfCode]) SUPA_BUDGETS[_pfCode].no_freelancers = false;
+  }
   for (var i = 0; i < checkboxes.length; i++) {
     var tmId = checkboxes[i].value;
     var rate = parseFloat(checkboxes[i].getAttribute('data-rate')) || 0;
