@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.35 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 16, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.36 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 16, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -2156,8 +2156,22 @@ function renderProject(projectId) {
   var prog = pct(spent, p.totalBudget);
   var rate = getRate(p.clientId);
 
+  /* Phase dropdown options */
+  var _phaseOpts = '<option value="">— Set Phase —</option>';
+  for (var _pk in PROJ_PHASE_LABELS) {
+    var _sel = (p.currentPhase === _pk) ? ' selected' : '';
+    _phaseOpts += '<option value="' + _pk + '"' + _sel + '>' + PROJ_PHASE_LABELS[_pk] + '</option>';
+  }
+  var _phaseColor = (p.currentPhase && PROJ_PHASE_COLORS[p.currentPhase]) ? PROJ_PHASE_COLORS[p.currentPhase] : 'rgba(255,255,255,.25)';
+  var _phasePill = '<select onchange="setProjectCurrentPhase(\'' + p._supaId + '\',this.value,\'' + p.code + '\')" '
+    + 'style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;border:2px solid ' + _phaseColor + ';background:transparent;color:' + _phaseColor + ';cursor:pointer;letter-spacing:.4px;outline:none;appearance:none;-webkit-appearance:none;min-width:90px;text-align:center">'
+    + _phaseOpts + '</select>';
+
   var h = '<p class="page-subtitle" style="margin-bottom:2px;font-family:monospace;font-size:12px;letter-spacing:.5px;color:var(--mid-gray)">' + p.code + '</p>';
-  h += '<h1 class="page-title">' + p.name + '</h1>';
+  h += '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px">';
+  h += '<h1 class="page-title" style="margin:0">' + p.name + '</h1>';
+  h += _phasePill;
+  h += '</div>';
   h += '<p class="page-subtitle">' + p.clientCode + ' ' + p.clientName + ' &middot; Rate: ' + (rate > 0 ? '$' + rate + '/hr' : 'Not set') + '</p>';
 
   if (!p.hasBudgetData && p.dataSource !== 'snapshot' && p.dataSource !== 'supabase') {
@@ -4113,6 +4127,26 @@ async function toggleYTDProjectClosed(code) {
   renderYTD();
 }
 
+async function setProjectCurrentPhase(supaId, phase, projCode) {
+  if (!supaId) return;
+  await sparkFetch('projects?id=eq.' + supaId, '', 'PATCH', { current_phase: phase || null });
+  /* Update in-memory so the pill re-renders immediately */
+  if (CLIENTS) {
+    outer2: for (var _ci = 0; _ci < CLIENTS.length; _ci++) {
+      for (var _pi = 0; _pi < CLIENTS[_ci].projects.length; _pi++) {
+        if (CLIENTS[_ci].projects[_pi].code === projCode) {
+          CLIENTS[_ci].projects[_pi].currentPhase = phase || null;
+          break outer2;
+        }
+      }
+    }
+  }
+  /* Re-render the pill colour without a full page reload */
+  var _color = (phase && PROJ_PHASE_COLORS[phase]) ? PROJ_PHASE_COLORS[phase] : 'rgba(255,255,255,.25)';
+  var _sel = document.querySelector('select[onchange*="setProjectCurrentPhase"]');
+  if (_sel) { _sel.style.borderColor = _color; _sel.style.color = _color; }
+}
+
 function renderYTD() {
   var mc = document.getElementById('mainContent');
   if (!mc) return;
@@ -5815,6 +5849,24 @@ var SPARK_PHASES = [
   {key:'phase4', label:'P4'},
   {key:'phase5', label:'P5'}
 ];
+
+/* Shared phase metadata — used by project page dropdown and resource manager */
+var PROJ_PHASE_LABELS = {
+  'phase1':   'Phase 1',
+  'phase2':   'Phase 2',
+  'phase3_1': 'Phase 3.1',
+  'phase3_2': 'Phase 3.2',
+  'phase4':   'Phase 4',
+  'phase5':   'Phase 5'
+};
+var PROJ_PHASE_COLORS = {
+  'phase1':   '#42A5F5',
+  'phase2':   '#66BB6A',
+  'phase3_1': '#FFA726',
+  'phase3_2': '#FF7043',
+  'phase4':   '#AB47BC',
+  'phase5':   '#26C6DA'
+};
 
 /* Freelancer section expanded state — keyed by team_member_id */
 var sparkFlExpanded = {};
@@ -11028,7 +11080,8 @@ async function buildClientsFromSupabase() {
       oopCost:      sb ? (sb.oopEffective || sb.oopTotal || 0) : (p.oop_cost_snapshot || 0),
       totalBudget:  sb ? (sb.laborHours   || 0) : 0,
       _supabudget:  sb || null,
-      _supaId: p.id
+      _supaId: p.id,
+      currentPhase: p.current_phase || null
     };
     if (sb) {
       proj.profit = (sb.client_price || 0) - (sb.laborTotal || 0) - (sb.oopEffective || sb.oopTotal || 0);
