@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.25 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.26 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 15, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -6776,6 +6776,43 @@ function sparkRenderFreelancersContent() {
     h += '</div>';
 
     h += '</div>'; /* end stats grid */
+
+    /* Week-by-week entry rows */
+    h += '<div style="border-top:1px solid rgba(91,74,138,.15)">';
+    /* Column headers */
+    if (grpEntries.length > 0) {
+      h += '<div style="display:grid;grid-template-columns:1fr 90px 36px auto;gap:8px;padding:5px 12px 3px;background:rgba(91,74,138,.05)">';
+      h += '<div style="font-size:9px;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Week</div>';
+      h += '<div style="font-size:9px;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px;font-weight:700;text-align:right">Hrs · Cost</div>';
+      h += '<div style="font-size:9px;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px;font-weight:700;text-align:center">Paid</div>';
+      h += '<div></div>';
+      h += '</div>';
+    }
+    for (var wi = 0; wi < grpEntries.length; wi++) {
+      var we = grpEntries[wi];
+      var weHrs  = we.hours || 0;
+      var weCost = weHrs * (we.rate || 0);
+      var rowBg  = we.paid ? 'rgba(129,199,132,.07)' : (wi % 2 === 0 ? 'transparent' : 'rgba(0,0,0,.02)');
+      h += '<div style="display:grid;grid-template-columns:1fr 90px 36px auto;align-items:center;gap:8px;padding:6px 12px;background:' + rowBg + '">';
+      /* Label */
+      h += '<div style="font-size:12px;color:var(--abyss);font-weight:500">' + (we.week_label || 'Week') + (we.notes ? '<div style="font-size:10px;color:var(--mid-gray);margin-top:1px">' + we.notes + '</div>' : '') + '</div>';
+      /* Hours input + cost */
+      h += '<div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">';
+      h += '<input type="number" min="0" step="0.5" value="' + weHrs + '" onchange="sparkPatchFlAndRefresh(\'' + we.id + '\',\'hours\',parseFloat(this.value)||0)" style="width:52px;padding:4px 6px;border-radius:5px;border:1px solid var(--canvas);font-size:12px;font-weight:600;text-align:right;color:var(--abyss);background:var(--surface)">';
+      h += '<span style="font-size:10px;color:var(--mid-gray);white-space:nowrap">' + sparkFmt(weCost) + '</span>';
+      h += '</div>';
+      /* Paid checkbox */
+      h += '<div style="text-align:center"><input type="checkbox"' + (we.paid ? ' checked' : '') + ' onchange="sparkToggleFlPaid(\'' + we.id + '\',this.checked)" title="Mark paid" style="cursor:pointer;width:15px;height:15px;accent-color:#81C784"></div>';
+      /* Delete */
+      h += '<button onclick="sparkDeleteFlEntry(\'' + we.id + '\')" title="Remove week" style="background:none;border:none;cursor:pointer;color:var(--mid-gray);font-size:15px;line-height:1;padding:0 2px" onmouseenter="this.style.color=\'var(--ember)\'" onmouseleave="this.style.color=\'var(--mid-gray)\'">×</button>';
+      h += '</div>';
+    }
+    /* Add Week button */
+    h += '<div style="padding:6px 12px 8px">';
+    h += '<button onclick="sparkAddFreelancerWeek(\'' + tmId + '\')" style="padding:3px 12px;border-radius:5px;border:1px dashed rgba(91,74,138,.4);background:transparent;color:#5B4A8A;cursor:pointer;font-size:11px;font-weight:600">+ Add Week</button>';
+    h += '</div>';
+
+    h += '</div>'; /* end week rows */
     h += '</div>'; /* end card */
   }
 
