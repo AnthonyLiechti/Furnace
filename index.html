@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.42 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 17, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.43 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 17, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -8006,9 +8006,16 @@ function renderRMFreelancers() {
 
 function renderRMFlContent() {
   var entries = RM_FL.entries || [];
+  var isDark = document.documentElement.classList.contains('dark');
+  /* Dark-aware tokens for inline styles */
+  var dmText    = isDark ? 'var(--dm-text)'    : 'var(--abyss)';
+  var dmBorder  = isDark ? 'var(--dm-border)'  : 'var(--canvas)';
+  var dmSurf2   = isDark ? 'var(--dm-surface2)': '#fff';
+  var dmRowAlt  = isDark ? 'rgba(255,255,255,.03)' : 'rgba(0,0,0,.02)';
+
   if (!entries.length) {
     return '<div style="padding:24px;text-align:center;color:var(--mid-gray)">'
-      + '<div style="font-size:14px;font-weight:600;margin-bottom:6px">No freelancers assigned</div>'
+      + '<div style="font-size:14px;font-weight:600;margin-bottom:6px;color:' + dmText + '">No freelancers assigned</div>'
       + '<div style="font-size:12px;margin-bottom:16px">Add freelancers to track hours and payments.</div>'
       + '<button onclick="rmFlShowAddFreelancer()" style="padding:8px 20px;border-radius:6px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-size:13px;font-weight:600">+ Add Freelancer</button>'
       + '</div>';
@@ -8062,7 +8069,7 @@ function renderRMFlContent() {
     h += '<div style="padding:8px 12px;background:rgba(91,74,138,.08);display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(91,74,138,.12)">';
     h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#5B4A8A;white-space:nowrap">Snapshot Budget</div>';
     if (budgetEntry) {
-      h += '<input type="number" min="0" step="0.5" value="' + budgHrs + '" onchange="rmFlPatch(\'' + budgetEntry.id + '\',\'hours\',parseFloat(this.value)||0)" style="width:60px;padding:3px 6px;border-radius:5px;border:1px solid rgba(91,74,138,.3);font-size:13px;font-weight:700;text-align:right;color:#5B4A8A;background:var(--white)">';
+      h += '<input type="number" min="0" step="0.5" value="' + budgHrs + '" onchange="rmFlPatch(\'' + budgetEntry.id + '\',\'hours\',parseFloat(this.value)||0)" style="width:60px;padding:3px 6px;border-radius:5px;border:1px solid rgba(91,74,138,.3);font-size:13px;font-weight:700;text-align:right;color:#5B4A8A;background:' + dmSurf2 + '">';
       h += '<span style="font-size:12px;color:var(--mid-gray)">hrs</span>';
       h += '<span style="font-size:12px;font-weight:600;color:#5B4A8A;margin-left:4px">' + sparkFmt(budgCost) + '</span>';
     } else {
@@ -8076,11 +8083,9 @@ function renderRMFlContent() {
     h += '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mid-gray);margin-bottom:3px">Scheduled</div>';
     h += '<div style="font-size:15px;font-weight:700;color:#5B4A8A">' + grpWeekHrs.toFixed(1) + ' hrs</div>';
     h += '<div style="font-size:11px;color:var(--mid-gray)">' + sparkFmt(grpWeekHrs * grpRate) + '</div></div>';
-
     h += '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mid-gray);margin-bottom:3px">Paid</div>';
     h += '<div style="font-size:15px;font-weight:700;color:#81C784">' + grpPaidHrs.toFixed(1) + ' hrs</div>';
     h += '<div style="font-size:11px;color:var(--mid-gray)">' + sparkFmt(grpPaidCost) + '</div></div>';
-
     h += '<div style="display:flex;flex-direction:column;justify-content:space-between">';
     if (unpaidHrs > 0) {
       h += '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mid-gray);margin-bottom:3px">Unpaid</div>';
@@ -8095,8 +8100,8 @@ function renderRMFlContent() {
     /* Week rows */
     h += '<div style="border-top:1px solid rgba(91,74,138,.15)">';
     if (weekEntries.length > 0) {
-      h += '<div style="display:grid;grid-template-columns:1fr 100px 1fr auto;gap:8px;padding:5px 12px 3px;background:rgba(91,74,138,.05)">';
-      h += '<div style="font-size:9px;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Week / Label</div>';
+      h += '<div style="display:grid;grid-template-columns:1fr 110px 1fr auto;gap:8px;padding:5px 12px 3px;background:rgba(91,74,138,.05)">';
+      h += '<div style="font-size:9px;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Label</div>';
       h += '<div style="font-size:9px;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px;font-weight:700;text-align:right">Hrs · Cost</div>';
       h += '<div style="font-size:9px;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Paid &amp; Date</div>';
       h += '<div></div></div>';
@@ -8105,22 +8110,20 @@ function renderRMFlContent() {
       var we = weekEntries[wi];
       var weHrs  = we.hours || 0;
       var weCost = weHrs * (we.rate || 0);
-      var rowBg  = we.paid ? 'rgba(129,199,132,.07)' : (wi % 2 === 0 ? 'transparent' : 'rgba(0,0,0,.02)');
-      h += '<div style="display:grid;grid-template-columns:1fr 100px 1fr auto;align-items:center;gap:8px;padding:6px 12px;background:' + rowBg + '">';
+      var rowBg  = we.paid ? 'rgba(129,199,132,.07)' : (wi % 2 === 0 ? 'transparent' : dmRowAlt);
+      h += '<div style="display:grid;grid-template-columns:1fr 110px 1fr auto;align-items:center;gap:8px;padding:6px 12px;background:' + rowBg + '">';
       /* Editable label */
-      h += '<div><input type="text" value="' + (we.week_label || 'Week').replace(/"/g,'&quot;') + '" onchange="rmFlDebouncedPatch(\'' + we.id + '\',\'week_label\',this.value)" style="font-size:12px;font-weight:500;color:var(--abyss);background:transparent;border:none;border-bottom:1px dashed var(--canvas);outline:none;width:100%;padding:1px 0">';
-      if (we.notes) h += '<div style="font-size:10px;color:var(--mid-gray);margin-top:1px">' + we.notes + '</div>';
-      h += '</div>';
+      h += '<input type="text" value="' + (we.week_label || 'Week').replace(/"/g,'&quot;') + '" onchange="rmFlDebouncedPatch(\'' + we.id + '\',\'week_label\',this.value)" style="font-size:12px;font-weight:500;color:' + dmText + ';background:transparent;border:none;border-bottom:1px dashed ' + dmBorder + ';outline:none;width:100%;padding:1px 0">';
       /* Hours + cost */
       h += '<div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">';
-      h += '<input type="number" min="0" step="0.5" value="' + weHrs + '" onchange="rmFlPatch(\'' + we.id + '\',\'hours\',parseFloat(this.value)||0)" style="width:52px;padding:4px 6px;border-radius:5px;border:1px solid var(--canvas);font-size:12px;font-weight:600;text-align:right;color:var(--abyss);background:var(--surface)">';
+      h += '<input type="number" min="0" step="0.5" value="' + weHrs + '" onchange="rmFlPatch(\'' + we.id + '\',\'hours\',parseFloat(this.value)||0)" style="width:52px;padding:4px 6px;border-radius:5px;border:1px solid ' + dmBorder + ';font-size:12px;font-weight:600;text-align:right;color:' + dmText + ';background:' + dmSurf2 + '">';
       h += '<span style="font-size:10px;color:var(--mid-gray);white-space:nowrap">' + sparkFmt(weCost) + '</span>';
       h += '</div>';
       /* Paid checkbox + date */
       h += '<div style="display:flex;align-items:center;gap:6px">';
       h += '<input type="checkbox"' + (we.paid ? ' checked' : '') + ' onchange="rmFlTogglePaid(\'' + we.id + '\',this.checked)" title="Mark paid" style="cursor:pointer;width:15px;height:15px;accent-color:#81C784;flex-shrink:0">';
       if (we.paid) {
-        h += '<input type="date" value="' + (we.paid_date || '') + '" onchange="rmFlDebouncedPatch(\'' + we.id + '\',\'paid_date\',this.value)" style="font-size:11px;border:1px solid var(--canvas);border-radius:5px;padding:2px 5px;color:#81C784;font-weight:600;background:var(--surface);outline:none">';
+        h += '<input type="date" value="' + (we.paid_date || '') + '" onchange="rmFlDebouncedPatch(\'' + we.id + '\',\'paid_date\',this.value)" style="font-size:11px;border:1px solid ' + dmBorder + ';border-radius:5px;padding:2px 5px;color:#81C784;font-weight:600;background:' + dmSurf2 + ';outline:none">';
       } else {
         h += '<span style="font-size:10px;color:var(--mid-gray)">Unpaid</span>';
       }
@@ -8129,10 +8132,13 @@ function renderRMFlContent() {
       h += '<button onclick="rmFlDeleteEntry(\'' + we.id + '\')" title="Remove week" style="background:none;border:none;cursor:pointer;color:var(--mid-gray);font-size:15px;line-height:1;padding:0 2px" onmouseenter="this.style.color=\'var(--ember)\'" onmouseleave="this.style.color=\'var(--mid-gray)\'">×</button>';
       h += '</div>';
     }
-    /* Add Week */
-    h += '<div style="padding:6px 12px 8px">';
-    h += '<button onclick="rmFlAddWeek(\'' + tmId + '\')" style="padding:3px 12px;border-radius:5px;border:1px dashed rgba(91,74,138,.4);background:transparent;color:#5B4A8A;cursor:pointer;font-size:11px;font-weight:600">+ Add Week</button>';
+
+    /* Add week — label-first entry point */
+    h += '<div style="padding:8px 12px 10px;display:flex;align-items:center;gap:8px">';
+    h += '<input type="text" id="rmFlNewLabel_' + tmId + '" placeholder="Label new week\u2026 (e.g. Week of Apr 21)" onkeydown="if(event.key===\'Enter\')rmFlAddWeek(\'' + tmId + '\',this.value)" style="flex:1;padding:4px 8px;border-radius:5px;border:1px solid ' + dmBorder + ';font-size:12px;color:' + dmText + ';background:' + dmSurf2 + ';outline:none">';
+    h += '<button onclick="rmFlAddWeek(\'' + tmId + '\',document.getElementById(\'rmFlNewLabel_' + tmId + '\').value)" style="padding:4px 12px;border-radius:5px;border:1px solid rgba(91,74,138,.4);background:transparent;color:#5B4A8A;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap">+ Add Week</button>';
     h += '</div>';
+
     h += '</div>'; /* end week rows */
     h += '</div>'; /* end card */
   }
@@ -8220,7 +8226,7 @@ async function rmFlTogglePaid(entryId, checked) {
   renderRMFlUpdate();
 }
 
-async function rmFlAddWeek(tmId) {
+async function rmFlAddWeek(tmId, label) {
   if (!RM_FL.budgetId) return;
   var rate = 0, memberObj = null, weekNum = 1;
   for (var i = 0; i < RM_FL.entries.length; i++) {
@@ -8231,10 +8237,11 @@ async function rmFlAddWeek(tmId) {
       weekNum++;
     }
   }
+  var weekLabel = (label && typeof label === 'string' && label.trim()) ? label.trim() : ('Week ' + weekNum);
   sparkShowSaving();
   var result = await sparkFetch('freelancer_budget_entries', '', 'POST', {
     budget_id: RM_FL.budgetId, team_member_id: tmId,
-    week_label: 'Week ' + weekNum, hours: 0, rate: rate, paid: false,
+    week_label: weekLabel, hours: 0, rate: rate, paid: false,
     display_order: RM_FL.entries.length
   });
   if (result && result.length) { result[0].team_member = memberObj; RM_FL.entries.push(result[0]); }
@@ -8332,6 +8339,203 @@ async function rmFlAddSelectedFreelancers() {
   renderRMFlUpdate();
 }
 
+/* ── Resource Manager — Out-Of-Pocket Tab State & Functions ── */
+var RM_OOP = { projCode: null, budgetId: null, entries: [] };
+var rmOopPatchTimers = {};
+
+function goToRMOop(projCode) {
+  rtView = 'oop';
+  RM_OOP.projCode = projCode || null;
+  RM_OOP.entries = [];
+  RM_OOP.budgetId = null;
+  navigate('resource');
+}
+
+function renderRMOop() {
+  var h = '<div style="margin-bottom:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
+  h += '<label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid-gray)">Project</label>';
+  h += '<select id="rmOopProjectSel" onchange="rmOopLoadProject(this.value)" style="padding:8px 14px;border-radius:7px;border:1px solid var(--dm-border,var(--canvas));background:var(--dm-surface2,var(--white));color:var(--dm-text,var(--abyss));font-size:13px;font-family:inherit;outline:none;min-width:320px">';
+  h += '<option value="">— Choose a project —</option>';
+  for (var _ci = 0; _ci < CLIENTS.length; _ci++) {
+    var _cl = CLIENTS[_ci];
+    for (var _pi = 0; _pi < _cl.projects.length; _pi++) {
+      var _p = _cl.projects[_pi];
+      if (_p.status === 'finished' || _p.status === 'complete') continue;
+      var _sb = SUPA_BUDGETS[_p.code];
+      if (!_sb) continue;
+      h += '<option value="' + _p.code + '"' + (_p.code === RM_OOP.projCode ? ' selected' : '') + '>' + _p.code + ' \u2014 ' + _p.name + '</option>';
+    }
+  }
+  h += '</select>';
+  h += '</div>';
+  h += '<div id="rmOopContent">';
+  if (RM_OOP.projCode) {
+    h += RM_OOP.entries.length > 0 ? renderRMOopContent() : '<div style="padding:20px;color:var(--mid-gray)">Loading\u2026</div>';
+  } else {
+    h += '<div style="padding:60px 24px;text-align:center;color:var(--mid-gray)">';
+    h += '<div style="font-size:36px;margin-bottom:12px">\uD83D\uDCB3</div>';
+    h += '<div style="font-size:14px;font-weight:600;margin-bottom:6px">Select a project</div>';
+    h += '<div style="font-size:12px">Choose a project above to manage OOP expenses and payment status.</div>';
+    h += '</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function renderRMOopContent() {
+  var entries = RM_OOP.entries || [];
+  var isDark = document.documentElement.classList.contains('dark');
+  var dmText   = isDark ? 'var(--dm-text)'    : 'var(--abyss)';
+  var dmBorder = isDark ? 'var(--dm-border)'  : 'var(--canvas)';
+  var dmSurf2  = isDark ? 'var(--dm-surface2)': '#fff';
+  var dmRowAlt = isDark ? 'rgba(255,255,255,.03)' : 'rgba(0,0,0,.02)';
+
+  /* Filter to active entries with cost > 0 */
+  var active = entries.filter(function(e) { return e.is_active !== false; });
+
+  if (!active.length) {
+    return '<div style="padding:40px 24px;text-align:center;color:var(--mid-gray)">'
+      + '<div style="font-size:14px;font-weight:600;margin-bottom:6px">No active OOP entries</div>'
+      + '<div style="font-size:12px">This project has no out-of-pocket line items set up yet.</div>'
+      + '</div>';
+  }
+
+  /* Group by section */
+  var sections = {}, secOrder = [];
+  for (var i = 0; i < active.length; i++) {
+    var e = active[i];
+    var secId = e.section_id || (e.section ? e.section.id : 'other');
+    var secName = (e.section && e.section.name) || 'Other';
+    if (!sections[secId]) { sections[secId] = { name: secName, entries: [] }; secOrder.push(secId); }
+    sections[secId].entries.push(e);
+  }
+
+  var grandTotal = 0, grandPaid = 0;
+  var h = '';
+
+  for (var s = 0; s < secOrder.length; s++) {
+    var sid = secOrder[s];
+    var sec = sections[sid];
+    var secTotal = 0, secPaid = 0;
+    for (var i = 0; i < sec.entries.length; i++) {
+      var e = sec.entries[i];
+      var cost = (e.count || 0) * (e.rate || 0) * (e.days || 1) * (e.head_count || 1);
+      if (cost === 0) continue;
+      secTotal += cost;
+      if (e.paid) secPaid += cost;
+    }
+    grandTotal += secTotal;
+    grandPaid  += secPaid;
+
+    h += '<div style="border:1px solid rgba(100,130,180,.2);border-radius:8px;margin-top:8px;overflow:hidden">';
+    /* Section header */
+    h += '<div style="background:rgba(100,130,180,.15);color:' + dmText + ';padding:8px 12px;display:flex;align-items:center;justify-content:space-between">';
+    h += '<span style="font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.05em">' + sec.name + '</span>';
+    h += '<span style="font-size:12px;font-weight:600;color:' + dmText + '">' + sparkFmt(secTotal) + (secPaid > 0 ? ' <span style="color:#81C784;font-size:11px">· ' + sparkFmt(secPaid) + ' paid</span>' : '') + '</span>';
+    h += '</div>';
+    /* Column headers */
+    h += '<div style="display:grid;grid-template-columns:1fr 90px 1fr;gap:8px;padding:5px 12px 3px;background:rgba(100,130,180,.06)">';
+    h += '<div style="font-size:9px;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Item</div>';
+    h += '<div style="font-size:9px;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px;font-weight:700;text-align:right">Cost</div>';
+    h += '<div style="font-size:9px;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Paid &amp; Date</div>';
+    h += '</div>';
+    /* Entry rows */
+    for (var j = 0; j < sec.entries.length; j++) {
+      var oe = sec.entries[j];
+      var oeCost = (oe.count || 0) * (oe.rate || 0) * (oe.days || 1) * (oe.head_count || 1);
+      if (oeCost === 0) continue;
+      var rowBg = oe.paid ? 'rgba(129,199,132,.07)' : (j % 2 === 0 ? 'transparent' : dmRowAlt);
+      h += '<div style="display:grid;grid-template-columns:1fr 90px 1fr;align-items:center;gap:8px;padding:6px 12px;background:' + rowBg + '">';
+      h += '<div style="font-size:12px;font-weight:500;color:' + dmText + '">' + (oe.line_item_name || '—') + '</div>';
+      h += '<div style="font-size:12px;font-weight:600;text-align:right;color:' + dmText + '">' + sparkFmt(oeCost) + '</div>';
+      h += '<div style="display:flex;align-items:center;gap:6px">';
+      h += '<input type="checkbox"' + (oe.paid ? ' checked' : '') + ' onchange="rmOopTogglePaid(\'' + oe.id + '\',this.checked)" title="Mark paid" style="cursor:pointer;width:15px;height:15px;accent-color:#81C784;flex-shrink:0">';
+      if (oe.paid) {
+        h += '<input type="date" value="' + (oe.paid_date || '') + '" onchange="rmOopDebouncedPatch(\'' + oe.id + '\',\'paid_date\',this.value)" style="font-size:11px;border:1px solid ' + dmBorder + ';border-radius:5px;padding:2px 5px;color:#81C784;font-weight:600;background:' + dmSurf2 + ';outline:none">';
+      } else {
+        h += '<span style="font-size:10px;color:var(--mid-gray)">Unpaid</span>';
+      }
+      h += '</div>';
+      h += '</div>';
+    }
+    h += '</div>'; /* end section card */
+  }
+
+  /* Grand totals */
+  var grandUnpaid = grandTotal - grandPaid;
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:10px 14px;margin-top:10px;background:rgba(100,130,180,.09);border-radius:8px">';
+  h += '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mid-gray);opacity:.8;margin-bottom:2px">Total OOP</div>';
+  h += '<span style="font-weight:700;color:' + dmText + '">' + sparkFmt(grandTotal) + '</span></div>';
+  h += '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#81C784;opacity:.8;margin-bottom:2px">Paid</div>';
+  h += '<span style="font-weight:700;color:#81C784">' + sparkFmt(grandPaid) + '</span></div>';
+  if (grandUnpaid > 0) {
+    h += '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ember);opacity:.8;margin-bottom:2px">Unpaid</div>';
+    h += '<span style="font-weight:700;color:var(--ember)">' + sparkFmt(grandUnpaid) + '</span></div>';
+  } else {
+    h += '<div style="display:flex;align-items:center;gap:4px"><span style="font-size:18px">✓</span><span style="font-size:11px;font-weight:600;color:#81C784">All Paid</span></div>';
+  }
+  h += '</div>';
+
+  return h;
+}
+
+function renderRMOopUpdate() {
+  var el = document.getElementById('rmOopContent');
+  if (el) el.innerHTML = renderRMOopContent();
+}
+
+async function rmOopLoadProject(projCode) {
+  if (!projCode) { RM_OOP.projCode = null; RM_OOP.budgetId = null; RM_OOP.entries = []; renderRMOopUpdate(); return; }
+  RM_OOP.projCode = projCode;
+  var sb = SUPA_BUDGETS && SUPA_BUDGETS[projCode];
+  if (!sb || !sb.id) {
+    for (var _ci = 0; _ci < (CLIENTS||[]).length; _ci++) {
+      for (var _pi = 0; _pi < CLIENTS[_ci].projects.length; _pi++) {
+        var _p = CLIENTS[_ci].projects[_pi];
+        if (_p.code === projCode && _p._supabudget) { sb = _p._supabudget; break; }
+      }
+      if (sb && sb.id) break;
+    }
+  }
+  if (!sb || !sb.id) { renderRMOopUpdate(); return; }
+  RM_OOP.budgetId = sb.id;
+  var el = document.getElementById('rmOopContent');
+  if (el) el.innerHTML = '<div style="padding:20px;color:var(--mid-gray)">Loading\u2026</div>';
+  var entries = await sparkFetch('oop_budget_entries',
+    'budget_id=eq.' + sb.id + '&select=*,section:oop_sections(id,name,slug),category:oop_categories(id,name)&order=display_order.asc');
+  RM_OOP.entries = entries || [];
+  renderRMOopUpdate();
+}
+
+async function rmOopTogglePaid(entryId, checked) {
+  sparkShowSaving();
+  var today = new Date().toISOString().slice(0, 10);
+  var patch = { paid: checked, paid_date: checked ? today : null };
+  await sparkFetch('oop_budget_entries?id=eq.' + entryId, '', 'PATCH', patch);
+  for (var i = 0; i < RM_OOP.entries.length; i++) {
+    if (RM_OOP.entries[i].id === entryId) {
+      RM_OOP.entries[i].paid = checked; RM_OOP.entries[i].paid_date = checked ? today : null; break;
+    }
+  }
+  sparkHideSaving();
+  renderRMOopUpdate();
+}
+
+function rmOopDebouncedPatch(entryId, field, val) {
+  if (field === 'paid_date' && !val) return;
+  var key = entryId + '|' + field;
+  if (rmOopPatchTimers[key]) clearTimeout(rmOopPatchTimers[key]);
+  rmOopPatchTimers[key] = setTimeout(async function() {
+    sparkShowSaving();
+    var patch = {}; patch[field] = val;
+    await sparkFetch('oop_budget_entries?id=eq.' + entryId, '', 'PATCH', patch);
+    for (var i = 0; i < RM_OOP.entries.length; i++) {
+      if (RM_OOP.entries[i].id === entryId) { RM_OOP.entries[i][field] = val; break; }
+    }
+    sparkHideSaving();
+  }, 500);
+}
+
 /* ══════════════════════════════════════════════════════════════════ */
 
 function renderResource() {
@@ -8342,13 +8546,28 @@ function renderResource() {
     var fh = '<h1 class="page-title">Resource Manager</h1>';
     fh += '<p class="page-subtitle">Manage allocations, freelancer schedules and payments</p>';
     fh += '<div class="rt-tabs">';
-    fh += '<div class="rt-tab" onclick="rtView=\'people\';renderResource()">By Person</div>';
-    fh += '<div class="rt-tab" onclick="rtView=\'projects\';renderResource()">By Project</div>';
+    fh += '<div class="rt-tab" onclick="rtView=\'people\';renderResource()">Hours</div>';
     fh += '<div class="rt-tab active">Freelancers</div>';
+    fh += '<div class="rt-tab" onclick="rtView=\'oop\';renderResource()">Out-Of-Pocket</div>';
     fh += '</div>';
     fh += '<div id="rmFlOuter">' + renderRMFreelancers() + '</div>';
     mc.innerHTML = fh;
     if (RM_FL.projCode && !RM_FL.entries.length) rmFlLoadProject(RM_FL.projCode);
+    return;
+  }
+
+  /* ── Out-Of-Pocket tab ── */
+  if (rtView === 'oop') {
+    var oh = '<h1 class="page-title">Resource Manager</h1>';
+    oh += '<p class="page-subtitle">Track out-of-pocket expenses and payment status across projects</p>';
+    oh += '<div class="rt-tabs">';
+    oh += '<div class="rt-tab" onclick="rtView=\'people\';renderResource()">Hours</div>';
+    oh += '<div class="rt-tab" onclick="rtView=\'freelancers\';renderResource()">Freelancers</div>';
+    oh += '<div class="rt-tab active">Out-Of-Pocket</div>';
+    oh += '</div>';
+    oh += '<div id="rmOopOuter">' + renderRMOop() + '</div>';
+    mc.innerHTML = oh;
+    if (RM_OOP.projCode && !RM_OOP.entries.length) rmOopLoadProject(RM_OOP.projCode);
     return;
   }
 
@@ -8446,15 +8665,20 @@ function renderResource() {
   }
   h += '</div></div>';
 
-  /* View toggle + leadership */
+  /* Main tabs: Hours (active) | Freelancers | Out-Of-Pocket */
   h += '<div class="rt-tabs">';
-  h += '<div class="rt-tab' + (rtView === 'people' ? ' active' : '') + '" onclick="rtView=\'people\';renderResource()">By Person</div>';
-  h += '<div class="rt-tab' + (rtView === 'projects' ? ' active' : '') + '" onclick="rtView=\'projects\';renderResource()">By Project</div>';
+  h += '<div class="rt-tab active">Hours</div>';
   h += '<div class="rt-tab" onclick="rtView=\'freelancers\';renderResource()">Freelancers</div>';
+  h += '<div class="rt-tab" onclick="rtView=\'oop\';renderResource()">Out-Of-Pocket</div>';
   h += '<div style="margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mid-gray)">';
   h += '<span>Include Leadership</span>';
   h += '<div onclick="rtShowLeadership=!rtShowLeadership;renderResource()" style="width:36px;height:20px;border-radius:10px;background:' + (rtShowLeadership ? 'var(--ocean)' : 'var(--canvas)') + ';cursor:pointer;position:relative;transition:background .2s"><div style="width:16px;height:16px;border-radius:50%;background:var(--white);position:absolute;top:2px;' + (rtShowLeadership ? 'left:18px' : 'left:2px') + ';transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></div></div>';
   h += '</div>';
+  h += '</div>';
+  /* By Person / By Project sub-toggle */
+  h += '<div style="display:flex;gap:6px;margin-bottom:16px">';
+  h += '<div class="rt-tab' + (rtView === 'people' ? ' active' : '') + '" onclick="rtView=\'people\';renderResource()" style="font-size:11px;padding:4px 12px">By Person</div>';
+  h += '<div class="rt-tab' + (rtView === 'projects' ? ' active' : '') + '" onclick="rtView=\'projects\';renderResource()" style="font-size:11px;padding:4px 12px">By Project</div>';
   h += '</div>';
 
   if (rtView === 'people') {
