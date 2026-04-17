@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.43 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 17, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.44 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 17, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -9497,8 +9497,8 @@ function renderAllocations() {
   /* ── SUB-TAB TOGGLE ── */
   h += '<div class="alloc-tab-bar">';
   h += '<button class="alloc-tab-btn' + (allocResourceTab === 'hours' ? ' active' : '') + '" onclick="allocResourceTab=\'hours\';renderAllocations()">Hours</button>';
-  h += '<button class="alloc-tab-btn' + (allocResourceTab === 'oop' ? ' active' : '') + '" onclick="allocResourceTab=\'oop\';renderAllocations()">Out-of-Pocket</button>';
   h += '<button class="alloc-tab-btn' + (allocResourceTab === 'freelancers' ? ' active' : '') + '" onclick="allocResourceTab=\'freelancers\';renderAllocations()">Freelancers</button>';
+  h += '<button class="alloc-tab-btn' + (allocResourceTab === 'oop' ? ' active' : '') + '" onclick="allocResourceTab=\'oop\';renderAllocations()">Out-of-Pocket</button>';
   h += '</div>';
 
   if (allocResourceTab === 'oop') {
@@ -10405,6 +10405,13 @@ function renderFlGrid() {
   if (!el) return;
   if (!SUPA_BUDGETS) { el.innerHTML = '<div style="padding:20px;color:var(--mid-gray)">No budget data loaded.</div>'; return; }
 
+  var _isDark   = document.documentElement.classList.contains('dark');
+  var _dmText   = _isDark ? 'var(--dm-text)'    : 'var(--abyss)';
+  var _dmBorder = _isDark ? 'var(--dm-border)'  : 'var(--canvas)';
+  var _dmSurf   = _isDark ? 'var(--dm-surface)' : 'var(--white)';
+  var _dmSurf2  = _isDark ? 'var(--dm-surface2)': '#f9f9f9';
+  var _dmMid    = _isDark ? 'var(--dm-text-muted)' : 'var(--mid-gray)';
+
   /* Collect entries for selected project(s) */
   var projectEntries = []; /* [{projCode, projName, entries: [...]}] */
   var codes = flProjFilter ? [flProjFilter] : Object.keys(SUPA_BUDGETS);
@@ -10438,17 +10445,17 @@ function renderFlGrid() {
     var projPaid = pe.sb.flSpent || 0;
     var projUnpaid = projTotal - projPaid;
 
-    h += '<div style="background:var(--white);border-radius:10px;margin-bottom:16px;overflow:hidden;border:1px solid var(--canvas)">';
+    h += '<div style="background:' + _dmSurf + ';border-radius:10px;margin-bottom:16px;overflow:hidden;border:1px solid ' + _dmBorder + '">';
     /* Project header */
     h += '<div style="padding:12px 16px;background:rgba(91,74,138,.08);border-bottom:1px solid rgba(91,74,138,.15);display:flex;justify-content:space-between;align-items:center">';
     h += '<div>';
     h += '<div style="font-size:12px;font-weight:700;color:#5B4A8A">' + pe.projCode + '</div>';
-    h += '<div style="font-size:13px;font-weight:600">' + pe.projName + '</div>';
+    h += '<div style="font-size:13px;font-weight:600;color:' + _dmText + '">' + pe.projName + '</div>';
     h += '</div>';
     h += '<div style="display:flex;gap:20px;text-align:right">';
-    h += '<div><div style="font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray)">Budget</div><div style="font-weight:700;color:#CE93D8">$' + Math.round(projTotal).toLocaleString() + '</div></div>';
-    h += '<div><div style="font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray)">Paid</div><div style="font-weight:700;color:#81C784">$' + Math.round(projPaid).toLocaleString() + '</div></div>';
-    h += '<div><div style="font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray)">Unpaid</div><div style="font-weight:700;color:' + (projUnpaid > 0 ? '#CE93D8' : 'var(--mid-gray)') + '">$' + Math.round(projUnpaid).toLocaleString() + '</div></div>';
+    h += '<div><div style="font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:' + _dmMid + '">Budget</div><div style="font-weight:700;color:#CE93D8">$' + Math.round(projTotal).toLocaleString() + '</div></div>';
+    h += '<div><div style="font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:' + _dmMid + '">Paid</div><div style="font-weight:700;color:#81C784">$' + Math.round(projPaid).toLocaleString() + '</div></div>';
+    h += '<div><div style="font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:' + _dmMid + '">Unpaid</div><div style="font-weight:700;color:' + (projUnpaid > 0 ? '#CE93D8' : _dmMid) + '">$' + Math.round(projUnpaid).toLocaleString() + '</div></div>';
     h += '</div>';
     h += '</div>';
 
@@ -10476,14 +10483,14 @@ function renderFlGrid() {
       h += '<div style="padding:8px 16px;background:rgba(91,74,138,.04);border-bottom:1px solid rgba(91,74,138,.08);display:flex;justify-content:space-between;align-items:center">';
       h += '<div style="display:flex;align-items:center;gap:10px">';
       h += '<div style="width:28px;height:28px;border-radius:50%;background:#5B4A8A;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">' + fl.name.charAt(0) + '</div>';
-      h += '<div><div style="font-weight:600;font-size:13px">' + fl.name + '</div>';
-      h += '<div style="font-size:11px;color:var(--mid-gray)">' + flHrs.toFixed(1) + ' hrs · $' + Math.round(flCost).toLocaleString() + '</div></div>';
+      h += '<div><div style="font-weight:600;font-size:13px;color:' + _dmText + '">' + fl.name + '</div>';
+      h += '<div style="font-size:11px;color:' + _dmMid + '">' + flHrs.toFixed(1) + ' hrs · $' + Math.round(flCost).toLocaleString() + '</div></div>';
       h += '</div>';
       if (flUnpaidCnt > 0) h += '<span style="background:rgba(206,147,216,.2);color:#7B1FA2;font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px">' + flUnpaidCnt + ' unpaid</span>';
       h += '</div>';
 
       /* Entry rows */
-      h += '<div style="display:grid;grid-template-columns:1fr 70px 65px 80px 120px 1fr;gap:4px;padding:5px 16px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);border-bottom:1px solid rgba(91,74,138,.08)">';
+      h += '<div style="display:grid;grid-template-columns:1fr 70px 65px 80px 120px 1fr;gap:4px;padding:5px 16px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:' + _dmMid + ';border-bottom:1px solid rgba(91,74,138,.08)">';
       h += '<div>Week</div><div style="text-align:right">Hours</div><div style="text-align:right">$/hr</div><div style="text-align:right">Total</div><div style="text-align:center">Paid</div><div>Notes</div>';
       h += '</div>';
 
@@ -10498,9 +10505,9 @@ function renderFlGrid() {
         var rowBg = isPaid ? 'rgba(129,199,132,.05)' : (eHrs > 0 ? 'rgba(206,147,216,.04)' : '');
 
         h += '<div style="display:grid;grid-template-columns:1fr 70px 65px 80px 120px 1fr;gap:4px;padding:6px 16px;align-items:center;border-bottom:1px solid rgba(91,74,138,.06);background:' + rowBg + '">';
-        h += '<div style="font-size:12px;font-weight:500">' + (entry.week_label || '—') + '</div>';
-        h += '<div style="text-align:right;font-size:12px">' + (eHrs > 0 ? eHrs.toFixed(1) : '—') + '</div>';
-        h += '<div style="text-align:right;font-size:11px;color:var(--mid-gray)">$' + eRate.toLocaleString() + '</div>';
+        h += '<div style="font-size:12px;font-weight:500;color:' + _dmText + '">' + (entry.week_label || '—') + '</div>';
+        h += '<div style="text-align:right;font-size:12px;color:' + _dmText + '">' + (eHrs > 0 ? eHrs.toFixed(1) : '—') + '</div>';
+        h += '<div style="text-align:right;font-size:11px;color:' + _dmMid + '">$' + eRate.toLocaleString() + '</div>';
         h += '<div style="text-align:right;font-weight:600;color:#5B4A8A;font-size:12px">' + (eTotal > 0 ? '$' + Math.round(eTotal).toLocaleString() : '—') + '</div>';
         /* Paid toggle */
         h += '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">';
