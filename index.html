@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.45 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 17, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.46 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 17, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -10392,7 +10392,7 @@ function renderFlProjList() {
       h += '<div style="font-size:11px;color:var(--mid-gray);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + p.name + '</div>';
       h += '<div style="font-size:11px;margin-top:2px;display:flex;justify-content:space-between">';
       h += '<span>$' + Math.round(flAmt).toLocaleString() + '</span>';
-      if (flUnpaidCnt > 0) h += '<span style="color:#CE93D8;font-weight:700">' + flUnpaidCnt + ' unpaid</span>';
+      if (flUnpaidCnt > 0) h += '<span style="color:#CE93D8;font-weight:700">unpaid</span>';
       h += '</div>';
       h += '</div>';
     }
