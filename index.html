@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.44 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 17, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.45 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 17, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -10471,42 +10471,66 @@ function renderFlGrid() {
     for (var fi = 0; fi < flOrder.length; fi++) {
       var tid = flOrder[fi];
       var fl = freelancers[tid];
-      var flHrs = 0, flCost = 0, flUnpaidCnt = 0;
+
+      /* Separate budget sentinel from week entries */
+      var budgetEntry = null, weekEntries = [], flRate = 0;
       for (var ei = 0; ei < fl.entries.length; ei++) {
-        var hrs = fl.entries[ei].hours || 0;
-        flHrs += hrs;
-        flCost += hrs * (fl.entries[ei].rate || 0);
-        if (!fl.entries[ei].paid && hrs > 0) flUnpaidCnt++;
+        flRate = fl.entries[ei].rate || flRate;
+        if (fl.entries[ei].week_label === '__budget__') budgetEntry = fl.entries[ei];
+        else weekEntries.push(fl.entries[ei]);
       }
+      var budgHrs  = budgetEntry ? (budgetEntry.hours || 0) : 0;
+      var schedHrs = weekEntries.reduce(function(s,e){return s+(e.hours||0);},0);
+      var flUnpaidCnt = weekEntries.filter(function(e){return !e.paid&&(e.hours||0)>0;}).length;
+      var pctSched = budgHrs > 0 ? Math.min(100, schedHrs / budgHrs * 100) : (schedHrs > 0 ? 100 : 0);
+      var overBudget = budgHrs > 0 && schedHrs > budgHrs;
 
       /* Freelancer header */
       h += '<div style="padding:8px 16px;background:rgba(91,74,138,.04);border-bottom:1px solid rgba(91,74,138,.08);display:flex;justify-content:space-between;align-items:center">';
       h += '<div style="display:flex;align-items:center;gap:10px">';
       h += '<div style="width:28px;height:28px;border-radius:50%;background:#5B4A8A;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">' + fl.name.charAt(0) + '</div>';
       h += '<div><div style="font-weight:600;font-size:13px;color:' + _dmText + '">' + fl.name + '</div>';
-      h += '<div style="font-size:11px;color:' + _dmMid + '">' + flHrs.toFixed(1) + ' hrs · $' + Math.round(flCost).toLocaleString() + '</div></div>';
+      h += '<div style="font-size:11px;color:' + _dmMid + '">$' + Math.round(flRate) + '/hr</div></div>';
       h += '</div>';
       if (flUnpaidCnt > 0) h += '<span style="background:rgba(206,147,216,.2);color:#7B1FA2;font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px">' + flUnpaidCnt + ' unpaid</span>';
       h += '</div>';
 
-      /* Entry rows */
-      h += '<div style="display:grid;grid-template-columns:1fr 70px 65px 80px 120px 1fr;gap:4px;padding:5px 16px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:' + _dmMid + ';border-bottom:1px solid rgba(91,74,138,.08)">';
-      h += '<div>Week</div><div style="text-align:right">Hours</div><div style="text-align:right">$/hr</div><div style="text-align:right">Total</div><div style="text-align:center">Paid</div><div>Notes</div>';
+      /* Budget summary bar (non-editable) */
+      h += '<div style="padding:6px 16px;background:rgba(91,74,138,.07);border-bottom:1px solid rgba(91,74,138,.1);display:flex;align-items:center;gap:12px">';
+      h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#5B4A8A;white-space:nowrap;min-width:50px">Budget</div>';
+      if (budgHrs > 0) {
+        h += '<div style="font-size:12px;font-weight:700;color:#5B4A8A;white-space:nowrap">' + budgHrs.toFixed(0) + ' hrs · $' + Math.round(budgHrs * flRate).toLocaleString() + '</div>';
+        h += '<div style="flex:1;height:5px;border-radius:3px;background:rgba(91,74,138,.15);overflow:hidden">';
+        h += '<div style="height:100%;border-radius:3px;background:' + (overBudget ? 'var(--ember)' : '#5B4A8A') + ';width:' + pctSched.toFixed(1) + '%"></div>';
+        h += '</div>';
+        h += '<div style="font-size:11px;color:' + (overBudget ? 'var(--ember)' : _dmMid) + ';white-space:nowrap">' + schedHrs.toFixed(1) + ' / ' + budgHrs.toFixed(0) + ' scheduled</div>';
+      } else {
+        h += '<div style="font-size:11px;color:' + _dmMid + ';font-style:italic">No snapshot budget — go to project to set hours</div>';
+        if (schedHrs > 0) h += '<div style="font-size:11px;color:#5B4A8A;white-space:nowrap;margin-left:auto">' + schedHrs.toFixed(1) + ' hrs scheduled</div>';
+      }
       h += '</div>';
 
-      for (var ei = 0; ei < fl.entries.length; ei++) {
-        var entry = fl.entries[ei];
+      /* Column headers */
+      h += '<div style="display:grid;grid-template-columns:1fr 80px 65px 80px 130px 28px;gap:4px;padding:5px 16px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:' + _dmMid + ';border-bottom:1px solid rgba(91,74,138,.08)">';
+      h += '<div>Week</div><div style="text-align:right">Hours</div><div style="text-align:right">$/hr</div><div style="text-align:right">Total</div><div style="text-align:center">Paid</div><div></div>';
+      h += '</div>';
+
+      /* Editable week rows */
+      for (var ei = 0; ei < weekEntries.length; ei++) {
+        var entry = weekEntries[ei];
         var eid = entry.id;
         var eHrs = entry.hours || 0;
         var eRate = entry.rate || 0;
         var eTotal = eHrs * eRate;
         var isPaid = entry.paid || false;
         var paidDate = entry.paid_date || '';
-        var rowBg = isPaid ? 'rgba(129,199,132,.05)' : (eHrs > 0 ? 'rgba(206,147,216,.04)' : '');
+        var rowBg = isPaid ? 'rgba(129,199,132,.06)' : (ei % 2 === 0 ? 'transparent' : (_isDark ? 'rgba(255,255,255,.02)' : 'rgba(0,0,0,.02)'));
 
-        h += '<div style="display:grid;grid-template-columns:1fr 70px 65px 80px 120px 1fr;gap:4px;padding:6px 16px;align-items:center;border-bottom:1px solid rgba(91,74,138,.06);background:' + rowBg + '">';
-        h += '<div style="font-size:12px;font-weight:500;color:' + _dmText + '">' + (entry.week_label || '—') + '</div>';
-        h += '<div style="text-align:right;font-size:12px;color:' + _dmText + '">' + (eHrs > 0 ? eHrs.toFixed(1) : '—') + '</div>';
+        h += '<div style="display:grid;grid-template-columns:1fr 80px 65px 80px 130px 28px;gap:4px;padding:5px 16px;align-items:center;border-bottom:1px solid rgba(91,74,138,.05);background:' + rowBg + '">';
+        /* Editable week label */
+        h += '<input type="text" value="' + (entry.week_label || '').replace(/"/g,'&quot;') + '" onchange="flDebouncedPatchGlobal(\'' + eid + '\',\'week_label\',this.value,\'' + pe.projCode + '\')" style="font-size:12px;font-weight:500;color:' + _dmText + ';background:transparent;border:none;border-bottom:1px dashed ' + _dmBorder + ';outline:none;width:100%;padding:1px 0">';
+        /* Editable hours */
+        h += '<input type="number" min="0" step="0.5" value="' + eHrs + '" onchange="flDebouncedPatchGlobal(\'' + eid + '\',\'hours\',parseFloat(this.value)||0,\'' + pe.projCode + '\')" style="width:100%;padding:3px 5px;border-radius:4px;border:1px solid ' + _dmBorder + ';font-size:12px;font-weight:600;text-align:right;color:' + _dmText + ';background:' + _dmSurf2 + ';outline:none">';
         h += '<div style="text-align:right;font-size:11px;color:' + _dmMid + '">$' + eRate.toLocaleString() + '</div>';
         h += '<div style="text-align:right;font-weight:600;color:#5B4A8A;font-size:12px">' + (eTotal > 0 ? '$' + Math.round(eTotal).toLocaleString() : '—') + '</div>';
         /* Paid toggle */
@@ -10515,9 +10539,17 @@ function renderFlGrid() {
         if (isPaid && paidDate) h += '<div style="font-size:9px;color:#2E7D32">' + paidDate + '</div>';
         else if (isPaid) h += '<input type="date" class="spark-input" style="width:100px;font-size:9px;padding:1px 3px;text-align:center;color:#2E7D32;border-color:#C8E6C9" value="' + paidDate + '" onchange="flPatchGlobal(\'' + eid + '\',\'paid_date\',this.value,\'' + pe.projCode + '\')" title="Date paid">';
         h += '</div>';
-        h += '<div style="font-size:11px;color:var(--mid-gray)">' + (entry.notes || '') + '</div>';
+        /* Delete */
+        h += '<button onclick="flDeleteWeekGlobal(\'' + eid + '\',\'' + pe.projCode + '\')" title="Remove week" style="background:none;border:none;cursor:pointer;color:' + _dmMid + ';font-size:15px;line-height:1;padding:0 2px" onmouseenter="this.style.color=\'var(--ember)\'" onmouseleave="this.style.color=\'' + _dmMid + '\'">×</button>';
         h += '</div>';
       }
+
+      /* Add week row */
+      var budId = pe.sb.id;
+      h += '<div style="padding:6px 16px 8px;display:flex;align-items:center;gap:8px">';
+      h += '<input type="text" id="flNewLabel_' + tid + '_' + pe.projCode + '" placeholder="Label new week\u2026 (e.g. Week of Apr 21)" onkeydown="if(event.key===\'Enter\')flAddWeekGlobal(\'' + budId + '\',\'' + tid + '\',\'' + pe.projCode + '\')" style="flex:1;padding:4px 8px;border-radius:5px;border:1px solid ' + _dmBorder + ';font-size:12px;color:' + _dmText + ';background:' + _dmSurf2 + ';outline:none">';
+      h += '<button onclick="flAddWeekGlobal(\'' + budId + '\',\'' + tid + '\',\'' + pe.projCode + '\')" style="padding:3px 12px;border-radius:5px;border:1px solid rgba(91,74,138,.4);background:transparent;color:#5B4A8A;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap">+ Add Week</button>';
+      h += '</div>';
     }
 
     h += '</div>';
@@ -10580,6 +10612,79 @@ async function flPatchGlobal(entryId, field, value, projCode) {
       }
     }
   }
+}
+
+var _flDebTimers = {};
+function flDebouncedPatchGlobal(entryId, field, value, projCode) {
+  var key = entryId + '|' + field;
+  if (_flDebTimers[key]) clearTimeout(_flDebTimers[key]);
+  /* Update local cache immediately so the UI reflects the change on re-render */
+  if (SUPA_BUDGETS && SUPA_BUDGETS[projCode] && SUPA_BUDGETS[projCode]._flEntries) {
+    for (var i = 0; i < SUPA_BUDGETS[projCode]._flEntries.length; i++) {
+      if (SUPA_BUDGETS[projCode]._flEntries[i].id === entryId) {
+        SUPA_BUDGETS[projCode]._flEntries[i][field] = (field === 'hours') ? (parseFloat(value) || 0) : value;
+        break;
+      }
+    }
+    if (field === 'hours') {
+      flRecomputeTotals(SUPA_BUDGETS[projCode]);
+      renderFlGrid(); /* re-render so progress bar + totals update */
+    }
+  }
+  _flDebTimers[key] = setTimeout(async function() {
+    var patch = {}; patch[field] = (field === 'hours') ? (parseFloat(value) || 0) : (value || null);
+    await sparkFetch('freelancer_budget_entries?id=eq.' + entryId, '', 'PATCH', patch);
+  }, 500);
+}
+
+async function flAddWeekGlobal(budgetId, tmId, projCode) {
+  if (!budgetId || !tmId || !projCode) return;
+  var labelInput = document.getElementById('flNewLabel_' + tmId + '_' + projCode);
+  var label = (labelInput && labelInput.value.trim()) ? labelInput.value.trim() : null;
+  /* Find rate + week count for this team member */
+  var rate = 0, weekNum = 1;
+  var entries = (SUPA_BUDGETS && SUPA_BUDGETS[projCode] && SUPA_BUDGETS[projCode]._flEntries) || [];
+  for (var i = 0; i < entries.length; i++) {
+    if (entries[i].team_member_id === tmId) {
+      rate = entries[i].rate || rate;
+      if (entries[i].week_label !== '__budget__') weekNum++;
+    }
+  }
+  if (!label) label = 'Week ' + weekNum;
+  var statusEl = document.getElementById('flSaveStatus');
+  if (statusEl) statusEl.textContent = 'Saving\u2026';
+  var result = await sparkFetch('freelancer_budget_entries', '', 'POST', {
+    budget_id: budgetId, team_member_id: tmId,
+    week_label: label, hours: 0, rate: rate, paid: false,
+    display_order: entries.length
+  });
+  if (result && result.length) {
+    /* Enrich with name */
+    result[0]._name = null;
+    for (var ti = 0; ti < (FURNACE_TEAM_MEMBERS||[]).length; ti++) {
+      if (FURNACE_TEAM_MEMBERS[ti].id === tmId) { result[0]._name = FURNACE_TEAM_MEMBERS[ti].name; break; }
+    }
+    if (!result[0]._name) result[0]._name = entries.length > 0 ? (entries[0]._name || 'Unknown') : 'Unknown';
+    if (SUPA_BUDGETS && SUPA_BUDGETS[projCode]) {
+      SUPA_BUDGETS[projCode]._flEntries.push(result[0]);
+      flRecomputeTotals(SUPA_BUDGETS[projCode]);
+    }
+  }
+  if (statusEl) { statusEl.textContent = 'Saved'; setTimeout(function(){ if(statusEl) statusEl.textContent=''; }, 2000); }
+  renderFlGrid();
+}
+
+async function flDeleteWeekGlobal(entryId, projCode) {
+  if (!confirm('Remove this week entry?')) return;
+  var statusEl = document.getElementById('flSaveStatus');
+  if (statusEl) statusEl.textContent = 'Saving\u2026';
+  await sparkFetch('freelancer_budget_entries?id=eq.' + entryId, '', 'DELETE', null);
+  if (SUPA_BUDGETS && SUPA_BUDGETS[projCode] && SUPA_BUDGETS[projCode]._flEntries) {
+    SUPA_BUDGETS[projCode]._flEntries = SUPA_BUDGETS[projCode]._flEntries.filter(function(e){ return e.id !== entryId; });
+    flRecomputeTotals(SUPA_BUDGETS[projCode]);
+  }
+  if (statusEl) { statusEl.textContent = 'Saved'; setTimeout(function(){ if(statusEl) statusEl.textContent=''; }, 2000); }
+  renderFlGrid();
 }
 
 function renderAllocProjList() {
