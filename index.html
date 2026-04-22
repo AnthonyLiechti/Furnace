@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.60 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.61 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -2071,8 +2071,8 @@ function renderProjFinancials(p) {
   h += '<div class="snap-fin-item"><div class="sf-label">Client Price</div><div class="sf-value sf-gold">$' + Math.round(tcvPrice).toLocaleString() + '</div>';
   if (hasDisc) h += '<div class="sf-sub">Before discount: $' + Math.round(rawPrice).toLocaleString() + '</div>';
   h += '</div>';
-  h += '<div class="snap-fin-item"><div class="sf-label">Labor Cost</div><div class="sf-value">$' + Math.round(sb.laborTotal || 0).toLocaleString() + '</div><div class="sf-sub">' + (sb.laborHours || 0).toFixed(0) + ' hrs @ $200/hr</div></div>';
-  h += '<div class="snap-fin-item"><div class="sf-label">Freelancer Cost</div><div class="sf-value" style="color:#CE93D8">' + (noFl ? '<span style="opacity:.4">—</span>' : '$' + Math.round(flBudget).toLocaleString()) + '</div>' + (!noFl && flBudget > 0 ? '<div class="sf-sub">' + (sb._flEntries || []).length + ' entries</div>' : '') + '</div>';
+  h += '<div class="snap-fin-item"><div class="sf-label">Projected Labor Price</div><div class="sf-value">$' + Math.round(sb.laborTotal || 0).toLocaleString() + '</div><div class="sf-sub">' + (sb.laborHours || 0).toFixed(0) + ' hrs @ $200/hr</div></div>';
+  h += '<div class="snap-fin-item"><div class="sf-label">Projected Freelancer Price</div><div class="sf-value" style="color:#CE93D8">' + (noFl ? '<span style="opacity:.4">—</span>' : '$' + Math.round(flBudget).toLocaleString()) + '</div>' + (!noFl && flBudget > 0 ? '<div class="sf-sub">' + (sb._flEntries || []).length + ' entries</div>' : '') + '</div>';
   h += '<div class="snap-fin-item"><div class="sf-label">OOP Cost</div><div class="sf-value">' + (noOop ? '<span style="opacity:.4">—</span>' : '$' + Math.round(oopBudget).toLocaleString()) + '</div></div>';
   h += '<div class="snap-fin-item"><div class="sf-label">Profit</div><div class="sf-value ' + (profitVal >= 0 ? 'sf-green' : '') + '">$' + Math.round(profitVal).toLocaleString() + '</div><div class="sf-sub">' + profitPctVal + '%</div></div>';
   h += '<div class="snap-fin-item"><div class="sf-label">Margin</div><div class="sf-value" style="color:' + marginColor + '">' + marginPctVal + '%</div><div class="sf-sub">Internal cost: $' + Math.round(internalLaborCost).toLocaleString() + '</div></div>';
@@ -2397,7 +2397,7 @@ function renderProject(projectId) {
       if (maxPersonHrs === 0) maxPersonHrs = 1;
       h += '<div class="section-title" style="margin-top:24px">Team Investment</div>';
       h += '<table class="phase-table"><thead><tr>';
-      h += '<th>Team Member</th><th style="text-align:right">Hours</th><th style="text-align:right">Labor Cost</th><th style="text-align:right">% of Total</th><th>Distribution</th>';
+      h += '<th>Team Member</th><th style="text-align:right">Hours</th><th style="text-align:right">Projected Labor Price</th><th style="text-align:right">% of Total</th><th>Distribution</th>';
       h += '</tr></thead><tbody>';
       for (var i = 0; i < bdPeople.length; i++) {
         var bp = bdPeople[i];
