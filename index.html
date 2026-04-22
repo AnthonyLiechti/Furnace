@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.47 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.48 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -4191,6 +4191,11 @@ async function toggleYTDProjectClosed(code) {
   /* Update in-memory so the render is instant */
   proj.status = newStatus;
 
+  /* Notify Evan & Richelle to close in QuickBooks when marking finished */
+  if (newStatus === 'complete') {
+    slackNotifyProjectFinished(proj.name || '', proj.code || code);
+  }
+
   renderYTD();
 }
 
@@ -4959,12 +4964,26 @@ async function slackNotifyNewProject(projName, projCode, tokenOverride) {
     var resp = await fetch('/api/slack-notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projName: projName, projCode: projCode, token: token })
+      body: JSON.stringify({ projName: projName, projCode: projCode, token: token, type: 'new_project' })
     });
     return await resp.json();
   } catch(e) {
     console.error('Slack proxy error:', e);
     return { ok: false, error: e.message || 'proxy_unreachable' };
+  }
+}
+
+async function slackNotifyProjectFinished(projName, projCode) {
+  var token = SLACK_BOT_TOKEN;
+  if (!token) return;
+  try {
+    await fetch('/api/slack-notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projName: projName, projCode: projCode, token: token, type: 'project_finished' })
+    });
+  } catch(e) {
+    console.error('Slack finished-notify error:', e);
   }
 }
 
@@ -6240,6 +6259,8 @@ async function sparkSetProjectStatus(status) {
         if (status === 'complete') {
           p.status = 'complete';
           p.projectType = 'billable';
+          /* Notify Evan & Richelle to close in QuickBooks */
+          slackNotifyProjectFinished(p.name || sparkCurrentData.budget.name || '', p.code || '');
         } else if (status === 'nonbillable') {
           p.status = 'active';
           p.projectType = 'internal';

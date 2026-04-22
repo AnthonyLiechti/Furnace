@@ -4,7 +4,8 @@
  * to avoid browser CORS restrictions on the Slack Web API.
  *
  * POST /api/slack-notify
- * Body: { projName, projCode, token }
+ * Body: { projName, projCode, token, type? }
+ *   type: 'new_project' (default) | 'project_finished'
  */
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -14,12 +15,18 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'method_not_allowed' });
 
-  const { projName, projCode, token } = req.body || {};
+  const { projName, projCode, token, type } = req.body || {};
 
   if (!token) return res.status(400).json({ ok: false, error: 'no_token' });
   if (!projName || !projCode) return res.status(400).json({ ok: false, error: 'missing_params' });
 
-  const text = `📋 *New Project Created*\n*${projCode}* — ${projName}`;
+  let text;
+  if (type === 'project_finished') {
+    text = `✅ *Project Ready to Close in QuickBooks*\n*${projCode}* — ${projName}\nPlease close out this project in QuickBooks.`;
+  } else {
+    text = `📋 *New Project Created*\n*${projCode}* — ${projName}`;
+  }
+
   const targets = ['U0997RW6PAT', 'U01TVP5C94N']; /* Evan Figueroa, Richelle Butcher */
 
   let lastError = null;
