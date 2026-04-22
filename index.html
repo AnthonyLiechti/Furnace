@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.57 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.58 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -2080,13 +2080,19 @@ function renderProjFinancials(p) {
   h += '</div>';
 
   /* ── Progress bar ── */
+  /* Compute bar percentages in render order so each segment only eats space it renders before.
+     Render order: LaborSpent → OopSpent → OopRem → FlBudget → LaborRem → Profit */
   var pLaborSpent = Math.min(100, laborSpent$ / barTotal * 100);
-  /* Finished: suppress Labor Remaining segment — those dollars fold into Profit */
-  var pLaborRem   = isFinished ? 0 : Math.min(100 - pLaborSpent, laborRemaining$ / barTotal * 100);
-  var pOopSpent   = Math.min(100 - pLaborSpent - pLaborRem, oopSpent / barTotal * 100);
-  var pOopRem     = Math.min(100 - pLaborSpent - pLaborRem - pOopSpent, Math.max(0, oopRemaining) / barTotal * 100);
-  var pFlBudget   = Math.min(100 - pLaborSpent - pLaborRem - pOopSpent - pOopRem, flBudget / barTotal * 100);
-  var pProfit     = Math.max(0, 100 - pLaborSpent - pLaborRem - pOopSpent - pOopRem - pFlBudget);
+  var _used1      = pLaborSpent;
+  var pOopSpent   = Math.min(100 - _used1, oopSpent / barTotal * 100);
+  var _used2      = _used1 + pOopSpent;
+  var pOopRem     = Math.min(100 - _used2, Math.max(0, oopRemaining) / barTotal * 100);
+  var _used3      = _used2 + pOopRem;
+  var pFlBudget   = Math.min(100 - _used3, flBudget / barTotal * 100);
+  var _used4      = _used3 + pFlBudget;
+  /* Finished: Labor Remaining folds into Profit */
+  var pLaborRem   = isFinished ? 0 : Math.min(100 - _used4, laborRemaining$ / barTotal * 100);
+  var pProfit     = Math.max(0, 100 - _used4 - pLaborRem);
   h += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1)">';
   h += '<div class="lob-bar">';
   if (pLaborSpent > 0) h += '<div class="lob-seg" style="width:' + pLaborSpent.toFixed(1) + '%;background:var(--ember)">' + (pLaborSpent >= 8 ? '$' + Math.round(laborSpent$).toLocaleString() : '') + '</div>';
