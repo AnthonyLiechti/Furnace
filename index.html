@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.48 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.49 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -7363,7 +7363,9 @@ function sparkRenderOopContent() {
         activeItems++;
       }
     }
-    var markupAmt = markupBase * (markupPct / 100);
+    /* Only apply markup when the section has effective dollars — if subtotal is $0,
+       suppress markup entirely (no real spending yet in this section) */
+    var markupAmt = sectionSubtotal > 0 ? markupBase * (markupPct / 100) : 0;
     var sectionTotal = sectionSubtotal + markupAmt;
     grandTotal += sectionTotal;
 
