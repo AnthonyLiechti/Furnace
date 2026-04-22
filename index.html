@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.52 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.53 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -886,6 +886,24 @@ function filteredProjectSpent(proj) {
   /* Fallback to RT data */
   var rtHours = getFilteredProjectHours(proj.name);
   return rtHours !== null ? rtHours : 0;
+}
+
+/* Like filteredProjectSpent but returns dollars, respecting per-entry billable_rate overrides */
+function filteredProjectSpentDollars(proj, defaultRate) {
+  defaultRate = defaultRate || 200;
+  if (!SUPA_LOADED || !SUPA_ACTUALS_ALL.length) return filteredProjectSpent(proj) * defaultRate;
+  var code = proj.code;
+  var range = globalDateFilter !== 'all' ? getDateRange(globalDateFilter) : null;
+  var start = range ? range.start.toISOString().slice(0, 10) : null;
+  var end   = range ? range.end.toISOString().slice(0, 10)   : null;
+  var total = 0;
+  for (var i = 0; i < SUPA_ACTUALS_ALL.length; i++) {
+    var a = SUPA_ACTUALS_ALL[i];
+    if (a.project_code !== code) continue;
+    if (start && (a.work_date < start || a.work_date > end)) continue;
+    total += (a.hours || 0) * (a.billable_rate || defaultRate);
+  }
+  return total;
 }
 
 function onDateFilterChange(val) {
@@ -1157,7 +1175,7 @@ async function ensureProjectActuals(projCode, proj) {
   _lazyLoadedProjects[projCode] = true;
   /* Fetch ALL actuals for this project — no date filter, authoritative total */
   var entries = await sparkFetchAll('labor_actuals',
-    'select=id,hours,work_date,person_name,project_code,phase_key,is_billable,is_bizdev,is_timeoff,board_name&source=eq.timetracker&project_code=eq.' + projCode + '&order=work_date.desc');
+    'select=id,hours,work_date,person_name,project_code,phase_key,is_billable,is_bizdev,is_timeoff,board_name,billable_rate&source=eq.timetracker&project_code=eq.' + projCode + '&order=work_date.desc');
   if (entries && entries.length > 0) {
     /* Replace (not add to) any stale bulk-load entry for this project */
     SUPA_ACTUALS[projCode] = { totalHours: 0, phases: {}, people: {}, byDate: {} };
@@ -2010,7 +2028,8 @@ function renderProjFinancials(p) {
   /* Determine finished state early so profit/margin tiles match the bar */
   var isFinished = sb.status === 'complete' || p.status === 'complete' || p.status === 'finished';
   var agencyRate = 200;
-  var laborSpent$ = saHrs * agencyRate;
+  /* Use per-entry billable_rate overrides when available; falls back to $200/hr */
+  var laborSpent$ = filteredProjectSpentDollars(p, agencyRate);
 
   /* Profit tile: finished → actual spending; open → budget amounts */
   var profitVal = isFinished
@@ -11898,7 +11917,7 @@ async function loadSupabaseData() {
       sparkFetchAll('labor_budget_entries', 'select=id,budget_id,department,employment_type,phase1,phase2,phase3_1,phase3_2,phase4,phase5,rate_override,team_member_id,team_member:team_members(id,name,fully_burdened_rate)&budget_id=in.(' + _bids + ')'),
       sparkFetchAll('oop_budget_entries', 'select=id,budget_id,line_item_name,count,rate,days,head_count,adjusted_count,adjusted_rate,adjusted_days,adjusted_head_count,actual_count,actual_rate,actual_days,actual_head_count,actual_amount,paid,paid_date,is_active&budget_id=in.(' + _bids + ')'),
       sparkFetchAll('freelancer_budget_entries', 'select=id,budget_id,team_member_id,week_label,hours,rate,paid,paid_date,notes&budget_id=in.(' + _bids + ')'),
-      sparkFetchAll('labor_actuals', 'select=id,hours,work_date,person_name,project_code,phase_key,is_billable,is_bizdev,is_timeoff,board_name&source=eq.timetracker&work_date=gte.2024-01-01&order=work_date.desc'),
+      sparkFetchAll('labor_actuals', 'select=id,hours,work_date,person_name,project_code,phase_key,is_billable,is_bizdev,is_timeoff,board_name,billable_rate&source=eq.timetracker&work_date=gte.2024-01-01&order=work_date.desc'),
       sparkFetchAll('allocations', 'select=id,person,project,date,hours_per_day,week_of&order=date.asc')
     ]);
     var laborEntries = _phase2[0];
