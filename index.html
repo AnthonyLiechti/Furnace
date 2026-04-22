@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.55 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.56 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -7374,7 +7374,7 @@ function sparkRenderOopContent() {
     /* else: no section OR category — truly orphaned, skip */
   }
 
-  var grandTotal = 0;
+  var grandTotal = 0, grandSubtotal = 0;
   var h = '';
 
   for (var s = 0; s < sections.length; s++) {
@@ -7408,6 +7408,7 @@ function sparkRenderOopContent() {
     /* Apply markup on the effective subtotal — suppressed entirely when section is $0 */
     var markupAmt = sectionSubtotal > 0 ? sectionSubtotal * (markupPct / 100) : 0;
     var sectionTotal = sectionSubtotal + markupAmt;
+    grandSubtotal += sectionSubtotal;
     grandTotal += sectionTotal;
 
     /* Department display name */
@@ -7604,8 +7605,13 @@ function sparkRenderOopContent() {
     h += '</div>'; /* end spark-oop-wrap */
   }
 
-  /* Grand total bar */
-  h += '<div class="spark-oop-grand-total"><span>Out-of-Pocket Total</span><span>' + sparkFmt(grandTotal) + '</span></div>';
+  /* Grand total bar — subtotal + markup breakdown */
+  var grandMarkup = grandTotal - grandSubtotal;
+  h += '<div style="margin-top:16px">';
+  h += '<div class="spark-oop-subtotal" style="border-top:1px solid rgba(255,255,255,.08);padding-top:10px"><span>Out-of-Pocket Subtotal</span><span style="font-weight:600">' + sparkFmt(grandSubtotal) + '</span></div>';
+  h += '<div class="spark-oop-markup-row"><span>Markup ' + markupPct + '%</span><span>' + sparkFmt(grandMarkup) + '</span></div>';
+  h += '<div class="spark-oop-grand-total" style="margin-top:8px"><span>Out-of-Pocket Total</span><span>' + sparkFmt(grandTotal) + '</span></div>';
+  h += '</div>';
 
   el.innerHTML = h;
 }
