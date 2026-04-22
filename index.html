@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.59 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.60 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -4271,20 +4271,28 @@ function renderYTD() {
   function lobBar(spentD, laborRemD, oopD, flD, reserveD) {
     var barTotal = spentD + laborRemD + oopD + flD + Math.max(0, reserveD);
     if (barTotal <= 0) return '';
-    function seg(val, color, textColor, label) {
-      var p = Math.round(val / barTotal * 100);
+    /* Use exact percentages — CSS handles decimals fine, avoids rounding gaps */
+    function seg(val, color, textColor, label, isLast) {
+      var p = val / barTotal * 100;
       if (p <= 0) return '';
-      return '<div class="lob-seg" style="width:' + p + '%;background:' + color + (textColor ? ';color:' + textColor : '') + '">'
+      var flexStr = isLast ? ';flex:1 0 ' + p.toFixed(2) + '%' : '';
+      return '<div class="lob-seg" style="width:' + p.toFixed(2) + '%;background:' + color + (textColor ? ';color:' + textColor : '') + flexStr + '">'
         + (p >= 7 ? label : '') + '</div>';
     }
+    /* Build visible segments first so we can mark the last one */
+    var segs = [];
+    if (spentD > 0)               segs.push([spentD,    'var(--ember)', null,             '$' + Math.round(spentD).toLocaleString()]);
+    if (laborRemD > 0)            segs.push([laborRemD, 'var(--ocean)', null,             '$' + Math.round(laborRemD).toLocaleString()]);
+    if (flD > 0)                  segs.push([flD,       '#9B8EC2',     null,             '$' + Math.round(flD).toLocaleString()]);
+    if (oopD > 0)                 segs.push([oopD,      'var(--sand)', 'var(--abyss)',   '$' + Math.round(oopD).toLocaleString()]);
+    if (Math.max(0,reserveD) > 0) segs.push([Math.max(0,reserveD), '#81C784', null,     '$' + Math.round(reserveD).toLocaleString()]);
     var s = '<div class="labor-oop-bar" style="margin-top:14px">';
     s += '<div class="lob-title">Budget Breakdown</div>';
     s += '<div class="lob-bar">';
-    s += seg(spentD,    'var(--ember)', null, '$' + Math.round(spentD).toLocaleString());
-    s += seg(laborRemD, 'var(--ocean)', null, '$' + Math.round(laborRemD).toLocaleString());
-    if (flD > 0) s += seg(flD, '#9B8EC2', null, '$' + Math.round(flD).toLocaleString());
-    s += seg(oopD,    'var(--sand)',  'var(--abyss)', '$' + Math.round(oopD).toLocaleString());
-    s += seg(Math.max(0, reserveD), '#81C784', null, '$' + Math.round(reserveD).toLocaleString());
+    for (var _si = 0; _si < segs.length; _si++) {
+      var _sg = segs[_si];
+      s += seg(_sg[0], _sg[1], _sg[2], _sg[3], _si === segs.length - 1);
+    }
     s += '</div>';
     s += '<div class="lob-legend">';
     s += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ember)"></div>Labor Spent</div>';
