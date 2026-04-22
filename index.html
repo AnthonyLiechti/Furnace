@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.46 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 17, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.47 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -4517,8 +4517,10 @@ function renderYTD() {
       /* Banner header: project name + billing + closed badge */
       h += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:' + (hasFinData ? '16px' : '8px') + '">';
       h += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
-      h += '<div><div style="font-size:15px;font-weight:700">' + proj.code + '</div>';
-      h += '<div style="font-size:12px;opacity:.6;margin-top:2px">' + proj.name + '</div></div>';
+      h += '<div onclick="navigate(\'project:' + proj.id + '\')" style="cursor:pointer" title="Go to project page">';
+      h += '<div style="font-size:15px;font-weight:700;text-decoration:underline;text-decoration-color:rgba(255,255,255,.3)">' + proj.code + '</div>';
+      h += '<div style="font-size:12px;opacity:.6;margin-top:2px">' + proj.name + '</div>';
+      h += '</div>';
       if (isClosed) h += '<span style="font-size:10px;font-weight:700;background:rgba(129,199,132,.25);color:#81C784;padding:3px 9px;border-radius:20px;letter-spacing:.4px">✓ CLOSED</span>';
       h += '</div>';
       h += '<div style="text-align:right">';
@@ -7318,13 +7320,16 @@ function sparkRenderOopContent() {
     var gc = sparkOopGridClass(slug);
 
     /* Compute section totals (including uncategorized entries for this section) */
-    var sectionSubtotal = 0;
+    /* sectionSubtotal = effective amounts (actual_amount → adjusted → planned cascade)  */
+    /* markupBase      = planned-only amounts (no markup on entries that already have actuals) */
+    var sectionSubtotal = 0, markupBase = 0;
     var activeItems = 0;
     for (var c = 0; c < secCats.length; c++) {
       var catEntries = entriesByCat[secCats[c].id] || [];
       for (var e = 0; e < catEntries.length; e++) {
         if (catEntries[e].is_active !== false) {
-          sectionSubtotal += sparkOopItemTotal(catEntries[e]);
+          sectionSubtotal += sparkOopItemEffective(catEntries[e]);
+          if (catEntries[e].actual_amount == null) markupBase += sparkOopItemTotal(catEntries[e]);
           activeItems++;
         }
       }
@@ -7332,11 +7337,12 @@ function sparkRenderOopContent() {
     var uncatItems = uncatBySection[secId] || [];
     for (var u = 0; u < uncatItems.length; u++) {
       if (uncatItems[u].is_active !== false) {
-        sectionSubtotal += sparkOopItemTotal(uncatItems[u]);
+        sectionSubtotal += sparkOopItemEffective(uncatItems[u]);
+        if (uncatItems[u].actual_amount == null) markupBase += sparkOopItemTotal(uncatItems[u]);
         activeItems++;
       }
     }
-    var markupAmt = sectionSubtotal * (markupPct / 100);
+    var markupAmt = markupBase * (markupPct / 100);
     var sectionTotal = sectionSubtotal + markupAmt;
     grandTotal += sectionTotal;
 
@@ -7364,14 +7370,16 @@ function sparkRenderOopContent() {
       for (var c = 0; c < secCats.length; c++) {
         var cat = secCats[c];
         var catId = cat.id;
-        var catExpanded = !!sparkOopCategoryExpanded[catId];
         var catEntries = entriesByCat[catId] || [];
+        /* Auto-expand categories that have actual amounts set, unless user explicitly collapsed */
+        var _catHasActuals = catEntries.some(function(ce) { return ce.is_active !== false && ce.actual_amount != null; });
+        var catExpanded = sparkOopCategoryExpanded[catId] !== undefined ? !!sparkOopCategoryExpanded[catId] : _catHasActuals;
         var activeCatEntries = [];
         var catTotal = 0;
         for (var e = 0; e < catEntries.length; e++) {
           if (catEntries[e].is_active !== false) {
             activeCatEntries.push(catEntries[e]);
-            catTotal += sparkOopItemTotal(catEntries[e]);
+            catTotal += sparkOopItemEffective(catEntries[e]);
           }
         }
 
@@ -7469,7 +7477,7 @@ function sparkRenderOopContent() {
         var uncatCatId = 'uncat-' + secId;
         var uncatExpanded = !!sparkOopCategoryExpanded[uncatCatId];
         var uncatTotal = 0;
-        for (var u = 0; u < activeUncatForSec.length; u++) uncatTotal += sparkOopItemTotal(activeUncatForSec[u]);
+        for (var u = 0; u < activeUncatForSec.length; u++) uncatTotal += sparkOopItemEffective(activeUncatForSec[u]);
         /* Category row */
         h += '<div class="spark-oop-cat-row" onclick="sparkToggleOopCategory(\'' + uncatCatId + '\')">';
         h += '<div><span class="cat-toggle">' + (uncatExpanded ? '&#9660;' : '&#9654;') + '</span>';
@@ -7836,6 +7844,277 @@ async function renderSpark() {
   }
 }
 
+/* ── TREVOR'S TIME TRACKER INTEGRATION ── */
+var TREVOR_TRACKER_KEY = '02c2643f53c24a75fe28cd15576318e7769ab4d8b0954bbcedba40edee556103'; /* Trevor's personal deploy — never commit */
+var TREVOR_TRACKER_URL = 'https://daily-hours-tracker.vercel.app';
+var TREVOR_RT_NAME    = 'Trevor Morse'; /* Name as it appears in Resource Analytics people keys */
+var TREVOR_HOURS = { entries: [], from: null, to: null, loading: false, error: null };
+var TREVOR_SYNC  = { syncing: false, msg: '', isError: false };
+
+async function fetchTrevorHours(from, to) {
+  if (!TREVOR_TRACKER_KEY) return;
+  if (TREVOR_HOURS.from === from && TREVOR_HOURS.to === to && !TREVOR_HOURS.error && !TREVOR_HOURS.loading) return;
+  TREVOR_HOURS.loading = true; TREVOR_HOURS.error = null;
+  try {
+    var resp = await fetch(TREVOR_TRACKER_URL + '/api/v1/time-entries?from=' + from + '&to=' + to,
+      { headers: { 'Authorization': 'Bearer ' + TREVOR_TRACKER_KEY } });
+    if (resp.ok) {
+      TREVOR_HOURS.entries = await resp.json();
+      TREVOR_HOURS.from = from; TREVOR_HOURS.to = to;
+    } else if (resp.status === 401) {
+      TREVOR_HOURS.error = '401 — key revoked. Tell Trevor to mint a new one in Settings › Admin › API.';
+      TREVOR_HOURS.entries = [];
+    } else {
+      TREVOR_HOURS.error = 'API error ' + resp.status;
+      TREVOR_HOURS.entries = [];
+    }
+  } catch(e) {
+    TREVOR_HOURS.error = 'Network error: ' + (e.message || 'unknown');
+    TREVOR_HOURS.entries = [];
+  }
+  TREVOR_HOURS.loading = false;
+  renderResource();
+}
+
+function trevorGetRange(wk) {
+  /* Returns { from, to } covering the current RT view week or month */
+  if (!wk || !wk.sunday) return null;
+  if (rtTimeMode === 'month') {
+    var d = new Date(wk.sunday + 'T00:00:00');
+    var first = new Date(d.getFullYear(), d.getMonth(), 1);
+    var last  = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    return { from: first.toISOString().slice(0, 10), to: last.toISOString().slice(0, 10) };
+  }
+  /* Week: sunday + 1 = Mon, sunday + 5 = Fri */
+  var sun = new Date(wk.sunday + 'T00:00:00');
+  var mon = new Date(sun); mon.setDate(mon.getDate() + 1);
+  var fri = new Date(sun); fri.setDate(fri.getDate() + 5);
+  return { from: mon.toISOString().slice(0, 10), to: fri.toISOString().slice(0, 10) };
+}
+
+function renderTrevorTrackerCard(wk) {
+  if (!TREVOR_TRACKER_KEY) return '';
+  /* Only show when Trevor has allocations in this period */
+  if (!wk || !wk.people || !wk.people[TREVOR_RT_NAME]) return '';
+  var range = trevorGetRange(wk);
+  if (!range) return '';
+
+  /* Kick off fetch if range changed or error needs retry */
+  if ((TREVOR_HOURS.from !== range.from || TREVOR_HOURS.to !== range.to) && !TREVOR_HOURS.loading) {
+    fetchTrevorHours(range.from, range.to);
+  }
+
+  var _isDark  = document.documentElement.classList.contains('dark');
+  var _dmSurf  = _isDark ? 'var(--dm-surface2)' : 'rgba(91,74,138,.05)';
+  var _dmText  = _isDark ? 'var(--dm-text)'      : 'var(--abyss)';
+  var _dmMid   = _isDark ? 'var(--dm-text-muted)': 'var(--mid-gray)';
+  var _dmBdr   = _isDark ? 'var(--dm-border)'    : 'var(--canvas)';
+  var _purple  = '#5B4A8A';
+
+  var h = '<div class="rt-card" style="border-top:3px solid ' + _purple + '">';
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">';
+  h += '<div style="display:flex;align-items:center;gap:10px">';
+  h += '<h3 style="margin:0">Trevor\'s Time Tracker</h3>';
+  h += '<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:' + _dmSurf + ';color:' + _dmMid + '">' + range.from + ' – ' + range.to + '</span>';
+  h += '</div>';
+  h += '<div style="display:flex;gap:6px">';
+  h += '<button onclick="TREVOR_HOURS.from=null;fetchTrevorHours(\'' + range.from + '\',\'' + range.to + '\')" style="font-size:11px;padding:5px 12px;border-radius:5px;border:1px solid ' + _dmBdr + ';background:transparent;color:' + _dmMid + ';cursor:pointer">↻ Refresh</button>';
+  if (TREVOR_SYNC.syncing) {
+    h += '<button disabled style="font-size:11px;padding:5px 12px;border-radius:5px;border:none;background:rgba(91,74,138,.3);color:' + _purple + ';cursor:default">Syncing…</button>';
+  } else {
+    h += '<button onclick="trevorSyncToSupabase(\'' + range.from + '\',\'' + range.to + '\')" style="font-size:11px;padding:5px 12px;border-radius:5px;border:none;background:' + _purple + ';color:#fff;cursor:pointer;font-weight:600">↑ Sync to Supabase</button>';
+  }
+  h += '</div>';
+  h += '</div>';
+  /* Sync status bar */
+  if (TREVOR_SYNC.msg) {
+    var sbg = TREVOR_SYNC.isError ? 'rgba(211,47,47,.08)' : (TREVOR_SYNC.syncing ? 'rgba(91,74,138,.08)' : 'rgba(46,125,50,.08)');
+    var scol = TREVOR_SYNC.isError ? '#C62828' : (TREVOR_SYNC.syncing ? _purple : '#2E7D32');
+    h += '<div style="font-size:11px;padding:7px 10px;border-radius:6px;background:' + sbg + ';color:' + scol + ';margin-bottom:14px">' + TREVOR_SYNC.msg + '</div>';
+  }
+
+  if (TREVOR_HOURS.loading) {
+    h += '<div style="text-align:center;padding:24px;color:' + _dmMid + ';font-size:12px">Fetching from tracker…</div>';
+    h += '</div>'; return h;
+  }
+  if (TREVOR_HOURS.error) {
+    h += '<div style="padding:12px 14px;background:rgba(211,47,47,.08);border-radius:6px;color:#C62828;font-size:12px">' + TREVOR_HOURS.error + '</div>';
+    h += '</div>'; return h;
+  }
+  if (!TREVOR_HOURS.entries || TREVOR_HOURS.entries.length === 0) {
+    h += '<div style="text-align:center;padding:24px;color:' + _dmMid + ';font-size:12px">No entries for this period.</div>';
+    h += '</div>'; return h;
+  }
+
+  /* Build board_id → Furnace project code lookup */
+  var boardMap = {};
+  var allP = allProjects();
+  for (var i = 0; i < allP.length; i++) {
+    if (allP[i].boardId) boardMap[String(allP[i].boardId)] = allP[i].code;
+  }
+
+  /* Group entries by project */
+  var byProj = {};
+  var totalHrs = 0;
+  for (var i = 0; i < TREVOR_HOURS.entries.length; i++) {
+    var e = TREVOR_HOURS.entries[i];
+    var hrs = parseFloat(e.parsed_hours) || 0;
+    totalHrs += hrs;
+    var projKey = e.matched_project_name || '(unmatched)';
+    var bid = e.matched_board_id ? String(e.matched_board_id) : null;
+    var code = bid ? (boardMap[bid] || null) : null;
+    if (!byProj[projKey]) byProj[projKey] = { hrs: 0, code: code, acts: {} };
+    byProj[projKey].hrs += hrs;
+    var act = e.parsed_activity || e.entry_type || 'General';
+    byProj[projKey].acts[act] = (byProj[projKey].acts[act] || 0) + hrs;
+  }
+  var pks = Object.keys(byProj).sort(function(a,b){ return byProj[b].hrs - byProj[a].hrs; });
+
+  /* Summary chips */
+  h += '<div style="display:flex;gap:10px;margin-bottom:16px">';
+  h += '<div style="flex:1;text-align:center;background:' + _dmSurf + ';border-radius:8px;padding:10px 0">';
+  h += '<div style="font-size:10px;color:' + _dmMid + ';margin-bottom:2px;text-transform:uppercase;letter-spacing:.5px">Tracked</div>';
+  h += '<div style="font-size:24px;font-weight:700;color:' + _purple + '">' + totalHrs.toFixed(1) + 'h</div>';
+  h += '</div>';
+  h += '<div style="flex:1;text-align:center;background:' + _dmSurf + ';border-radius:8px;padding:10px 0">';
+  h += '<div style="font-size:10px;color:' + _dmMid + ';margin-bottom:2px;text-transform:uppercase;letter-spacing:.5px">Projects</div>';
+  h += '<div style="font-size:24px;font-weight:700">' + pks.length + '</div>';
+  h += '</div>';
+  h += '<div style="flex:1;text-align:center;background:' + _dmSurf + ';border-radius:8px;padding:10px 0">';
+  h += '<div style="font-size:10px;color:' + _dmMid + ';margin-bottom:2px;text-transform:uppercase;letter-spacing:.5px">Entries</div>';
+  h += '<div style="font-size:24px;font-weight:700">' + TREVOR_HOURS.entries.length + '</div>';
+  h += '</div>';
+  h += '</div>';
+
+  /* Project breakdown */
+  h += '<div style="font-size:11px">';
+  h += '<div style="display:grid;grid-template-columns:1fr 130px 52px;color:' + _dmMid + ';font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding:0 6px 6px;border-bottom:1px solid ' + _dmBdr + '">';
+  h += '<div>Project</div><div>Top Activity</div><div style="text-align:right">Hours</div></div>';
+  for (var pi = 0; pi < pks.length; pi++) {
+    var pk = pks[pi], pv = byProj[pk];
+    var pct = totalHrs > 0 ? pv.hrs / totalHrs : 0;
+    var topAct = '', topHrs = 0;
+    for (var ak in pv.acts) { if (pv.acts[ak] > topHrs) { topHrs = pv.acts[ak]; topAct = ak; } }
+    var bdr = pi < pks.length - 1 ? '1px solid ' + _dmBdr : 'none';
+    h += '<div style="display:grid;grid-template-columns:1fr 130px 52px;padding:8px 6px;border-bottom:' + bdr + ';align-items:center">';
+    h += '<div>';
+    h += '<div style="font-weight:600">' + pk + '</div>';
+    if (pv.code) h += '<div style="font-size:10px;color:var(--ocean);font-family:monospace;margin-top:1px">' + pv.code + '</div>';
+    h += '<div style="height:3px;border-radius:2px;background:' + _dmBdr + ';margin-top:5px"><div style="height:3px;border-radius:2px;background:' + _purple + ';width:' + Math.round(pct*100) + '%"></div></div>';
+    h += '</div>';
+    h += '<div style="color:' + _dmMid + ';padding-left:6px">' + topAct + '</div>';
+    h += '<div style="text-align:right;font-weight:700">' + pv.hrs.toFixed(1) + 'h</div>';
+    h += '</div>';
+  }
+  h += '</div>';
+  h += '</div>';
+  return h;
+}
+
+async function trevorSyncToSupabase(from, to) {
+  if (!TREVOR_TRACKER_KEY) return;
+  if (!sparkAuth || !sparkAuth.connected) {
+    TREVOR_SYNC = { syncing: false, msg: 'Furnace not connected to Supabase.', isError: true };
+    renderResource(); return;
+  }
+
+  function setStatus(msg, isError) {
+    TREVOR_SYNC = { syncing: !isError, msg: msg, isError: !!isError };
+    renderResource();
+  }
+
+  setStatus('Fetching from tracker…');
+
+  /* 1. Fetch from Trevor's tracker API */
+  var entries;
+  try {
+    var resp = await fetch(TREVOR_TRACKER_URL + '/api/v1/time-entries?from=' + from + '&to=' + to,
+      { headers: { 'Authorization': 'Bearer ' + TREVOR_TRACKER_KEY } });
+    if (!resp.ok) throw new Error(resp.status === 401 ? 'Key revoked (401)' : 'API error ' + resp.status);
+    entries = await resp.json();
+    TREVOR_HOURS.entries = entries; TREVOR_HOURS.from = from; TREVOR_HOURS.to = to; TREVOR_HOURS.error = null;
+  } catch(e) {
+    setStatus('Tracker fetch failed: ' + e.message, true); return;
+  }
+
+  if (!entries || entries.length === 0) {
+    TREVOR_SYNC = { syncing: false, msg: 'No entries in tracker for this period.', isError: false };
+    renderResource(); return;
+  }
+
+  /* 2. Build board_id → Furnace project lookup */
+  var boardMap = {};
+  var allP = allProjects();
+  for (var i = 0; i < allP.length; i++) {
+    if (allP[i].boardId) boardMap[String(allP[i].boardId)] = allP[i];
+  }
+
+  /* 3. Convert tracker entries → labor_actuals rows */
+  var rows = [], skipped = 0;
+  for (var i = 0; i < entries.length; i++) {
+    var e = entries[i];
+    var hrs = parseFloat(e.parsed_hours);
+    if (!hrs || hrs <= 0) continue;
+    var bid  = e.matched_board_id ? String(e.matched_board_id) : null;
+    var proj = bid ? boardMap[bid] : null;
+    if (!proj) { skipped++; continue; }
+    var etype = (e.entry_type || '').toLowerCase();
+    rows.push({
+      person_name:  TREVOR_RT_NAME,
+      board_name:   e.matched_project_name || proj.name || '',
+      project_code: proj.code,
+      work_date:    e.date,
+      hours:        hrs,
+      source:       'timetracker',
+      is_billable:  proj.hourType !== 'nonbillable',
+      is_bizdev:    false,
+      is_timeoff:   etype.indexOf('off') > -1 || etype.indexOf('vacation') > -1 || etype.indexOf('pto') > -1,
+      phase_key:    null,
+      start_time:   null
+    });
+  }
+
+  if (rows.length === 0) {
+    TREVOR_SYNC = { syncing: false, msg: 'Nothing to sync — ' + skipped + ' unmatched project' + (skipped !== 1 ? 's' : '') + '.', isError: false };
+    renderResource(); return;
+  }
+
+  /* 4. Delete Trevor's existing actuals for this date range */
+  setStatus('Clearing old entries for ' + from + ' – ' + to + '…');
+  try {
+    await sparkFetch('labor_actuals?source=eq.timetracker&person_name=eq.' + encodeURIComponent(TREVOR_RT_NAME) + '&work_date=gte.' + from + '&work_date=lte.' + to, '', 'DELETE');
+  } catch(e) {
+    setStatus('Delete failed: ' + e.message, true); return;
+  }
+
+  /* 5. Batch insert new rows */
+  setStatus('Writing ' + rows.length + ' entries to Supabase…');
+  var BATCH = 200, inserted = 0;
+  for (var b = 0; b < rows.length; b += BATCH) {
+    try {
+      var res = await sparkFetch('labor_actuals', '', 'POST', rows.slice(b, b + BATCH));
+      if (res && res.error) throw new Error(res.error.message || JSON.stringify(res.error));
+      inserted += Math.min(BATCH, rows.length - b);
+    } catch(e) {
+      setStatus('Insert failed: ' + e.message, true); return;
+    }
+  }
+
+  /* 6. Patch local SUPA_ACTUALS_ALL cache + rebuild RT_WEEKS */
+  SUPA_ACTUALS_ALL = (SUPA_ACTUALS_ALL || []).filter(function(a) {
+    return !(a.person_name === TREVOR_RT_NAME && a.work_date >= from && a.work_date <= to);
+  });
+  SUPA_ACTUALS_ALL = SUPA_ACTUALS_ALL.concat(rows);
+  computeResourceWeeks();
+
+  TREVOR_SYNC = {
+    syncing:  false,
+    msg:      '✓ ' + inserted + ' entr' + (inserted !== 1 ? 'ies' : 'y') + ' synced' + (skipped ? ' · ' + skipped + ' unmatched skipped' : ''),
+    isError:  false
+  };
+  renderResource();
+}
+
 /* ── RESOURCE TRACKER STATE ── */
 var RT_WEEKS = [];
 var RT_LEADERSHIP = ['Jeff Butcher', 'Jeff Cole', 'Richelle Butcher'];
@@ -8059,9 +8338,15 @@ function renderRMFlContent() {
     h += '<div style="border:1px solid rgba(91,74,138,.25);border-radius:8px;margin-top:8px;overflow:hidden">';
 
     /* Header */
+    var _curBillRate   = grp.member && grp.member.billable_rate;
+    var _rateMismatch  = _curBillRate && grpRate && (grpRate !== _curBillRate);
     h += '<div style="background:#5B4A8A;color:#fff;padding:9px 12px;display:flex;align-items:center;justify-content:space-between">';
-    h += '<div style="display:flex;align-items:center;gap:8px"><span style="font-weight:700;font-size:13px">' + name + '</span>';
-    h += '<span style="font-size:11px;opacity:.65">' + sparkFmtDec(grpRate) + '/hr</span></div>';
+    h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-weight:700;font-size:13px">' + name + '</span>';
+    h += '<span style="font-size:11px;opacity:.65">' + sparkFmtDec(grpRate) + '/hr</span>';
+    if (_rateMismatch) {
+      h += '<span title="Rate on this project (' + sparkFmtDec(grpRate) + '/hr) differs from current default rate (' + sparkFmtDec(_curBillRate) + '/hr)" style="font-size:9px;font-weight:700;background:rgba(255,193,7,.22);color:#FFD54F;border:1px solid rgba(255,213,79,.4);border-radius:10px;padding:2px 8px;white-space:nowrap;letter-spacing:.02em;cursor:default">Historical Rate &middot; current ' + sparkFmtDec(_curBillRate) + '/hr</span>';
+    }
+    h += '</div>';
     h += '<button onclick="rmFlRemoveFreelancer(\'' + tmId + '\')" title="Remove freelancer" style="background:none;border:none;color:rgba(255,255,255,.45);cursor:pointer;font-size:20px;line-height:1;padding:0 4px" onmouseenter="this.style.color=\'#fff\'" onmouseleave="this.style.color=\'rgba(255,255,255,.45)\'">×</button>';
     h += '</div>';
 
@@ -8753,6 +9038,10 @@ function renderRTPeople(wk) {
     h += '</div></div>';
   }
   h += '</div>';
+
+  /* Trevor's external time tracker */
+  h += renderTrevorTrackerCard(wk);
+
   return h;
 }
 
@@ -10050,6 +10339,9 @@ function renderOopGrid() {
 }
 
 function renderOopGridWeek(el, lbl, projCode) {
+  var _isDark   = document.documentElement.classList.contains('dark');
+  var _dmBorder = _isDark ? 'var(--dm-border)'     : 'var(--canvas)';
+  var _dmMid    = _isDark ? 'var(--dm-text-muted)' : 'var(--mid-gray)';
   var days = getWeekDays(allocWeekOf);
   if (lbl) lbl.innerHTML = getAllocWeekLabel(allocWeekOf);
   var cols = days.length;
@@ -10077,7 +10369,7 @@ function renderOopGridWeek(el, lbl, projCode) {
     var isToday = days[c] === new Date().toISOString().slice(0, 10);
     h += '<div class="oop-cell" style="' + (isToday ? 'background:rgba(48,109,124,.04)' : '') + '" onclick="oopShowModal(\'' + oopSelectedProject.replace(/'/g, "\\'") + '\',\'' + projCode + '\',\'' + days[c] + '\',null)">';
     if (dayEntries.length === 0) {
-      h += '<div class="oop-cell-empty"><span style="font-size:18px;color:var(--canvas)">+</span></div>';
+      h += '<div class="oop-cell-empty"><span style="font-size:18px;color:' + _dmBorder + '">+</span></div>';
     } else {
       for (var e = 0; e < dayEntries.length; e++) {
         var ent = dayEntries[e];
@@ -10088,14 +10380,14 @@ function renderOopGridWeek(el, lbl, projCode) {
         h += '<span class="oop-chip-amt">$' + Math.round(ent.amount).toLocaleString() + '</span>';
         h += '</div>';
       }
-      h += '<div style="text-align:center;margin-top:2px"><span style="font-size:14px;color:var(--canvas);cursor:pointer" title="Add another">+</span></div>';
+      h += '<div style="text-align:center;margin-top:2px"><span style="font-size:14px;color:' + _dmBorder + ';cursor:pointer" title="Add another">+</span></div>';
     }
     h += '</div>';
   }
   h += '<div class="oop-total-cell">$' + Math.round(weekTotal).toLocaleString() + '</div>';
 
   /* Daily totals row */
-  h += '<div class="oop-row-hdr" style="font-size:10px;color:var(--mid-gray)">All Projects</div>';
+  h += '<div class="oop-row-hdr" style="font-size:10px;color:' + _dmMid + '">All Projects</div>';
   var grandTotal = 0;
   for (var c = 0; c < days.length; c++) {
     var dayTotal = oopGetDayTotal(days[c]);
@@ -10111,6 +10403,11 @@ function renderOopGridWeek(el, lbl, projCode) {
 }
 
 function renderOopGridDay(el, lbl, projCode) {
+  var _isDark   = document.documentElement.classList.contains('dark');
+  var _dmText   = _isDark ? 'var(--dm-text)'       : 'var(--abyss)';
+  var _dmSurf   = _isDark ? 'var(--dm-surface)'    : 'var(--white)';
+  var _dmBorder = _isDark ? 'var(--dm-border)'     : 'var(--canvas)';
+  var _dmMid    = _isDark ? 'var(--dm-text-muted)' : 'var(--mid-gray)';
   var today = new Date();
   today.setDate(today.getDate() + (oopDayOffset || 0));
   var dayStr = today.toISOString().slice(0, 10);
@@ -10135,7 +10432,7 @@ function renderOopGridDay(el, lbl, projCode) {
 
   /* Entries for selected project */
   if (dayEntries.length === 0) {
-    h += '<div style="text-align:center;padding:40px;color:var(--mid-gray)">';
+    h += '<div style="text-align:center;padding:40px;color:' + _dmMid + '">';
     h += '<div style="font-size:32px;margin-bottom:8px">+</div>';
     h += '<div style="font-size:13px">No OOP scheduled for this day</div>';
     h += '<button onclick="oopShowModal(\'' + oopSelectedProject.replace(/'/g, "\\'") + '\',\'' + projCode + '\',\'' + dayStr + '\',null)" style="margin-top:12px;padding:8px 20px;border-radius:6px;border:none;background:var(--ocean);color:var(--white);cursor:pointer;font-size:12px;font-weight:600">Add OOP Payment</button>';
@@ -10144,23 +10441,23 @@ function renderOopGridDay(el, lbl, projCode) {
     for (var i = 0; i < dayEntries.length; i++) {
       var ent = dayEntries[i];
       var borderColor = ent.paid ? '#81C784' : '#FFB74D';
-      h += '<div style="background:var(--white);border-radius:8px;border-left:4px solid ' + borderColor + ';padding:14px 18px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center" onclick="oopShowModal(\'' + oopSelectedProject.replace(/'/g, "\\'") + '\',\'' + projCode + '\',\'' + dayStr + '\',\'' + ent.id + '\')">';
+      h += '<div style="background:' + _dmSurf + ';border-radius:8px;border-left:4px solid ' + borderColor + ';padding:14px 18px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center" onclick="oopShowModal(\'' + oopSelectedProject.replace(/'/g, "\\'") + '\',\'' + projCode + '\',\'' + dayStr + '\',\'' + ent.id + '\')">';
       h += '<div>';
       h += '<div style="font-size:14px;font-weight:600">' + (ent.lineItemName || 'Unnamed') + '</div>';
-      if (ent.notes) h += '<div style="font-size:11px;color:var(--mid-gray);margin-top:2px">' + ent.notes + '</div>';
+      if (ent.notes) h += '<div style="font-size:11px;color:' + _dmMid + ';margin-top:2px">' + ent.notes + '</div>';
       h += '</div>';
       h += '<div style="text-align:right">';
       h += '<div style="font-size:18px;font-weight:700;font-variant-numeric:tabular-nums">$' + Math.round(ent.amount).toLocaleString() + '</div>';
       h += '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;' + (ent.paid ? 'background:rgba(46,125,50,.15);color:#2E7D32' : 'background:rgba(245,127,23,.15);color:#F57F17') + '">' + (ent.paid ? 'Paid' : 'Scheduled') + '</span>';
       h += '</div></div>';
     }
-    h += '<button onclick="oopShowModal(\'' + oopSelectedProject.replace(/'/g, "\\'") + '\',\'' + projCode + '\',\'' + dayStr + '\',null)" style="width:100%;padding:10px;border-radius:6px;border:1px dashed var(--canvas);background:transparent;color:var(--mid-gray);cursor:pointer;font-size:12px;margin-top:4px">+ Add Another</button>';
+    h += '<button onclick="oopShowModal(\'' + oopSelectedProject.replace(/'/g, "\\'") + '\',\'' + projCode + '\',\'' + dayStr + '\',null)" style="width:100%;padding:10px;border-radius:6px;border:1px dashed ' + _dmBorder + ';background:transparent;color:' + _dmMid + ';cursor:pointer;font-size:12px;margin-top:4px">+ Add Another</button>';
   }
 
   /* All projects summary for this day */
   if (allDayEntries.length > 0) {
-    h += '<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--canvas)">';
-    h += '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);font-weight:600;margin-bottom:8px">All Projects on ' + dayStr + '</div>';
+    h += '<div style="margin-top:20px;padding-top:16px;border-top:1px solid ' + _dmBorder + '">';
+    h += '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:' + _dmMid + ';font-weight:600;margin-bottom:8px">All Projects on ' + dayStr + '</div>';
     var byProj = {};
     for (var i = 0; i < allDayEntries.length; i++) {
       var e = allDayEntries[i];
@@ -10173,7 +10470,7 @@ function renderOopGridDay(el, lbl, projCode) {
       h += '<span style="font-weight:600;font-variant-numeric:tabular-nums">$' + Math.round(byProj[pn]).toLocaleString() + '</span>';
       h += '</div>';
     }
-    h += '<div style="display:flex;justify-content:space-between;padding:8px 0 0;font-size:13px;font-weight:700;border-top:1px solid var(--canvas);margin-top:4px">';
+    h += '<div style="display:flex;justify-content:space-between;padding:8px 0 0;font-size:13px;font-weight:700;border-top:1px solid ' + _dmBorder + ';margin-top:4px">';
     h += '<span>Grand Total</span><span>$' + Math.round(allTotal).toLocaleString() + '</span></div>';
     h += '</div>';
   }
@@ -10183,6 +10480,11 @@ function renderOopGridDay(el, lbl, projCode) {
 }
 
 function renderOopGridMonth(el, lbl, projCode) {
+  var _isDark   = document.documentElement.classList.contains('dark');
+  var _dmText   = _isDark ? 'var(--dm-text)'       : 'var(--abyss)';
+  var _dmSurf   = _isDark ? 'var(--dm-surface)'    : 'var(--white)';
+  var _dmBorder = _isDark ? 'var(--dm-border)'     : 'var(--canvas)';
+  var _dmMid    = _isDark ? 'var(--dm-text-muted)' : 'var(--mid-gray)';
   /* Get the first Monday of the month containing allocWeekOf */
   var baseDate = new Date(allocWeekOf + 'T00:00:00');
   var monthStart = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
@@ -10212,14 +10514,15 @@ function renderOopGridMonth(el, lbl, projCode) {
   var curMonth = baseDate.getMonth();
 
   /* Grid: 6 columns (Mon-Fri + Week Total) */
-  var h = '<div style="display:grid;grid-template-columns:repeat(5,1fr) 80px;gap:1px;background:var(--canvas);border-radius:8px;overflow:hidden">';
+  var _dmGridGap = _isDark ? 'var(--dm-border)' : 'var(--canvas)';
+  var h = '<div style="display:grid;grid-template-columns:repeat(5,1fr) 80px;gap:1px;background:' + _dmGridGap + ';border-radius:8px;overflow:hidden">';
 
   /* Day headers */
   var dayNames = ['Mon','Tue','Wed','Thu','Fri'];
   for (var d = 0; d < 5; d++) {
-    h += '<div style="padding:8px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);font-weight:600;text-align:center;background:var(--white)">' + dayNames[d] + '</div>';
+    h += '<div style="padding:8px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:' + _dmMid + ';font-weight:600;text-align:center;background:' + _dmSurf + '">' + dayNames[d] + '</div>';
   }
-  h += '<div style="padding:8px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);font-weight:600;text-align:center;background:var(--white)">Total</div>';
+  h += '<div style="padding:8px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:' + _dmMid + ';font-weight:600;text-align:center;background:' + _dmSurf + '">Total</div>';
 
   /* Week rows */
   for (var w = 0; w < weeks.length; w++) {
@@ -10236,11 +10539,11 @@ function renderOopGridMonth(el, lbl, projCode) {
       for (var e = 0; e < dayEntries.length; e++) dayAmt += dayEntries[e].amount || 0;
       weekTotal += dayAmt;
 
-      var bg = isToday ? 'rgba(48,109,124,.06)' : 'var(--white)';
+      var bg = isToday ? 'rgba(48,109,124,.06)' : _dmSurf;
       var opacity = isThisMonth ? '1' : '0.4';
 
       h += '<div style="background:' + bg + ';padding:6px 8px;min-height:70px;opacity:' + opacity + ';cursor:pointer;position:relative" onclick="oopShowModal(\'' + oopSelectedProject.replace(/'/g, "\\'") + '\',\'' + projCode + '\',\'' + day + '\',null)">';
-      h += '<div style="font-size:11px;font-weight:600;color:' + (isToday ? 'var(--ocean)' : 'var(--abyss)') + ';margin-bottom:4px">' + dayDate.getDate() + '</div>';
+      h += '<div style="font-size:11px;font-weight:600;color:' + (isToday ? 'var(--ocean)' : _dmText) + ';margin-bottom:4px">' + dayDate.getDate() + '</div>';
 
       for (var e = 0; e < dayEntries.length; e++) {
         var ent = dayEntries[e];
@@ -10250,7 +10553,7 @@ function renderOopGridMonth(el, lbl, projCode) {
         h += '</div>';
       }
       if (dayEntries.length === 0 && isThisMonth) {
-        h += '<div style="font-size:14px;color:var(--canvas);text-align:center;margin-top:8px">+</div>';
+        h += '<div style="font-size:14px;color:' + _dmBorder + ';text-align:center;margin-top:8px">+</div>';
       }
       h += '</div>';
     }
@@ -10280,24 +10583,28 @@ function renderOopGridMonth(el, lbl, projCode) {
 /* (week view day cells rendered inline in renderOopGridWeek) */
 
 function renderOopEntryList(projCode) {
+  var _isDark   = document.documentElement.classList.contains('dark');
+  var _dmSurf   = _isDark ? 'var(--dm-surface)'    : 'var(--white)';
+  var _dmBorder = _isDark ? 'var(--dm-border)'     : 'var(--canvas)';
+  var _dmMid    = _isDark ? 'var(--dm-text-muted)' : 'var(--mid-gray)';
   var allEntries = (OOP_SCHEDULE.entries || []).filter(function(e) { return e.projectName === oopSelectedProject; });
   if (allEntries.length === 0) return '';
   allEntries.sort(function(a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
-  var h = '<div style="padding:16px 18px;background:var(--white);border-top:1px solid var(--canvas)">';
-  h += '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--mid-gray);font-weight:600;margin-bottom:8px">All Scheduled OOP for ' + oopSelectedProject + '</div>';
+  var h = '<div style="padding:16px 18px;background:' + _dmSurf + ';border-top:1px solid ' + _dmBorder + '">';
+  h += '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:' + _dmMid + ';font-weight:600;margin-bottom:8px">All Scheduled OOP for ' + oopSelectedProject + '</div>';
   h += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
-  h += '<tr style="border-bottom:1px solid var(--canvas);font-size:10px;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px">';
+  h += '<tr style="border-bottom:1px solid ' + _dmBorder + ';font-size:10px;color:' + _dmMid + ';text-transform:uppercase;letter-spacing:.5px">';
   h += '<th style="text-align:left;padding:6px 8px">Date</th><th style="text-align:left;padding:6px 8px">Line Item</th><th style="text-align:right;padding:6px 8px">Amount</th><th style="text-align:center;padding:6px 8px">Status</th><th style="text-align:left;padding:6px 8px">Notes</th></tr>';
   var allTotal = 0;
   for (var i = 0; i < allEntries.length; i++) {
     var ent = allEntries[i];
     allTotal += ent.amount || 0;
-    h += '<tr style="border-bottom:1px solid var(--light-gray);cursor:pointer" onclick="oopShowModal(\'' + oopSelectedProject.replace(/'/g, "\\'") + '\',\'' + projCode + '\',\'' + ent.date + '\',\'' + ent.id + '\')">';
+    h += '<tr style="border-bottom:1px solid ' + _dmBorder + ';cursor:pointer" onclick="oopShowModal(\'' + oopSelectedProject.replace(/'/g, "\\'") + '\',\'' + projCode + '\',\'' + ent.date + '\',\'' + ent.id + '\')">';
     h += '<td style="padding:6px 8px;font-variant-numeric:tabular-nums">' + ent.date + '</td>';
     h += '<td style="padding:6px 8px">' + (ent.lineItemName || '') + '</td>';
     h += '<td style="padding:6px 8px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums">$' + Math.round(ent.amount).toLocaleString() + '</td>';
     h += '<td style="padding:6px 8px;text-align:center"><span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;' + (ent.paid ? 'background:rgba(46,125,50,.15);color:#2E7D32' : 'background:rgba(245,127,23,.15);color:#F57F17') + '">' + (ent.paid ? 'Paid' : 'Scheduled') + '</span></td>';
-    h += '<td style="padding:6px 8px;color:var(--mid-gray);font-size:11px">' + (ent.notes || '') + '</td>';
+    h += '<td style="padding:6px 8px;color:' + _dmMid + ';font-size:11px">' + (ent.notes || '') + '</td>';
     h += '</tr>';
   }
   h += '<tr style="font-weight:700"><td style="padding:6px 8px" colspan="2">Total</td><td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums">$' + Math.round(allTotal).toLocaleString() + '</td><td colspan="2"></td></tr>';
