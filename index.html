@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.54 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.55 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -2020,7 +2020,7 @@ function renderProjFinancials(p) {
   var flSpent    = noFl  ? 0 : (sb.flSpent || 0);
   var flRemaining = flBudget - flSpent;
 
-  var oopBudget   = noOop ? 0 : (sb.oopEffective || sb.oopTotal || 0);
+  var oopBudget   = noOop ? 0 : sbOopBudget(sb);
   var oopSpent    = noOop ? 0 : (sb.oopSpent || 0);
   var oopPredicted = noOop ? 0 : oopGetPredictedForProject(p.code);
   var oopRemaining = oopBudget - oopSpent;
@@ -4262,7 +4262,7 @@ function renderYTD() {
   }
   function effReserve(proj) {
     var sb = proj._supabudget;
-    return effTCV(proj) - (proj.laborCost || 0) - (sb ? (sb.oopEffective || sb.oopTotal || 0) : 0) - (sb ? (sb.flTotal || 0) : 0);
+    return effTCV(proj) - (proj.laborCost || 0) - sbOopBudget(sb) - (sb ? (sb.flTotal || 0) : 0);
   }
   /* Budget breakdown bar — matches master dashboard style */
   function lobBar(spentD, laborRemD, oopD, flD, reserveD) {
@@ -4337,7 +4337,7 @@ function renderYTD() {
     totalSpentD    += pSpentHrs * pBlended;
     totalReserve   += effReserve(p);
     if (sb) {
-      totalOOPBudget += sb.oopEffective || sb.oopTotal || 0;
+      totalOOPBudget += sbOopBudget(sb);
       totalOOPSpent  += sb.oopSpent  || 0;
       totalFLBudget  += sb.flTotal   || 0;
       totalFLSpent   += sb.flSpent   || 0;
@@ -4482,7 +4482,7 @@ function renderYTD() {
       hdrSpentD     += hpSpentHrs * (hp.totalBudget > 0 ? (hp.laborCost || 0) / hp.totalBudget : 0);
       hdrReserve    += effReserve(hp);
       if (hpsb) {
-        hdrOOP += hpsb.oopEffective || hpsb.oopTotal || 0;
+        hdrOOP += sbOopBudget(hpsb);
         hdrFL  += hpsb.flTotal || 0;
       }
     }
@@ -4533,7 +4533,7 @@ function renderYTD() {
       var laborMU    = proj.laborCost   || 0;
       var blendedRate = budgHrs > 0 ? laborMU / budgHrs : 0;
       var spentD     = spentHrs * blendedRate; /* labor dollars spent at project blended rate */
-      var oopBudg    = sb ? (sb.oopEffective || sb.oopTotal || 0) : 0;
+      var oopBudg    = sbOopBudget(sb);
       var oopSpent   = sb ? (sb.oopSpent || 0) : 0;
       var flBudg     = sb ? (sb.flTotal  || 0) : 0;
       var flSpent    = sb ? (sb.flSpent  || 0) : 0;
@@ -6049,6 +6049,14 @@ function sparkSettingVal(settings, category, key, fallback) {
   return fallback;
 }
 
+/* Returns the OOP budget value for display/profit — effective amounts with markup applied.
+   Falls back to oopEffective × 1.20 when oopEffectiveWithMarkup hasn't been stored yet. */
+function sbOopBudget(sb) {
+  if (!sb) return 0;
+  if (sb.oopEffectiveWithMarkup != null) return sb.oopEffectiveWithMarkup;
+  return (sb.oopEffective || sb.oopTotal || 0) * 1.20;
+}
+
 function sparkOopItemTotal(item) {
   /* Planned total (always from planned fields) */
   var rate = item.rate || item.rate_override || item.vendor_rate || 0;
@@ -6135,8 +6143,11 @@ function sparkRecomputeBudgetTotals() {
     oopEffective += effVal;
     if (oe.paid) oopSpent += effVal;
   }
+  var _mkPct1 = sparkSettingVal((sparkCurrentData && sparkCurrentData.settings) || [], 'markup', 'oop_markup_percentage', 20);
   sb.oopTotal = oopPlanned;
   sb.oopEffective = oopEffective;
+  sb.oopEffectiveWithMarkup = oopEffective > 0 ? oopEffective * (1 + _mkPct1 / 100) : 0;
+  sb.oopMarkupPct = _mkPct1;
   sb.oopSpent = oopSpent;
 
   /* Update portfolio project data and re-render the financials banner */
@@ -6166,7 +6177,7 @@ async function syncProjectSnapshotColumns() {
   var patch = {
     dollar_budget: b.client_price || 0,
     labor_cost_snapshot: sb ? (sb.laborTotal || 0) : 0,
-    oop_cost_snapshot: sb ? (sb.oopEffective || sb.oopTotal || 0) : 0,
+    oop_cost_snapshot: sb ? sbOopBudget(sb) : 0,
     has_budget_data: true
   };
   await sparkFetch('projects?id=eq.' + projId, '', 'PATCH', patch);
@@ -6476,7 +6487,10 @@ function syncProjFinancialsFromCurrent() {
     oopEffective += effVal;
     if (oe.paid) oopSpent += effVal;
   }
+  var _mkPct2 = sparkSettingVal((sparkCurrentData && sparkCurrentData.settings) || [], 'markup', 'oop_markup_percentage', 20);
   sb.oopEffective = oopEffective;
+  sb.oopEffectiveWithMarkup = oopEffective > 0 ? oopEffective * (1 + _mkPct2 / 100) : 0;
+  sb.oopMarkupPct = _mkPct2;
   sb.oopSpent     = oopSpent;
 
   /* Find the project and re-render the financials banner */
@@ -6516,10 +6530,10 @@ function sparkRenderSummary() {
   }
   var totalOop = 0;
   for (var i = 0; i < data.oop.length; i++) {
-    if (data.oop[i].is_active !== false) totalOop += sparkOopItemTotal(data.oop[i]);
+    if (data.oop[i].is_active !== false) totalOop += sparkOopItemEffective(data.oop[i]);
   }
   var markupPct = sparkSettingVal(data.settings, 'markup', 'oop_markup_percentage', 20);
-  var totalOopWithMarkup = totalOop * (1 + markupPct / 100);
+  var totalOopWithMarkup = totalOop > 0 ? totalOop * (1 + markupPct / 100) : 0;
   var totalAmount = totalLaborCost + totalFlCost + totalOopWithMarkup;
   var budget = data.budget;
   var rawPrice = budget.client_price || 0;
@@ -7678,13 +7692,13 @@ function sparkRenderBudgetContent(embedded) {
     totalFreelancerHrs += fe.hours || 0;
     totalFreelancerCost += (fe.hours || 0) * (fe.rate || 0);
   }
-  /* Compute OOP total */
+  /* Compute OOP total using effective amounts (cascade: actual → adjusted → planned) */
   var totalOop = 0;
   for (var i = 0; i < data.oop.length; i++) {
-    if (data.oop[i].is_active !== false) totalOop += sparkOopItemTotal(data.oop[i]);
+    if (data.oop[i].is_active !== false) totalOop += sparkOopItemEffective(data.oop[i]);
   }
   var markupPct = sparkSettingVal(settings, 'markup', 'oop_markup_percentage', 20);
-  var totalOopWithMarkup = totalOop * (1 + markupPct / 100);
+  var totalOopWithMarkup = totalOop > 0 ? totalOop * (1 + markupPct / 100) : 0;
   var totalAmount = totalLaborCost + totalFreelancerCost + totalOopWithMarkup;
   var profit = clientPrice - totalAmount;
   var profitMargin = clientPrice > 0 ? (profit / clientPrice * 100) : 0;
@@ -9482,7 +9496,7 @@ function renderRTProjects(wk) {
             var clientPrice = sb.client_price || 0;
             var laborCost = sb.laborTotal || 0;
             var laborInternal = sb.laborCostInternal || laborCost;
-            var oopCost = sb.oopEffective || sb.oopTotal || 0;
+            var oopCost = sbOopBudget(sb);
             var oopSpent = sb.oopSpent || 0;
             var totalCost = laborCost + oopCost;
             var profit = clientPrice - totalCost;
@@ -11830,7 +11844,11 @@ function furnaceGlobalHandleEntryChange(type, payload) {
     var oe = sb.oop[i]; if (oe.is_active === false) continue;
     var v = sparkOopItemEffective(oe); oopEff += v; if (oe.paid) oopSpent += v;
   }
-  sb.oopEffective = oopEff; sb.oopSpent = oopSpent;
+  var _mkPct3 = sparkSettingVal((sparkCurrentData && sparkCurrentData.settings) || [], 'markup', 'oop_markup_percentage', 20);
+  sb.oopEffective = oopEff;
+  sb.oopEffectiveWithMarkup = oopEff > 0 ? oopEff * (1 + _mkPct3 / 100) : 0;
+  sb.oopMarkupPct = _mkPct3;
+  sb.oopSpent = oopSpent;
   flRecomputeTotals(sb);
 
   /* Re-render project financials banner and portfolio card */
@@ -12022,6 +12040,8 @@ async function loadSupabaseData() {
       b.laborCostInternal = laborInternalCost;
       b.oopTotal = oopPlanned;
       b.oopEffective = oopEffective;
+      b.oopEffectiveWithMarkup = oopEffective > 0 ? oopEffective * 1.20 : 0; /* 20% default; updated to actual rate when budget editor loads */
+      b.oopMarkupPct = 20;
       b.oopSpent = oopSpent;
       b._oopEntries = b.oop; /* store raw OOP entries for planner sidebar */
 
@@ -12149,9 +12169,9 @@ function enrichProjectsWithSupabase() {
         p.dataSource = 'supabase';
         p.dollarBudget = sb.client_price || 0;
         p.laborCost = sb.laborTotal || 0;
-        p.oopCost = sb.oopEffective || sb.oopTotal || 0;
+        p.oopCost = sbOopBudget(sb);
         /* Compute profit from live labor + OOP data, not stale total_amount */
-        var computedTotal = (sb.laborTotal || 0) + (sb.oopEffective || sb.oopTotal || 0);
+        var computedTotal = (sb.laborTotal || 0) + sbOopBudget(sb);
         p.profit = (sb.client_price || 0) - computedTotal;
         p.profitMargin = sb.client_price > 0 ? ((p.profit / sb.client_price) * 100) : 0;
         p.totalBudget = sb.laborHours || 0;
@@ -12247,14 +12267,14 @@ async function buildClientsFromSupabase() {
       dataSource: sb ? 'supabase' : (p.has_budget_data ? 'snapshot' : 'no_snapshot'),
       dollarBudget: sb ? (sb.client_price || 0) : (p.dollar_budget || 0),
       laborCost:    sb ? (sb.laborTotal   || 0) : (p.labor_cost_snapshot || 0),
-      oopCost:      sb ? (sb.oopEffective || sb.oopTotal || 0) : (p.oop_cost_snapshot || 0),
+      oopCost:      sb ? sbOopBudget(sb) : (p.oop_cost_snapshot || 0),
       totalBudget:  sb ? (sb.laborHours   || 0) : 0,
       _supabudget:  sb || null,
       _supaId: p.id,
       currentPhase: p.current_phase || null
     };
     if (sb) {
-      proj.profit = (sb.client_price || 0) - (sb.laborTotal || 0) - (sb.oopEffective || sb.oopTotal || 0);
+      proj.profit = (sb.client_price || 0) - (sb.laborTotal || 0) - sbOopBudget(sb);
       proj.profitMargin = sb.client_price > 0 ? (proj.profit / sb.client_price * 100) : 0;
     }
     client.projects.push(proj);
