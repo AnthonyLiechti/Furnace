@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.58 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.59 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -12049,8 +12049,9 @@ async function loadSupabaseData() {
       b.laborCostInternal = laborInternalCost;
       b.oopTotal = oopPlanned;
       b.oopEffective = oopEffective;
-      b.oopEffectiveWithMarkup = oopEffective > 0 ? oopEffective * 1.20 : 0; /* 20% default; updated to actual rate when budget editor loads */
-      b.oopMarkupPct = 20;
+      var _bulkMkPct = (b.oop_markup_percentage != null) ? b.oop_markup_percentage : 20;
+      b.oopEffectiveWithMarkup = oopEffective > 0 ? oopEffective * (1 + _bulkMkPct / 100) : 0;
+      b.oopMarkupPct = _bulkMkPct;
       b.oopSpent = oopSpent;
       b._oopEntries = b.oop; /* store raw OOP entries for planner sidebar */
 
