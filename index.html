@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.56 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.57 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -2085,16 +2085,14 @@ function renderProjFinancials(p) {
   var pLaborRem   = isFinished ? 0 : Math.min(100 - pLaborSpent, laborRemaining$ / barTotal * 100);
   var pOopSpent   = Math.min(100 - pLaborSpent - pLaborRem, oopSpent / barTotal * 100);
   var pOopRem     = Math.min(100 - pLaborSpent - pLaborRem - pOopSpent, Math.max(0, oopRemaining) / barTotal * 100);
-  var pFlSpent    = Math.min(100 - pLaborSpent - pLaborRem - pOopSpent - pOopRem, flSpent / barTotal * 100);
-  var pFlRem      = Math.min(100 - pLaborSpent - pLaborRem - pOopSpent - pOopRem - pFlSpent, Math.max(0, flRemaining) / barTotal * 100);
-  var pProfit     = Math.max(0, 100 - pLaborSpent - pLaborRem - pOopSpent - pOopRem - pFlSpent - pFlRem);
+  var pFlBudget   = Math.min(100 - pLaborSpent - pLaborRem - pOopSpent - pOopRem, flBudget / barTotal * 100);
+  var pProfit     = Math.max(0, 100 - pLaborSpent - pLaborRem - pOopSpent - pOopRem - pFlBudget);
   h += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1)">';
   h += '<div class="lob-bar">';
   if (pLaborSpent > 0) h += '<div class="lob-seg" style="width:' + pLaborSpent.toFixed(1) + '%;background:var(--ember)">' + (pLaborSpent >= 8 ? '$' + Math.round(laborSpent$).toLocaleString() : '') + '</div>';
   if (pOopSpent > 0)   h += '<div class="lob-seg" style="width:' + pOopSpent.toFixed(1) + '%;background:#F57F17">' + (pOopSpent >= 8 ? '$' + Math.round(oopSpent).toLocaleString() : '') + '</div>';
   if (pOopRem > 0.5)   h += '<div class="lob-seg" style="width:' + pOopRem.toFixed(1) + '%;background:#FFE0B2;color:var(--abyss)">' + (pOopRem >= 8 ? '$' + Math.round(Math.max(0, oopRemaining)).toLocaleString() : '') + '</div>';
-  if (pFlSpent > 0)    h += '<div class="lob-seg" style="width:' + pFlSpent.toFixed(1) + '%;background:#7B1FA2">' + (pFlSpent >= 8 ? '$' + Math.round(flSpent).toLocaleString() : '') + '</div>';
-  if (pFlRem > 0.5)    h += '<div class="lob-seg" style="width:' + pFlRem.toFixed(1) + '%;background:#E1BEE7;color:var(--abyss)">' + (pFlRem >= 8 ? '$' + Math.round(Math.max(0, flRemaining)).toLocaleString() : '') + '</div>';
+  if (pFlBudget > 0.5) h += '<div class="lob-seg" style="width:' + pFlBudget.toFixed(1) + '%;background:#7B1FA2">' + (pFlBudget >= 8 ? '$' + Math.round(flBudget).toLocaleString() : '') + '</div>';
   if (!isFinished && pLaborRem > 0.5) h += '<div class="lob-seg" style="width:' + pLaborRem.toFixed(1) + '%;background:var(--ocean)">' + (pLaborRem >= 8 ? '$' + Math.round(laborRemaining$).toLocaleString() : '') + '</div>';
   if (pProfit > 0.5)   h += '<div class="lob-seg" style="width:' + pProfit.toFixed(1) + '%;background:#81C784">' + (pProfit >= 8 ? '$' + Math.round(profitBar$).toLocaleString() : '') + '</div>';
   h += '</div>';
@@ -2103,8 +2101,7 @@ function renderProjFinancials(p) {
   if (!isFinished) { h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ocean)"></div>Labor Remaining</div>'; }
   if (!noOop) { h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#F57F17"></div>OOP Spent</div>'; }
   if (!noOop) { h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#FFE0B2"></div>OOP Remaining</div>'; }
-  if (!noFl && flBudget > 0) { h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#7B1FA2"></div>FL Paid</div>'; }
-  if (!noFl && flBudget > 0) { h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#E1BEE7"></div>FL Unpaid</div>'; }
+  if (!noFl && flBudget > 0) { h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#7B1FA2"></div>FL Budgeted</div>'; }
   h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Profit</div>';
   h += '</div></div>';
 
