@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.74 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.75 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -2273,6 +2273,7 @@ function renderProject(projectId) {
   h += '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px">';
   h += '<h1 class="page-title" style="margin:0">' + p.name + '</h1>';
   h += _phasePill;
+  h += '<button onclick="notifyNewProjectSlack(' + JSON.stringify(p.name) + ',' + JSON.stringify(p.code) + ',this)" title="DM Evan &amp; Richelle with new project number" style="margin-left:auto;padding:5px 13px;border-radius:20px;border:1px solid rgba(91,74,138,.4);background:rgba(91,74,138,.12);color:#9B8EC2;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit;white-space:nowrap">📣 Notify Team</button>';
   h += '</div>';
   h += '<p class="page-subtitle">' + p.clientCode + ' ' + p.clientName + ' &middot; Rate: ' + (rate > 0 ? '$' + rate + '/hr' : 'Not set') + '</p>';
 
@@ -5132,6 +5133,36 @@ async function settingsTestSlack() {
                : ' (' + errMsg + ')';
       status.textContent = '✗ Failed' + hint;
       status.style.color = 'var(--ember)';
+    }
+  }
+}
+
+/* Called from the project page "Notify Team" button — sends the new project DM on demand */
+async function notifyNewProjectSlack(projName, projCode, btn) {
+  if (!SLACK_BOT_TOKEN) {
+    alert('No Slack bot token configured. Add one in Settings → Integrations.');
+    return;
+  }
+  if (btn) { btn.textContent = '⏳ Sending…'; btn.disabled = true; }
+  var result = await slackNotifyNewProject(projName, projCode);
+  if (btn) {
+    if (result.ok) {
+      btn.textContent = '✓ Sent!';
+      btn.style.color = '#81C784';
+      btn.style.borderColor = 'rgba(129,199,132,.4)';
+      btn.style.background = 'rgba(129,199,132,.1)';
+      setTimeout(function() {
+        btn.textContent = '📣 Notify Team';
+        btn.style.color = '#9B8EC2';
+        btn.style.borderColor = 'rgba(91,74,138,.4)';
+        btn.style.background = 'rgba(91,74,138,.12)';
+        btn.disabled = false;
+      }, 3000);
+    } else {
+      btn.textContent = '✗ Failed';
+      btn.style.color = 'var(--ember)';
+      btn.disabled = false;
+      setTimeout(function() { btn.textContent = '📣 Notify Team'; btn.style.color = '#9B8EC2'; }, 3000);
     }
   }
 }
