@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.85 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.86 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -6721,11 +6721,11 @@ function sparkRecomputeBudgetTotals() {
     oopEffective += effVal;
     if (oe.paid) oopSpent += effVal;
   }
-  var _mkPct1 = sparkSettingVal((sparkCurrentData && sparkCurrentData.settings) || [], 'markup', 'oop_markup_percentage', 20);
+  var _oopWithMarkup1 = sparkComputeOopWithSectionMarkup(sparkCurrentData);
   sb.oopTotal = oopPlanned;
   sb.oopEffective = oopEffective;
-  sb.oopEffectiveWithMarkup = oopEffective > 0 ? oopEffective * (1 + _mkPct1 / 100) : 0;
-  sb.oopMarkupPct = _mkPct1;
+  sb.oopEffectiveWithMarkup = _oopWithMarkup1;
+  sb.oopMarkupPct = oopEffective > 0 ? ((_oopWithMarkup1 / oopEffective - 1) * 100) : sparkSettingVal((sparkCurrentData && sparkCurrentData.settings) || [], 'markup', 'oop_markup_percentage', 20);
   sb.oopSpent = oopSpent;
 
   /* Update portfolio project data and re-render the financials banner */
@@ -7065,10 +7065,11 @@ function syncProjFinancialsFromCurrent() {
     oopEffective += effVal;
     if (oe.paid) oopSpent += effVal;
   }
-  var _mkPct2 = sparkSettingVal((sparkCurrentData && sparkCurrentData.settings) || [], 'markup', 'oop_markup_percentage', 20);
+  var _oopWithMarkup = sparkComputeOopWithSectionMarkup(sparkCurrentData);
   sb.oopEffective = oopEffective;
-  sb.oopEffectiveWithMarkup = oopEffective > 0 ? oopEffective * (1 + _mkPct2 / 100) : 0;
-  sb.oopMarkupPct = _mkPct2;
+  sb.oopEffectiveWithMarkup = _oopWithMarkup;
+  /* Blended markup % for display */
+  sb.oopMarkupPct = oopEffective > 0 ? ((_oopWithMarkup / oopEffective - 1) * 100) : sparkSettingVal((sparkCurrentData && sparkCurrentData.settings) || [], 'markup', 'oop_markup_percentage', 20);
   sb.oopSpent     = oopSpent;
 
   /* Find the project and re-render the financials banner */
