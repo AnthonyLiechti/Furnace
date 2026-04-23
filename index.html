@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.78 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.79 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -1290,10 +1290,22 @@ function renderSidebar() {
   html += '<div class="nav-item ' + (currentView === 'settings' ? 'active' : '') + '" onclick="navigate(\'settings\')"><span class="icon">&#9881;</span> Settings</div>';
   html += '<div class="nav-divider"></div>';
 
-  /* Split clients into active and inactive */
+  /* Split clients into active and inactive.
+     Exception: an inactive client with at least one active billable project
+     is promoted to the active list so it stays visible. */
+  function clientHasActiveBillable(c) {
+    for (var _i = 0; _i < c.projects.length; _i++) {
+      var _p = c.projects[_i];
+      if (isProjectCompleted(_p)) continue;
+      if (_p.code === '100_00_00' || _p.projectType === 'internal' || _p.projectType === 'bizdev') continue;
+      if (_p._supabudget && (_p._supabudget.status === 'nonbillable' || _p._supabudget.status === 'bizdev')) continue;
+      return true;
+    }
+    return false;
+  }
   var activeClients = [], inactiveClients = [];
   for (var ci = 0; ci < CLIENTS.length; ci++) {
-    if (CLIENTS[ci].status === 'inactive') { inactiveClients.push(CLIENTS[ci]); }
+    if (CLIENTS[ci].status === 'inactive' && !clientHasActiveBillable(CLIENTS[ci])) { inactiveClients.push(CLIENTS[ci]); }
     else { activeClients.push(CLIENTS[ci]); }
   }
 
