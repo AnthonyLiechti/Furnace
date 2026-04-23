@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.81 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.82 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -2292,7 +2292,7 @@ function renderProject(projectId) {
   h += '<h1 class="page-title" style="margin:0">' + p.name + '</h1>';
   h += _phasePill;
   h += '<button onclick="notifyNewProjectSlack(' + JSON.stringify(p.name) + ',' + JSON.stringify(p.code) + ',this)" title="DM Evan &amp; Richelle with new project number" style="margin-left:auto;padding:5px 13px;border-radius:20px;border:1px solid rgba(91,74,138,.4);background:rgba(91,74,138,.12);color:#9B8EC2;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit;white-space:nowrap">📣 Notify Team</button>';
-  h += '<button onclick="deleteProject(' + JSON.stringify(p._supaId||'') + ',' + JSON.stringify(p.code) + ',' + JSON.stringify(p.clientId||'') + ')" title="Delete this project" style="padding:5px 10px;border-radius:20px;border:1px solid rgba(198,40,40,.3);background:transparent;color:rgba(198,40,40,.6);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap" onmouseenter="this.style.background=\'rgba(198,40,40,.1)\';this.style.color=\'#EF9A9A\'" onmouseleave="this.style.background=\'transparent\';this.style.color=\'rgba(198,40,40,.6)\'">🗑 Delete</button>';
+  h += '<button data-supa-id="' + (p._supaId||'') + '" data-proj-code="' + p.code + '" data-client-id="' + (p.clientId||'') + '" onclick="deleteProject(this)" title="Delete this project" style="padding:5px 10px;border-radius:20px;border:1px solid rgba(198,40,40,.3);background:transparent;color:rgba(198,40,40,.6);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap" onmouseenter="this.style.background=\'rgba(198,40,40,.1)\';this.style.color=\'#EF9A9A\'" onmouseleave="this.style.background=\'transparent\';this.style.color=\'rgba(198,40,40,.6)\'">🗑 Delete</button>';
   h += '</div>';
   h += '<p class="page-subtitle">' + p.clientCode + ' ' + p.clientName + ' &middot; Rate: ' + (rate > 0 ? '$' + rate + '/hr' : 'Not set') + '</p>';
 
@@ -6155,74 +6155,92 @@ async function createNewProject() {
   }
 }
 
-async function deleteProject(supaProjectId, projCode, clientId) {
-  if (!supaProjectId) { alert('Cannot delete — no Supabase project ID found for this project.'); return; }
+function deleteProject(btn) {
+  var supaProjectId = btn.getAttribute('data-supa-id') || '';
+  var projCode      = btn.getAttribute('data-proj-code') || '';
+  var clientId      = btn.getAttribute('data-client-id') || '';
+
+  if (!supaProjectId) { alert('Cannot delete \u2014 no Supabase record found for this project.'); return; }
 
   var isDark = document.documentElement.classList.contains('dark');
-  var mBg   = isDark ? 'var(--dm-surface)' : 'var(--white)';
-  var mText = isDark ? 'var(--dm-text)'    : 'var(--ink)';
+  var mBg    = isDark ? '#1E1E2E' : '#ffffff';
+  var mText  = isDark ? '#E8E8F0' : '#1a1a2e';
+  var mGray  = '#888';
 
-  var overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:99999;display:flex;align-items:center;justify-content:center';
-  overlay.innerHTML = '<div style="background:' + mBg + ';border-radius:14px;padding:28px;width:400px;max-width:92vw;text-align:center">'
+  /* ── Step 1 overlay: "Are you sure?" ── */
+  var ov1 = document.createElement('div');
+  ov1.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center';
+  ov1.innerHTML =
+    '<div style="background:' + mBg + ';border-radius:14px;padding:28px;width:400px;max-width:92vw;text-align:center">'
     + '<div style="font-size:32px;margin-bottom:12px">&#128465;</div>'
-    + '<div style="font-size:16px;font-weight:700;color:' + mText + ';margin-bottom:8px">Delete Project?</div>'
-    + '<div style="font-size:13px;color:var(--mid-gray);margin-bottom:6px;line-height:1.5">This will permanently delete <strong style="color:' + mText + '">' + projCode + '</strong> and all its budget data from Supabase.</div>'
-    + '<div style="font-size:11px;color:var(--mid-gray);margin-bottom:24px">Tracked hours in labor actuals will not be deleted.</div>'
-    + '<div id="deleteProjErr" style="display:none;color:#EF9A9A;font-size:12px;background:rgba(198,40,40,.15);padding:8px 12px;border-radius:6px;margin-bottom:14px"></div>'
+    + '<div style="font-size:16px;font-weight:700;color:' + mText + ';margin-bottom:10px">Delete Project?</div>'
+    + '<div style="font-size:13px;color:' + mGray + ';line-height:1.6;margin-bottom:6px">You are about to delete <strong style="color:' + mText + '">' + projCode + '</strong> and all its budget data.</div>'
+    + '<div style="font-size:11px;color:' + mGray + ';margin-bottom:24px">Tracked hours in labor actuals will not be affected.</div>'
     + '<div style="display:flex;gap:10px;justify-content:center">'
-    + '<button id="deleteProjConfirm" style="padding:10px 24px;border-radius:7px;border:none;background:#C62828;color:#fff;cursor:pointer;font-size:13px;font-weight:700">Yes, Delete</button>'
-    + '<button id="deleteProjCancel" style="padding:10px 20px;border-radius:7px;border:1px solid var(--mid-gray);background:transparent;cursor:pointer;font-size:13px;color:var(--mid-gray)">Cancel</button>'
+    + '<button id="_dp1yes" style="padding:10px 24px;border-radius:7px;border:none;background:#b71c1c;color:#fff;cursor:pointer;font-size:13px;font-weight:700">Yes, continue</button>'
+    + '<button id="_dp1no"  style="padding:10px 20px;border-radius:7px;border:1px solid ' + mGray + ';background:transparent;cursor:pointer;font-size:13px;color:' + mGray + '">Cancel</button>'
     + '</div></div>';
-  document.body.appendChild(overlay);
+  document.body.appendChild(ov1);
+  ov1.querySelector('#_dp1no').onclick  = function() { ov1.remove(); };
+  ov1.onclick = function(e) { if (e.target === ov1) ov1.remove(); };
 
-  overlay.querySelector('#deleteProjCancel').onclick = function() { overlay.remove(); };
-  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  ov1.querySelector('#_dp1yes').onclick = function() {
+    ov1.remove();
 
-  overlay.querySelector('#deleteProjConfirm').onclick = async function() {
-    var confirmBtn = overlay.querySelector('#deleteProjConfirm');
-    var errEl      = overlay.querySelector('#deleteProjErr');
-    confirmBtn.disabled = true; confirmBtn.textContent = 'Deleting\u2026';
-    try {
-      sparkShowSaving();
-      /* 1. Fetch all budget IDs for this project */
-      var budgets = await sparkFetch('budgets', 'project_id=eq.' + supaProjectId + '&select=id');
-      var budgetIds = (budgets || []).map(function(b) { return b.id; });
+    /* ── Step 2 overlay: "Are you absolutely sure?" ── */
+    var ov2 = document.createElement('div');
+    ov2.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;display:flex;align-items:center;justify-content:center';
+    ov2.innerHTML =
+      '<div style="background:' + mBg + ';border-radius:14px;padding:28px;width:420px;max-width:92vw;text-align:center">'
+      + '<div style="font-size:13px;font-weight:700;color:#EF9A9A;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">&#9888; This cannot be undone</div>'
+      + '<div style="font-size:15px;font-weight:700;color:' + mText + ';margin-bottom:10px">Permanently delete <span style="font-family:monospace;color:#EF9A9A">' + projCode + '</span>?</div>'
+      + '<div style="font-size:12px;color:' + mGray + ';margin-bottom:24px">All snapshots, labor budgets, and OOP entries for this project will be removed from Supabase.</div>'
+      + '<div id="_dp2err" style="display:none;color:#EF9A9A;font-size:12px;background:rgba(198,40,40,.15);padding:8px 12px;border-radius:6px;margin-bottom:14px"></div>'
+      + '<div style="display:flex;gap:10px;justify-content:center">'
+      + '<button id="_dp2del" style="padding:10px 28px;border-radius:7px;border:none;background:#C62828;color:#fff;cursor:pointer;font-size:13px;font-weight:700">Delete Forever</button>'
+      + '<button id="_dp2no"  style="padding:10px 20px;border-radius:7px;border:1px solid ' + mGray + ';background:transparent;cursor:pointer;font-size:13px;color:' + mGray + '">Cancel</button>'
+      + '</div></div>';
+    document.body.appendChild(ov2);
+    ov2.querySelector('#_dp2no').onclick  = function() { ov2.remove(); };
+    ov2.onclick = function(e) { if (e.target === ov2) ov2.remove(); };
 
-      /* 2. Delete child records for each budget */
-      if (budgetIds.length) {
-        var _bids = budgetIds.join(',');
-        await sparkFetch('labor_budget_entries?budget_id=in.(' + _bids + ')', '', 'DELETE');
-        await sparkFetch('oop_budget_entries?budget_id=in.(' + _bids + ')', '', 'DELETE');
-        await sparkFetch('freelancer_budget_entries?budget_id=in.(' + _bids + ')', '', 'DELETE');
-        await sparkFetch('budgets?project_id=eq.' + supaProjectId, '', 'DELETE');
-      }
-
-      /* 3. Delete the project record */
-      await sparkFetch('projects?id=eq.' + supaProjectId, '', 'DELETE');
-
-      /* 4. Remove from CLIENTS local state */
-      for (var ci = 0; ci < CLIENTS.length; ci++) {
-        var _projs = CLIENTS[ci].projects;
-        for (var pi = _projs.length - 1; pi >= 0; pi--) {
-          if (_projs[pi].code === projCode) { _projs.splice(pi, 1); break; }
+    ov2.querySelector('#_dp2del').onclick = async function() {
+      var delBtn = ov2.querySelector('#_dp2del');
+      var errEl  = ov2.querySelector('#_dp2err');
+      delBtn.disabled = true; delBtn.textContent = 'Deleting\u2026';
+      try {
+        sparkShowSaving();
+        /* 1. Fetch all budget IDs for this project */
+        var budgets = await sparkFetch('budgets', 'project_id=eq.' + supaProjectId + '&select=id');
+        var budgetIds = (budgets || []).map(function(b) { return b.id; });
+        /* 2. Delete child records */
+        if (budgetIds.length) {
+          var _bids = budgetIds.join(',');
+          await sparkFetch('labor_budget_entries?budget_id=in.(' + _bids + ')', '', 'DELETE');
+          await sparkFetch('oop_budget_entries?budget_id=in.(' + _bids + ')', '', 'DELETE');
+          await sparkFetch('freelancer_budget_entries?budget_id=in.(' + _bids + ')', '', 'DELETE');
+          await sparkFetch('budgets?project_id=eq.' + supaProjectId, '', 'DELETE');
         }
+        /* 3. Delete project record */
+        await sparkFetch('projects?id=eq.' + supaProjectId, '', 'DELETE');
+        /* 4. Remove from local CLIENTS state */
+        for (var ci = 0; ci < CLIENTS.length; ci++) {
+          var _pr = CLIENTS[ci].projects;
+          for (var pi = _pr.length - 1; pi >= 0; pi--) {
+            if (_pr[pi].code === projCode) { _pr.splice(pi, 1); break; }
+          }
+        }
+        try { localStorage.removeItem('furnace_supa_v4'); } catch(e) {}
+        sparkHideSaving();
+        ov2.remove();
+        if (clientId) navigate('client:' + clientId); else navigate('master');
+      } catch(err) {
+        sparkHideSaving();
+        console.error('deleteProject error:', err);
+        if (errEl) { errEl.textContent = 'Delete failed: ' + (err.message || String(err)); errEl.style.display = 'block'; }
+        delBtn.disabled = false; delBtn.textContent = 'Delete Forever';
       }
-
-      /* 5. Bust cache */
-      try { localStorage.removeItem('furnace_supa_v4'); } catch(e) {}
-
-      sparkHideSaving();
-      overlay.remove();
-      /* Navigate back to client page or master dashboard */
-      if (clientId) navigate('client:' + clientId);
-      else navigate('master');
-    } catch(err) {
-      sparkHideSaving();
-      console.error('deleteProject error:', err);
-      if (errEl) { errEl.textContent = 'Delete failed: ' + (err.message || err); errEl.style.display = 'block'; }
-      confirmBtn.disabled = false; confirmBtn.textContent = 'Yes, Delete';
-    }
+    };
   };
 }
 
