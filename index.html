@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.76 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.77 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -4034,6 +4034,26 @@ async function oppConvertSubmit(budgetId, projId) {
     return;
   }
 
+  /* Duplicate check — fast local scan */
+  var _convCodeUpper = code.toUpperCase();
+  var _convDup = false;
+  for (var _cci = 0; _cci < (CLIENTS || []).length; _cci++) {
+    for (var _cpi = 0; _cpi < CLIENTS[_cci].projects.length; _cpi++) {
+      if ((CLIENTS[_cci].projects[_cpi].code || '').toUpperCase() === _convCodeUpper) { _convDup = true; break; }
+    }
+    if (_convDup) break;
+  }
+  if (_convDup) {
+    if (errEl) { errEl.textContent = 'Project code \u201c' + code + '\u201d is already in use \u2014 please choose a different number.'; errEl.style.display = 'block'; }
+    codeEl.focus(); return;
+  }
+  /* Supabase check for stale local state */
+  var _convDbCheck = await sparkFetch('projects', 'project_code=eq.' + encodeURIComponent(code) + '&select=id');
+  if (_convDbCheck && _convDbCheck.length > 0) {
+    if (errEl) { errEl.textContent = 'Project code \u201c' + code + '\u201d is already in use \u2014 please choose a different number.'; errEl.style.display = 'block'; }
+    codeEl.focus(); return;
+  }
+
   if (btn) { btn.disabled = true; btn.textContent = 'Activating…'; }
   if (errEl) errEl.style.display = 'none';
 
@@ -5945,6 +5965,21 @@ async function createNewProject() {
   if (!clientId) { showErr('Please select a client.'); return; }
   if (!name) { showErr('Project name is required.'); if (nameEl) nameEl.focus(); return; }
   if (!code) { showErr('Project code is required.'); if (codeEl) codeEl.focus(); return; }
+
+  /* Duplicate check — fast local scan first */
+  var _codeUpper = code.toUpperCase();
+  var _dupFound = false;
+  for (var _ci = 0; _ci < (CLIENTS || []).length; _ci++) {
+    for (var _pi = 0; _pi < CLIENTS[_ci].projects.length; _pi++) {
+      if ((CLIENTS[_ci].projects[_pi].code || '').toUpperCase() === _codeUpper) { _dupFound = true; break; }
+    }
+    if (_dupFound) break;
+  }
+  if (_dupFound) { showErr('Project code \u201c' + code + '\u201d is already in use \u2014 please choose a different one.'); if (codeEl) codeEl.focus(); return; }
+
+  /* Also hit Supabase in case local state is stale */
+  var _dbCheck = await sparkFetch('projects', 'project_code=eq.' + encodeURIComponent(code) + '&select=id');
+  if (_dbCheck && _dbCheck.length > 0) { showErr('Project code \u201c' + code + '\u201d is already in use \u2014 please choose a different one.'); if (codeEl) codeEl.focus(); return; }
 
   /* Disable button during creation */
   var btn = document.querySelector('#addProjectOverlay button');
