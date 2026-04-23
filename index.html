@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.80 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.81 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -2292,6 +2292,7 @@ function renderProject(projectId) {
   h += '<h1 class="page-title" style="margin:0">' + p.name + '</h1>';
   h += _phasePill;
   h += '<button onclick="notifyNewProjectSlack(' + JSON.stringify(p.name) + ',' + JSON.stringify(p.code) + ',this)" title="DM Evan &amp; Richelle with new project number" style="margin-left:auto;padding:5px 13px;border-radius:20px;border:1px solid rgba(91,74,138,.4);background:rgba(91,74,138,.12);color:#9B8EC2;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit;white-space:nowrap">📣 Notify Team</button>';
+  h += '<button onclick="deleteProject(' + JSON.stringify(p._supaId||'') + ',' + JSON.stringify(p.code) + ',' + JSON.stringify(p.clientId||'') + ')" title="Delete this project" style="padding:5px 10px;border-radius:20px;border:1px solid rgba(198,40,40,.3);background:transparent;color:rgba(198,40,40,.6);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap" onmouseenter="this.style.background=\'rgba(198,40,40,.1)\';this.style.color=\'#EF9A9A\'" onmouseleave="this.style.background=\'transparent\';this.style.color=\'rgba(198,40,40,.6)\'">🗑 Delete</button>';
   h += '</div>';
   h += '<p class="page-subtitle">' + p.clientCode + ' ' + p.clientName + ' &middot; Rate: ' + (rate > 0 ? '$' + rate + '/hr' : 'Not set') + '</p>';
 
@@ -6152,6 +6153,77 @@ async function createNewProject() {
     showErr(msg);
     if (btn) { btn.textContent = 'Create Project'; btn.disabled = false; }
   }
+}
+
+async function deleteProject(supaProjectId, projCode, clientId) {
+  if (!supaProjectId) { alert('Cannot delete — no Supabase project ID found for this project.'); return; }
+
+  var isDark = document.documentElement.classList.contains('dark');
+  var mBg   = isDark ? 'var(--dm-surface)' : 'var(--white)';
+  var mText = isDark ? 'var(--dm-text)'    : 'var(--ink)';
+
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:99999;display:flex;align-items:center;justify-content:center';
+  overlay.innerHTML = '<div style="background:' + mBg + ';border-radius:14px;padding:28px;width:400px;max-width:92vw;text-align:center">'
+    + '<div style="font-size:32px;margin-bottom:12px">&#128465;</div>'
+    + '<div style="font-size:16px;font-weight:700;color:' + mText + ';margin-bottom:8px">Delete Project?</div>'
+    + '<div style="font-size:13px;color:var(--mid-gray);margin-bottom:6px;line-height:1.5">This will permanently delete <strong style="color:' + mText + '">' + projCode + '</strong> and all its budget data from Supabase.</div>'
+    + '<div style="font-size:11px;color:var(--mid-gray);margin-bottom:24px">Tracked hours in labor actuals will not be deleted.</div>'
+    + '<div id="deleteProjErr" style="display:none;color:#EF9A9A;font-size:12px;background:rgba(198,40,40,.15);padding:8px 12px;border-radius:6px;margin-bottom:14px"></div>'
+    + '<div style="display:flex;gap:10px;justify-content:center">'
+    + '<button id="deleteProjConfirm" style="padding:10px 24px;border-radius:7px;border:none;background:#C62828;color:#fff;cursor:pointer;font-size:13px;font-weight:700">Yes, Delete</button>'
+    + '<button id="deleteProjCancel" style="padding:10px 20px;border-radius:7px;border:1px solid var(--mid-gray);background:transparent;cursor:pointer;font-size:13px;color:var(--mid-gray)">Cancel</button>'
+    + '</div></div>';
+  document.body.appendChild(overlay);
+
+  overlay.querySelector('#deleteProjCancel').onclick = function() { overlay.remove(); };
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+  overlay.querySelector('#deleteProjConfirm').onclick = async function() {
+    var confirmBtn = overlay.querySelector('#deleteProjConfirm');
+    var errEl      = overlay.querySelector('#deleteProjErr');
+    confirmBtn.disabled = true; confirmBtn.textContent = 'Deleting\u2026';
+    try {
+      sparkShowSaving();
+      /* 1. Fetch all budget IDs for this project */
+      var budgets = await sparkFetch('budgets', 'project_id=eq.' + supaProjectId + '&select=id');
+      var budgetIds = (budgets || []).map(function(b) { return b.id; });
+
+      /* 2. Delete child records for each budget */
+      if (budgetIds.length) {
+        var _bids = budgetIds.join(',');
+        await sparkFetch('labor_budget_entries?budget_id=in.(' + _bids + ')', '', 'DELETE');
+        await sparkFetch('oop_budget_entries?budget_id=in.(' + _bids + ')', '', 'DELETE');
+        await sparkFetch('freelancer_budget_entries?budget_id=in.(' + _bids + ')', '', 'DELETE');
+        await sparkFetch('budgets?project_id=eq.' + supaProjectId, '', 'DELETE');
+      }
+
+      /* 3. Delete the project record */
+      await sparkFetch('projects?id=eq.' + supaProjectId, '', 'DELETE');
+
+      /* 4. Remove from CLIENTS local state */
+      for (var ci = 0; ci < CLIENTS.length; ci++) {
+        var _projs = CLIENTS[ci].projects;
+        for (var pi = _projs.length - 1; pi >= 0; pi--) {
+          if (_projs[pi].code === projCode) { _projs.splice(pi, 1); break; }
+        }
+      }
+
+      /* 5. Bust cache */
+      try { localStorage.removeItem('furnace_supa_v4'); } catch(e) {}
+
+      sparkHideSaving();
+      overlay.remove();
+      /* Navigate back to client page or master dashboard */
+      if (clientId) navigate('client:' + clientId);
+      else navigate('master');
+    } catch(err) {
+      sparkHideSaving();
+      console.error('deleteProject error:', err);
+      if (errEl) { errEl.textContent = 'Delete failed: ' + (err.message || err); errEl.style.display = 'block'; }
+      confirmBtn.disabled = false; confirmBtn.textContent = 'Yes, Delete';
+    }
+  };
 }
 
 /* ── REAL-TIME COLLABORATION ── */
