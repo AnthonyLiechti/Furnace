@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.77 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.78 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -7950,16 +7950,20 @@ function sparkRenderBudgetContent(embedded) {
       oh += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">';
       oh += '<div style="font-size:16px;font-weight:700;display:flex;align-items:center;gap:10px">PROJECT OVERVIEW <span style="font-size:13px;font-weight:400;opacity:.5">#' + (budget.estimate_number || '\u2014') + '</span><span id="sparkLiveDot" title="Live updates active" style="display:none;width:8px;height:8px;border-radius:50%;background:rgba(129,199,132,.5);transition:background .4s"></span></div>';
       oh += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
-      var statusOpts = [
-        {label:'Non-Billable', val:'nonbillable', color:'var(--mid-gray)'},
-        {label:'Business Development', val:'bizdev', color:'#F57F17'},
-        {label:'Active Billable', val:'active', color:'var(--ocean)'},
-        {label:'Finished', val:'complete', color:'#81C784'}
-      ];
-      for (var si = 0; si < statusOpts.length; si++) {
-        var so = statusOpts[si];
-        var isSel = (curStatus === so.val);
-        oh += '<span style="padding:5px 12px;border-radius:12px;font-size:10px;font-weight:600;cursor:pointer;transition:all .2s;' + (isSel ? 'background:' + so.color + ';color:var(--white)' : 'background:rgba(255,255,255,.08);color:var(--mid-gray)') + '" onclick="sparkSetProjectStatus(\'' + so.val + '\')">' + (isSel ? '\u2714 ' : '') + so.label + '</span>';
+      if (curStatus !== 'opportunity') {
+        var statusOpts = [
+          {label:'Non-Billable', val:'nonbillable', color:'var(--mid-gray)'},
+          {label:'Business Development', val:'bizdev', color:'#F57F17'},
+          {label:'Active Billable', val:'active', color:'var(--ocean)'},
+          {label:'Finished', val:'complete', color:'#81C784'}
+        ];
+        for (var si = 0; si < statusOpts.length; si++) {
+          var so = statusOpts[si];
+          var isSel = (curStatus === so.val);
+          oh += '<span style="padding:5px 12px;border-radius:12px;font-size:10px;font-weight:600;cursor:pointer;transition:all .2s;' + (isSel ? 'background:' + so.color + ';color:var(--white)' : 'background:rgba(255,255,255,.08);color:var(--mid-gray)') + '" onclick="sparkSetProjectStatus(\'' + so.val + '\')">' + (isSel ? '\u2714 ' : '') + so.label + '</span>';
+        }
+      } else {
+        oh += '<span style="padding:5px 12px;border-radius:12px;font-size:10px;font-weight:600;background:rgba(91,74,138,.4);color:#C5B8F0">&#9670; In Opportunity</span>';
       }
       oh += '</div></div>';
       oh += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">';
