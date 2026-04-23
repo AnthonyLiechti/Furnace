@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.65 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.66 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -2020,10 +2020,13 @@ function renderProjFinancials(p) {
   var flSpent    = noFl  ? 0 : (sb.flSpent || 0);
   var flRemaining = flBudget - flSpent;
 
-  var oopBudget   = noOop ? 0 : sbOopBudget(sb);
+  var oopBudget   = noOop ? 0 : sbOopBudget(sb);          /* effective (cascade) amounts × markup — used for OOP detail row + progress bar */
   var oopSpent    = noOop ? 0 : (sb.oopSpent || 0);
   var oopPredicted = noOop ? 0 : oopGetPredictedForProject(p.code);
   var oopRemaining = oopBudget - oopSpent;
+  /* Projected OOP Price: planned amounts only (ignoring actuals) × markup */
+  var _oopMkPct   = sb.oopMarkupPct != null ? sb.oopMarkupPct : 20;
+  var oopProjected = noOop ? 0 : (sb.oopTotal || 0) * (1 + _oopMkPct / 100);
 
   /* Determine finished state early so profit/margin tiles match the bar */
   var isFinished = sb.status === 'complete' || p.status === 'complete' || p.status === 'finished';
@@ -2031,16 +2034,16 @@ function renderProjFinancials(p) {
   /* Use per-entry billable_rate overrides when available; falls back to $200/hr */
   var laborSpent$ = filteredProjectSpentDollars(p, agencyRate);
 
-  /* Profit tile: finished → actual spending; open → budget amounts */
+  /* Profit tile: finished → actual spending; open → projected budget amounts */
   var profitVal = isFinished
     ? tcvPrice - laborSpent$ - oopSpent - flSpent
-    : tcvPrice - (sb.laborTotal || 0) - oopBudget - flBudget;
+    : tcvPrice - (sb.laborTotal || 0) - oopProjected - flBudget;
   var profitPctVal = tcvPrice > 0 ? ((profitVal / tcvPrice) * 100).toFixed(1) : 0;
 
   var internalLaborCost = sb.laborCostInternal || sb.laborTotal || 0;
   var projLaborPrice = sb.laborTotal || 0;
   /* Margin uses projected budget prices (not internal rates) */
-  var marginOop = isFinished ? oopSpent : oopBudget;
+  var marginOop = isFinished ? oopSpent : oopProjected;
   var marginFl  = isFinished ? flSpent  : flBudget;
   var marginPctVal = tcvPrice > 0 ? ((tcvPrice - projLaborPrice - marginOop - marginFl) / tcvPrice * 100).toFixed(1) : 0;
   var marginColor = parseFloat(marginPctVal) > 30 ? '#81C784' : parseFloat(marginPctVal) >= 15 ? 'var(--honey)' : '#C62828';
@@ -2074,7 +2077,7 @@ function renderProjFinancials(p) {
   h += '</div>';
   h += '<div class="snap-fin-item"><div class="sf-label">Projected Labor Price</div><div class="sf-value">$' + Math.round(sb.laborTotal || 0).toLocaleString() + '</div><div class="sf-sub">' + (sb.laborHours || 0).toFixed(0) + ' hrs @ $200/hr</div></div>';
   h += '<div class="snap-fin-item"><div class="sf-label">Projected Freelancer Price</div><div class="sf-value" style="color:#CE93D8">' + (noFl ? '<span style="opacity:.4">—</span>' : '$' + Math.round(flBudget).toLocaleString()) + '</div>' + (!noFl && flBudget > 0 ? '<div class="sf-sub">' + (sb._flEntries || []).length + ' entries</div>' : '') + '</div>';
-  h += '<div class="snap-fin-item"><div class="sf-label">Projected OOP Price</div><div class="sf-value">' + (noOop ? '<span style="opacity:.4">—</span>' : '$' + Math.round(oopBudget).toLocaleString()) + '</div></div>';
+  h += '<div class="snap-fin-item"><div class="sf-label">Projected OOP Price</div><div class="sf-value">' + (noOop ? '<span style="opacity:.4">—</span>' : '$' + Math.round(oopProjected).toLocaleString()) + '</div><div class="sf-sub">' + (!noOop && oopProjected > 0 ? _oopMkPct + '% markup' : '') + '</div></div>';
   h += '<div class="snap-fin-item"><div class="sf-label">Projected Profit</div><div class="sf-value ' + (profitVal >= 0 ? 'sf-green' : '') + '">$' + Math.round(profitVal).toLocaleString() + '</div><div class="sf-sub">' + profitPctVal + '%</div></div>';
   h += '<div class="snap-fin-item"><div class="sf-label">Projected Profit Margin</div><div class="sf-value" style="color:' + marginColor + '">' + marginPctVal + '%</div><div class="sf-sub">Proj. labor: $' + Math.round(projLaborPrice).toLocaleString() + '</div></div>';
   h += '<div class="snap-fin-item"><div class="sf-label">Eff. Rate</div><div class="sf-value" style="color:' + effRateColor + '">' + effRateDisplay + '</div>' + (saHrs > 0 ? '<div class="sf-sub">vs $200 bill rate</div>' : '<div class="sf-sub">No hours tracked</div>') + '</div>';
