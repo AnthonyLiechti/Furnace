@@ -693,6 +693,15 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   50%  { opacity: .45; }
   100% { opacity: 1; }
 }
+@keyframes marginSparkle {
+  0%   { color:#81C784; text-shadow:0 0 6px rgba(129,199,132,.4); }
+  20%  { color:#C8E6C9; text-shadow:0 0 12px rgba(129,199,132,.9),0 0 24px rgba(255,255,255,.35); }
+  40%  { color:#FFD54F; text-shadow:0 0 10px rgba(255,213,79,.8), 0 0 20px rgba(255,255,255,.3); }
+  60%  { color:#fff;    text-shadow:0 0 14px rgba(129,199,132,1), 0 0 28px rgba(129,199,132,.5); }
+  80%  { color:#C8E6C9; text-shadow:0 0 10px rgba(129,199,132,.8),0 0 20px rgba(255,255,255,.25); }
+  100% { color:#81C784; text-shadow:0 0 6px rgba(129,199,132,.4); }
+}
+.margin-sparkle { animation: marginSparkle 2.4s ease-in-out infinite; }
 </style>
 </head>
 <body>
@@ -701,7 +710,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.86 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.87 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -2077,7 +2086,9 @@ function renderProjFinancials(p) {
   var marginOop = isFinished ? oopSpent : oopProjected;
   var marginFl  = isFinished ? flSpent  : flBudget;
   var marginPctVal = tcvPrice > 0 ? ((tcvPrice - projLaborPrice - marginOop - marginFl) / tcvPrice * 100).toFixed(1) : 0;
-  var marginColor = parseFloat(marginPctVal) > 30 ? '#81C784' : parseFloat(marginPctVal) >= 15 ? 'var(--honey)' : '#C62828';
+  var _mPct = parseFloat(marginPctVal);
+  var marginColor = _mPct > 25 ? '#81C784' : _mPct > 15 ? '#81C784' : _mPct > 10 ? '#F57F17' : '#EF5350';
+  var marginSparkle = _mPct > 25;
 
   var effRate = saHrs > 0 ? (internalLaborCost / saHrs) : 0;
   var effRateDisplay = saHrs > 0 ? '$' + Math.round(effRate).toLocaleString() + '/hr' : '\u2014';
@@ -2110,7 +2121,7 @@ function renderProjFinancials(p) {
   h += '<div class="snap-fin-item"><div class="sf-label">Projected Freelancer Price</div><div class="sf-value" style="color:#CE93D8">' + (noFl ? '<span style="opacity:.4">—</span>' : '$' + Math.round(flBudget).toLocaleString()) + '</div>' + (!noFl && flBudget > 0 ? '<div class="sf-sub">' + (sb._flEntries || []).length + ' entries</div>' : '') + '</div>';
   h += '<div class="snap-fin-item"><div class="sf-label">Projected OOP Price</div><div class="sf-value">' + (noOop ? '<span style="opacity:.4">—</span>' : '$' + Math.round(oopProjected).toLocaleString()) + '</div><div class="sf-sub">' + (!noOop && oopProjected > 0 ? _oopMkPct + '% markup' : '') + '</div></div>';
   h += '<div class="snap-fin-item"><div class="sf-label">Projected Profit</div><div class="sf-value ' + (profitVal >= 0 ? 'sf-green' : '') + '">$' + Math.round(profitVal).toLocaleString() + '</div><div class="sf-sub">' + profitPctVal + '%</div></div>';
-  h += '<div class="snap-fin-item"><div class="sf-label">Projected Profit Margin</div><div class="sf-value" style="color:' + marginColor + '">' + marginPctVal + '%</div><div class="sf-sub">Proj. labor: $' + Math.round(projLaborPrice).toLocaleString() + '</div></div>';
+  h += '<div class="snap-fin-item"><div class="sf-label">Projected Profit Margin</div><div class="sf-value' + (marginSparkle ? ' margin-sparkle' : '') + '" style="' + (marginSparkle ? '' : 'color:' + marginColor) + '">' + marginPctVal + '%</div><div class="sf-sub">Proj. labor: $' + Math.round(projLaborPrice).toLocaleString() + '</div></div>';
   h += '<div class="snap-fin-item"><div class="sf-label">Eff. Rate</div><div class="sf-value" style="color:' + effRateColor + '">' + effRateDisplay + '</div>' + (saHrs > 0 ? '<div class="sf-sub">vs $200 bill rate</div>' : '<div class="sf-sub">No hours tracked</div>') + '</div>';
   h += '</div>';
 
