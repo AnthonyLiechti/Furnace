@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.70 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.72 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -738,6 +738,16 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
       <input type="date" id="dateFilterEnd" onchange="applyCustomDateRange()" style="font-size:12px;padding:4px 8px;border:1px solid var(--canvas);border-radius:6px;font-family:inherit">
     </div>
     <div id="dateFilterLabel" style="font-size:11px;color:var(--mid-gray);font-style:italic"></div>
+    <div id="hoursUpdatedBadge" style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--mid-gray)">
+      <span style="opacity:.5">⏱</span>
+      <span id="hoursUpdatedLabel" style="font-style:italic">Hours updated: —</span>
+      <span id="hoursUpdatedEditArea" style="display:none;align-items:center;gap:4px">
+        <input type="date" id="hoursUpdatedInput" style="font-size:11px;padding:2px 6px;border:1px solid var(--canvas);border-radius:4px;font-family:inherit;background:var(--white);color:var(--abyss)">
+        <button onclick="saveHoursUpdated()" style="font-size:10px;padding:2px 8px;border-radius:4px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-family:inherit">Save</button>
+        <button onclick="cancelHoursEdit()" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid var(--canvas);background:transparent;color:var(--mid-gray);cursor:pointer;font-family:inherit">✕</button>
+      </span>
+      <button id="hoursUpdatedEditBtn" onclick="openHoursEdit()" title="Set hours sync date" style="background:none;border:1px solid var(--canvas);color:var(--mid-gray);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;font-family:inherit">Edit</button>
+    </div>
   </div>
   <div id="mainContent"></div>
 </div>
@@ -972,6 +982,7 @@ var SUPA_LOADED = false;
 var FURNACE_TEAM_MEMBERS = [];
 var SLACK_BOT_TOKEN = ''; /* loaded from agency_settings on init */
 var SUPA_POS = [];        /* purchase orders sent to clients, loaded from pos table */
+var HOURS_LAST_UPDATED = ''; /* human-readable date string, stored in agency_settings */
 var YTD_COLLAPSED = {};   /* client codes that are collapsed in YTD view */
 
 /* ── NATIVE ALLOCATION DATA ── */
@@ -2134,10 +2145,23 @@ function renderProjFinancials(p) {
     h += '<div style="font-size:12px;color:var(--mid-gray);padding:8px 0;font-style:italic">Marked as no freelancers on this project.</div>';
   } else if (flBudget > 0) {
     var flUnpaid = flBudget - flSpent;
+    /* Compute internal cost total using fully_burdened_rate from team_member */
+    var flCostInternal = 0;
+    var _flArr = sb._flEntries || [];
+    var _flHasSentinel = false;
+    for (var _fci = 0; _fci < _flArr.length; _fci++) { if (_flArr[_fci].week_label === '__budget__') { _flHasSentinel = true; break; } }
+    for (var _fci = 0; _fci < _flArr.length; _fci++) {
+      var _fce = _flArr[_fci];
+      if (_flHasSentinel && _fce.week_label !== '__budget__') continue;
+      var _costRate = (_fce.team_member && _fce.team_member.fully_burdened_rate) ? _fce.team_member.fully_burdened_rate : (_fce.rate || 0);
+      flCostInternal += (_fce.hours || 0) * _costRate;
+    }
+    var flMargin = flBudget - flCostInternal;
     h += '<div class="snap-financials">';
-    h += '<div class="snap-fin-item"><div class="sf-label">FL Budgeted</div><div class="sf-value" style="color:#CE93D8">$' + Math.round(flBudget).toLocaleString() + '</div><div class="sf-sub">' + (sb._flEntries || []).length + ' entries</div></div>';
-    h += '<div class="snap-fin-item"><div class="sf-label">FL Paid</div><div class="sf-value" style="color:#81C784">$' + Math.round(flSpent).toLocaleString() + '</div><div class="sf-sub">' + pct(flSpent, flBudget) + '% of budget</div></div>';
-
+    h += '<div class="snap-fin-item"><div class="sf-label">FL Billable Price</div><div class="sf-value" style="color:#CE93D8">$' + Math.round(flBudget).toLocaleString() + '</div><div class="sf-sub">' + (sb._flEntries || []).length + ' entries</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">FL Internal Cost</div><div class="sf-value" style="color:#F57F17">$' + Math.round(flCostInternal).toLocaleString() + '</div><div class="sf-sub">at cost rate</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">FL Margin</div><div class="sf-value" style="color:' + (flMargin >= 0 ? '#81C784' : 'var(--ember)') + '">$' + Math.round(flMargin).toLocaleString() + '</div><div class="sf-sub">' + (flBudget > 0 ? Math.round(flMargin / flBudget * 100) : 0) + '%</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">FL Paid</div><div class="sf-value" style="color:#81C784">$' + Math.round(flSpent).toLocaleString() + '</div><div class="sf-sub">' + pct(flSpent, flBudget) + '% billed</div></div>';
     h += '<div class="snap-fin-item"><div class="sf-label">FL Remaining</div><div class="sf-value" style="color:' + (flRemaining < 0 ? 'var(--ember)' : 'var(--white)') + '">$' + Math.round(flRemaining).toLocaleString() + '</div></div>';
     h += '</div>';
   } else {
@@ -2161,6 +2185,46 @@ function renderProjFinancials(p) {
   }
 
   h += '</div>'; /* end snapshot-banner */
+
+  /* ── Billed to Date ── */
+  var _projCode = p.code;
+  var _projPOs = SUPA_POS.filter(function(po) {
+    return po.project_code === _projCode;
+  }).sort(function(a,b){ return (a.date_sent||'').localeCompare(b.date_sent||''); });
+  if (_projPOs.length > 0 || tcvPrice > 0) {
+    var _totalBilled = _projPOs.reduce(function(s,po){ return s + (parseFloat(po.amount)||0); }, 0);
+    var _billRem = tcvPrice - _totalBilled;
+    var _billedPct = tcvPrice > 0 ? Math.round(_totalBilled / tcvPrice * 100) : 0;
+    h += '<div class="snapshot-banner" style="margin-top:12px">';
+    h += '<div class="snap-header"><div class="snap-title">Billed to Date</div>';
+    h += '<div class="snap-version">' + (_projPOs.length > 0 ? _projPOs.length + ' PO' + (_projPOs.length !== 1 ? 's' : '') : 'No POs yet') + '</div></div>';
+    h += '<div class="snap-financials">';
+    h += '<div class="snap-fin-item"><div class="sf-label">Total Billed</div><div class="sf-value sf-gold">$' + Math.round(_totalBilled).toLocaleString() + '</div><div class="sf-sub">' + _billedPct + '% of TCV</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">TCV</div><div class="sf-value">$' + Math.round(tcvPrice).toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Remaining to Bill</div><div class="sf-value ' + (_billRem >= 0 ? 'sf-green' : '') + '">$' + Math.round(_billRem).toLocaleString() + '</div></div>';
+    h += '</div>';
+    if (_projPOs.length > 0) {
+      h += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1)">';
+      for (var _poi = 0; _poi < _projPOs.length; _poi++) {
+        var _po = _projPOs[_poi];
+        var _ds = _po.date_sent ? new Date(_po.date_sent + 'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+        h += '<div style="display:flex;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)">';
+        h += '<div style="flex:1;font-size:12px;color:rgba(255,255,255,.6)">▸ ' + _ds;
+        if (_po.po_number) h += ' · <strong style="color:rgba(255,255,255,.85)">#' + _po.po_number + '</strong>';
+        if (_po.notes) h += ' · <em>' + _po.notes + '</em>';
+        h += '</div>';
+        h += '<div style="font-size:13px;font-weight:700;color:var(--sand)">$' + Math.round(parseFloat(_po.amount)||0).toLocaleString() + '</div>';
+        h += '<button onclick="openEditPOModal(\'' + _po.id + '\')" title="Edit" style="margin-left:8px;background:none;border:none;cursor:pointer;color:rgba(255,255,255,.3);font-size:12px;padding:2px 4px">✎</button>';
+        h += '</div>';
+      }
+      h += '</div>';
+    } else {
+      h += '<div style="margin-top:10px;font-size:12px;color:rgba(255,255,255,.35);font-style:italic">No purchase orders logged yet.</div>';
+      h += '<button onclick="openPOModal(\'' + _projCode + '\')" style="margin-top:8px;padding:5px 14px;border-radius:6px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-size:12px;font-weight:600">+ Log First PO</button>';
+    }
+    h += '</div>';
+  }
+
   el.innerHTML = h;
 }
 
@@ -4184,6 +4248,51 @@ async function sparkFetch(table, query, method, body) {
 /* ══════════════════════════════════════════════════════════
    2026 YEAR TO DATE — PO TRACKER
    ══════════════════════════════════════════════════════════ */
+
+/* ── Hours Last Updated helpers ── */
+function setHoursUpdatedDisplay(val) {
+  HOURS_LAST_UPDATED = val || '';
+  var lbl = document.getElementById('hoursUpdatedLabel');
+  if (lbl) lbl.textContent = val ? 'Hours updated: ' + val : 'Hours updated: —';
+}
+function openHoursEdit() {
+  var editArea = document.getElementById('hoursUpdatedEditArea');
+  var editBtn  = document.getElementById('hoursUpdatedEditBtn');
+  var inp      = document.getElementById('hoursUpdatedInput');
+  if (!editArea) return;
+  /* Pre-fill input with current stored date if parseable */
+  try {
+    if (HOURS_LAST_UPDATED) {
+      var d = new Date(HOURS_LAST_UPDATED);
+      if (!isNaN(d)) inp.value = d.toISOString().slice(0,10);
+    }
+  } catch(e) {}
+  editArea.style.display = 'flex';
+  if (editBtn) editBtn.style.display = 'none';
+}
+function cancelHoursEdit() {
+  var editArea = document.getElementById('hoursUpdatedEditArea');
+  var editBtn  = document.getElementById('hoursUpdatedEditBtn');
+  if (editArea) editArea.style.display = 'none';
+  if (editBtn)  editBtn.style.display  = '';
+}
+async function saveHoursUpdated() {
+  var inp = document.getElementById('hoursUpdatedInput');
+  if (!inp || !inp.value) return;
+  var d = new Date(inp.value + 'T12:00:00');
+  var display = d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+  setHoursUpdatedDisplay(display);
+  cancelHoursEdit();
+  /* Persist to agency_settings — PATCH if exists, POST if new */
+  try {
+    var existing = await sparkFetch('agency_settings', 'key=eq.hours_last_updated&select=id');
+    if (existing && existing.length > 0) {
+      await sparkFetch('agency_settings', 'key=eq.hours_last_updated', 'PATCH', {value: display});
+    } else {
+      await sparkFetch('agency_settings', '', 'POST', {key: 'hours_last_updated', value: display, category: 'sync', sort_order: 99});
+    }
+  } catch(e) { console.warn('Could not save hours_last_updated:', e); }
+}
 
 async function loadPOs() {
   try {
@@ -12157,11 +12266,15 @@ async function loadSupabaseData() {
     SUPA_LOADED = true;
     console.log('Supabase data loaded:', Object.keys(SUPA_BUDGETS).length, 'budgets,', SUPA_ACTUALS_ALL.length, 'actuals');
 
-    /* Load Slack bot token from agency_settings */
+    /* Load Slack bot token + hours_last_updated from agency_settings */
     (async function() {
       try {
         var slackSetting = await sparkFetch('agency_settings', 'key=eq.slack_bot_token&select=value');
         if (slackSetting && slackSetting[0] && slackSetting[0].value) SLACK_BOT_TOKEN = slackSetting[0].value;
+      } catch(e) {}
+      try {
+        var hoursSetting = await sparkFetch('agency_settings', 'key=eq.hours_last_updated&select=value');
+        if (hoursSetting && hoursSetting[0] && hoursSetting[0].value) setHoursUpdatedDisplay(hoursSetting[0].value);
       } catch(e) {}
     })();
 
