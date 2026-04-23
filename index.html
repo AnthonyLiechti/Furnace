@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.73 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.74 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -2156,11 +2156,9 @@ function renderProjFinancials(p) {
       var _costRate = (_fce.team_member && _fce.team_member.fully_burdened_rate) ? _fce.team_member.fully_burdened_rate : (_fce.rate || 0);
       flCostInternal += (_fce.hours || 0) * _costRate;
     }
-    var flMargin = flBudget - flCostInternal;
     h += '<div class="snap-financials">';
     h += '<div class="snap-fin-item"><div class="sf-label">FL Billable Price</div><div class="sf-value" style="color:#CE93D8">$' + Math.round(flBudget).toLocaleString() + '</div><div class="sf-sub">' + (sb._flEntries || []).length + ' entries</div></div>';
     h += '<div class="snap-fin-item"><div class="sf-label">FL Internal Cost</div><div class="sf-value" style="color:#F57F17">$' + Math.round(flCostInternal).toLocaleString() + '</div><div class="sf-sub">at cost rate</div></div>';
-    h += '<div class="snap-fin-item"><div class="sf-label">FL Margin</div><div class="sf-value" style="color:' + (flMargin >= 0 ? '#81C784' : 'var(--ember)') + '">$' + Math.round(flMargin).toLocaleString() + '</div><div class="sf-sub">' + (flBudget > 0 ? Math.round(flMargin / flBudget * 100) : 0) + '%</div></div>';
     h += '<div class="snap-fin-item"><div class="sf-label">FL Paid</div><div class="sf-value" style="color:#81C784">$' + Math.round(flSpent).toLocaleString() + '</div><div class="sf-sub">' + pct(flSpent, flBudget) + '% billed</div></div>';
     h += '<div class="snap-fin-item"><div class="sf-label">FL Remaining</div><div class="sf-value" style="color:' + (flRemaining < 0 ? 'var(--ember)' : 'var(--white)') + '">$' + Math.round(flRemaining).toLocaleString() + '</div></div>';
     h += '</div>';
