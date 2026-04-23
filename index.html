@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.83 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.84 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -6001,7 +6001,7 @@ function showAddProjectForm(preselectedClientId) {
     '</div>' +
     '<div style="margin-bottom:22px">' +
       '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:' + mMuted + ';margin-bottom:6px">Project Code</label>' +
-      '<input id="addProjCode" type="text" placeholder="e.g. ' + suggestedCode + 'XX_XX" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid ' + mBorder + ';border-radius:6px;font-size:14px;color:' + mText + ';background:' + mInput + ';font-family:monospace">' +
+      '<input id="addProjCode" type="text" placeholder="e.g. ' + suggestedCode + 'XX_XX" oninput="addProjAutoComplete(this)" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid ' + mBorder + ';border-radius:6px;font-size:14px;color:' + mText + ';background:' + mInput + ';font-family:monospace">' +
       '<div id="addProjSuggest" style="margin-top:8px"></div>' +
     '</div>' +
     '<div id="addProjError" style="color:var(--ember);font-size:12px;margin-bottom:12px;display:none"></div>' +
@@ -6029,6 +6029,48 @@ function showAddProjectForm(preselectedClientId) {
 
   var nameEl = document.getElementById('addProjName');
   if (nameEl) nameEl.focus();
+}
+
+function addProjAutoComplete(inputEl) {
+  var val = inputEl.value;
+  /* Trigger only when the user has typed CLIENT_CAMPAIGN_ (trailing underscore = 3 parts, last empty) */
+  var parts = val.split('_');
+  if (parts.length !== 3 || parts[2] !== '') return;
+
+  var clientCode = parts[0].toUpperCase();
+  var campStr    = parts[1];
+  var campNum    = parseInt(campStr, 10);
+  if (!clientCode || !campStr || isNaN(campNum)) return;
+
+  /* Find the client by code */
+  var client = null;
+  for (var i = 0; i < (CLIENTS || []).length; i++) {
+    if ((CLIENTS[i].code || '').toUpperCase() === clientCode) { client = CLIENTS[i]; break; }
+  }
+  if (!client) return;
+
+  /* Find max project number for this campaign */
+  var maxProj = 0, foundCampaign = false;
+  for (var j = 0; j < client.projects.length; j++) {
+    var code = (client.projects[j].code || '').toUpperCase();
+    if (code.indexOf(clientCode + '_') !== 0) continue;
+    var rem = code.slice(clientCode.length + 1);
+    var rparts = rem.split('_');
+    if (rparts.length < 2) continue;
+    if (parseInt(rparts[0], 10) !== campNum) continue;
+    var pNum = parseInt(rparts[1], 10);
+    if (!isNaN(pNum)) { foundCampaign = true; if (pNum > maxProj) maxProj = pNum; }
+  }
+
+  /* Fill the next project number, preserving the user's campaign formatting */
+  var nextProj  = foundCampaign ? maxProj + 1 : 1;
+  var projPad   = nextProj < 10 ? '0' + nextProj : String(nextProj);
+  var newVal    = parts[0] + '_' + campStr + '_' + projPad;
+  inputEl.value = newVal;
+
+  /* Select the project-number portion so the user can immediately overwrite it */
+  var selStart = newVal.length - projPad.length;
+  try { inputEl.setSelectionRange(selStart, newVal.length); } catch(e) {}
 }
 
 function addProjUpdateSuggestions(clientId) {
