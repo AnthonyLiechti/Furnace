@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.64 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.65 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 22, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -2075,8 +2075,8 @@ function renderProjFinancials(p) {
   h += '<div class="snap-fin-item"><div class="sf-label">Projected Labor Price</div><div class="sf-value">$' + Math.round(sb.laborTotal || 0).toLocaleString() + '</div><div class="sf-sub">' + (sb.laborHours || 0).toFixed(0) + ' hrs @ $200/hr</div></div>';
   h += '<div class="snap-fin-item"><div class="sf-label">Projected Freelancer Price</div><div class="sf-value" style="color:#CE93D8">' + (noFl ? '<span style="opacity:.4">—</span>' : '$' + Math.round(flBudget).toLocaleString()) + '</div>' + (!noFl && flBudget > 0 ? '<div class="sf-sub">' + (sb._flEntries || []).length + ' entries</div>' : '') + '</div>';
   h += '<div class="snap-fin-item"><div class="sf-label">Projected OOP Price</div><div class="sf-value">' + (noOop ? '<span style="opacity:.4">—</span>' : '$' + Math.round(oopBudget).toLocaleString()) + '</div></div>';
-  h += '<div class="snap-fin-item"><div class="sf-label">Profit</div><div class="sf-value ' + (profitVal >= 0 ? 'sf-green' : '') + '">$' + Math.round(profitVal).toLocaleString() + '</div><div class="sf-sub">' + profitPctVal + '%</div></div>';
-  h += '<div class="snap-fin-item"><div class="sf-label">Margin</div><div class="sf-value" style="color:' + marginColor + '">' + marginPctVal + '%</div><div class="sf-sub">Proj. labor: $' + Math.round(projLaborPrice).toLocaleString() + '</div></div>';
+  h += '<div class="snap-fin-item"><div class="sf-label">Projected Profit</div><div class="sf-value ' + (profitVal >= 0 ? 'sf-green' : '') + '">$' + Math.round(profitVal).toLocaleString() + '</div><div class="sf-sub">' + profitPctVal + '%</div></div>';
+  h += '<div class="snap-fin-item"><div class="sf-label">Projected Profit Margin</div><div class="sf-value" style="color:' + marginColor + '">' + marginPctVal + '%</div><div class="sf-sub">Proj. labor: $' + Math.round(projLaborPrice).toLocaleString() + '</div></div>';
   h += '<div class="snap-fin-item"><div class="sf-label">Eff. Rate</div><div class="sf-value" style="color:' + effRateColor + '">' + effRateDisplay + '</div>' + (saHrs > 0 ? '<div class="sf-sub">vs $200 bill rate</div>' : '<div class="sf-sub">No hours tracked</div>') + '</div>';
   h += '</div>';
 
