@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.72 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.73 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -3280,6 +3280,7 @@ async function importHandleFile(file) {
   /* Store parsed entries for the import button */
   importTimeState.parsed = newEntries;
   importTimeState.allParsed = entries; /* Full set (pre-dedup) for Replace All */
+  importTimeState.maxDate = dateMax;   /* Latest date in file — used for Hours Updated stamp */
   importTimeState.status = 'preview';
 }
 
@@ -3357,6 +3358,23 @@ async function importExecute(replaceAll) {
 
   importTimeState.status = 'done';
   importTimeState.parsed = null;
+
+  /* Auto-stamp Hours Updated with the latest date in the imported file */
+  if (errors === 0) {
+    try {
+      var _stampDate = importTimeState.maxDate; /* e.g. "2026-04-22" */
+      var _stampDisplay = _stampDate
+        ? new Date(_stampDate + 'T12:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})
+        : new Date().toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+      setHoursUpdatedDisplay(_stampDisplay);
+      var _existingStamp = await sparkFetch('agency_settings', 'key=eq.hours_last_updated&select=id');
+      if (_existingStamp && _existingStamp.length > 0) {
+        await sparkFetch('agency_settings', 'key=eq.hours_last_updated', 'PATCH', {value: _stampDisplay});
+      } else {
+        await sparkFetch('agency_settings', '', 'POST', {key: 'hours_last_updated', value: _stampDisplay, category: 'sync', sort_order: 99});
+      }
+    } catch(e) { console.warn('Could not auto-stamp hours_last_updated:', e); }
+  }
 
   /* Add the imported entries to the local cache so dedup works on next upload without full reload */
   if (SUPA_ACTUALS_ALL && entries) {
