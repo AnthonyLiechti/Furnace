@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.82 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.83 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -6002,6 +6002,7 @@ function showAddProjectForm(preselectedClientId) {
     '<div style="margin-bottom:22px">' +
       '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:' + mMuted + ';margin-bottom:6px">Project Code</label>' +
       '<input id="addProjCode" type="text" placeholder="e.g. ' + suggestedCode + 'XX_XX" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid ' + mBorder + ';border-radius:6px;font-size:14px;color:' + mText + ';background:' + mInput + ';font-family:monospace">' +
+      '<div id="addProjSuggest" style="margin-top:8px"></div>' +
     '</div>' +
     '<div id="addProjError" style="color:var(--ember);font-size:12px;margin-bottom:12px;display:none"></div>' +
     '<div style="display:flex;gap:10px">' +
@@ -6013,16 +6014,105 @@ function showAddProjectForm(preselectedClientId) {
   /* Close on backdrop click */
   overlay.addEventListener('click', function(e) { if (e.target === overlay) hideAddProjectForm(); });
 
-  /* Auto-update code hint when client changes */
+  /* Auto-update suggestions when client changes */
   var sel = document.getElementById('addProjClientSelect');
-  if (sel) sel.addEventListener('change', function() {
-    var cl3 = clientById(this.value);
-    var codeEl = document.getElementById('addProjCode');
-    if (cl3 && codeEl && !codeEl.value) codeEl.placeholder = cl3.code + '_XX_XX';
-  });
+  if (sel) {
+    sel.addEventListener('change', function() {
+      var cl3 = clientById(this.value);
+      var codeEl = document.getElementById('addProjCode');
+      if (cl3 && codeEl && !codeEl.value) codeEl.placeholder = cl3.code + '_XX_XX';
+      addProjUpdateSuggestions(this.value);
+    });
+    /* Trigger immediately for preselected client */
+    if (sel.value) addProjUpdateSuggestions(sel.value);
+  }
 
   var nameEl = document.getElementById('addProjName');
   if (nameEl) nameEl.focus();
+}
+
+function addProjUpdateSuggestions(clientId) {
+  var el = document.getElementById('addProjSuggest');
+  if (!el) return;
+
+  var client = clientById(clientId);
+  if (!client) { el.innerHTML = ''; return; }
+
+  var clientCode = client.code; /* e.g. "322" */
+
+  /* Parse all project codes for this client into campaign groups */
+  var campaigns = {}; /* campaignNum (int) → { max: int, str: string (original padding) } */
+  var allProjects = client.projects || [];
+  for (var i = 0; i < allProjects.length; i++) {
+    var code = (allProjects[i].code || '').toUpperCase();
+    /* Must start with client code */
+    if (code.indexOf(clientCode + '_') !== 0) continue;
+    var remainder = code.slice(clientCode.length + 1); /* e.g. "16_02" or "10_XXX" */
+    var parts = remainder.split('_');
+    if (parts.length < 2) continue;
+    var campStr = parts[0];  /* e.g. "16" */
+    var projStr = parts[1];  /* e.g. "02" */
+    var campNum = parseInt(campStr, 10);
+    var projNum = parseInt(projStr, 10);
+    if (isNaN(campNum) || isNaN(projNum)) continue;
+    if (!campaigns[campNum] || projNum > campaigns[campNum].max) {
+      campaigns[campNum] = { max: projNum, campStr: campStr };
+    }
+  }
+
+  var campNums = Object.keys(campaigns).map(Number).sort(function(a,b){return a-b;});
+
+  /* Build suggestions */
+  var suggestions = [];
+
+  /* Next project within each of the most recent campaigns (up to 4) */
+  var recentCamps = campNums.slice(-4).reverse(); /* newest first */
+  for (var c = 0; c < recentCamps.length; c++) {
+    var cn = recentCamps[c];
+    var info = campaigns[cn];
+    var nextProjNum = info.max + 1;
+    var campPad = info.campStr.length >= 2 ? info.campStr : ('0' + info.campStr).slice(-2);
+    var projPad = nextProjNum < 10 ? '0' + nextProjNum : String(nextProjNum);
+    suggestions.push({
+      code: clientCode + '_' + campPad + '_' + projPad,
+      desc: 'Campaign ' + cn + ' — project ' + nextProjNum
+    });
+  }
+
+  /* New campaign */
+  var maxCamp = campNums.length > 0 ? Math.max.apply(null, campNums) : 0;
+  var nextCamp = maxCamp + 1;
+  var nextCampPad = nextCamp < 10 ? '0' + nextCamp : String(nextCamp);
+  suggestions.push({
+    code: clientCode + '_' + nextCampPad + '_01',
+    desc: 'New campaign ' + nextCamp,
+    isNew: true
+  });
+
+  /* Render */
+  var dk = document.documentElement.classList.contains('dark');
+  var pillBase = 'display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;font-family:monospace;margin:0 4px 4px 0;border:1px solid;white-space:nowrap;transition:all .15s';
+  var h = '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:' + (dk?'#666':'#aaa') + ';margin-bottom:5px">&#128161; Suggested codes</div>';
+  h += '<div style="display:flex;flex-wrap:wrap">';
+  for (var s = 0; s < suggestions.length; s++) {
+    var sg = suggestions[s];
+    var isNew = sg.isNew;
+    var pillColor = isNew
+      ? (dk ? 'rgba(91,74,138,.35)' : 'rgba(91,74,138,.1)')
+      : (dk ? 'rgba(0,150,136,.2)'  : 'rgba(0,150,136,.08)');
+    var pillBorder = isNew
+      ? (dk ? 'rgba(91,74,138,.5)'  : 'rgba(91,74,138,.3)')
+      : (dk ? 'rgba(0,150,136,.4)'  : 'rgba(0,150,136,.35)');
+    var pillTextC = isNew ? (dk ? '#C5B8F0' : '#5B4A8A') : (dk ? '#4DB6AC' : '#00796B');
+    h += '<span style="' + pillBase + ';background:' + pillColor + ';border-color:' + pillBorder + ';color:' + pillTextC + '"'
+      + ' onclick="document.getElementById(\'addProjCode\').value=\'' + sg.code + '\';document.getElementById(\'addProjCode\').focus()"'
+      + ' title="' + sg.desc + '">'
+      + sg.code
+      + '<span style="font-family:sans-serif;font-size:9px;font-weight:400;opacity:.75">' + (isNew ? '★ new' : '#' + (s+1)) + '</span>'
+      + '</span>';
+  }
+  h += '</div>';
+  el.innerHTML = h;
 }
 
 function hideAddProjectForm() {
