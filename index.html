@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.84 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.85 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -4088,8 +4088,9 @@ async function oppConvertToActive(budgetId) {
     + '</div>'
     + '<div style="margin-bottom:20px">'
     + '<label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid-gray);margin-bottom:6px">Project Number <span style="color:#EF9A9A">*</span></label>'
-    + '<input id="oppConvertCode" placeholder="e.g. 322_16_02" value="' + defaultCode + '" style="' + iStyle + '">'
+    + '<input id="oppConvertCode" placeholder="e.g. 322_16_02" value="' + defaultCode + '" oninput="addProjAutoComplete(this)" style="' + iStyle + '">'
     + '<div style="font-size:11px;color:var(--mid-gray);margin-top:5px">Use the format <code style="background:var(--canvas);padding:1px 5px;border-radius:3px">client_seq_proj</code> (e.g. 322_16_02)</div>'
+    + '<div id="oppConvertSuggest" style="margin-top:8px"></div>'
     + '</div>'
     + '<div id="oppConvertError" style="display:none;color:#EF9A9A;font-size:12px;background:rgba(198,40,40,.15);padding:8px 12px;border-radius:6px;margin-bottom:14px"></div>'
     + '<div style="display:flex;gap:10px">'
@@ -4099,7 +4100,10 @@ async function oppConvertToActive(budgetId) {
     + '</div>';
 
   document.body.appendChild(overlay);
-  setTimeout(function() { var f = document.getElementById('oppConvertCode'); if (f) { f.focus(); f.select(); } }, 50);
+  var _convClients = (sparkCurrentData.budget.projects || {}).clients || {};
+  var _convClientId = _convClients.id || '';
+  if (_convClientId) addProjUpdateSuggestions(_convClientId, 'oppConvertSuggest', 'oppConvertCode');
+  setTimeout(function() { var f = document.getElementById('oppConvertCode'); if (f) { f.focus(); if (!f.value) f.select(); } }, 50);
 }
 
 async function oppConvertSubmit(budgetId, projId) {
@@ -6073,8 +6077,10 @@ function addProjAutoComplete(inputEl) {
   try { inputEl.setSelectionRange(selStart, newVal.length); } catch(e) {}
 }
 
-function addProjUpdateSuggestions(clientId) {
-  var el = document.getElementById('addProjSuggest');
+function addProjUpdateSuggestions(clientId, suggestElId, codeInputId) {
+  suggestElId = suggestElId || 'addProjSuggest';
+  codeInputId = codeInputId || 'addProjCode';
+  var el = document.getElementById(suggestElId);
   if (!el) return;
 
   var client = clientById(clientId);
@@ -6147,7 +6153,7 @@ function addProjUpdateSuggestions(clientId) {
       : (dk ? 'rgba(0,150,136,.4)'  : 'rgba(0,150,136,.35)');
     var pillTextC = isNew ? (dk ? '#C5B8F0' : '#5B4A8A') : (dk ? '#4DB6AC' : '#00796B');
     h += '<span style="' + pillBase + ';background:' + pillColor + ';border-color:' + pillBorder + ';color:' + pillTextC + '"'
-      + ' onclick="document.getElementById(\'addProjCode\').value=\'' + sg.code + '\';document.getElementById(\'addProjCode\').focus()"'
+      + ' onclick="document.getElementById(\'' + codeInputId + '\').value=\'' + sg.code + '\';document.getElementById(\'' + codeInputId + '\').focus()"'
       + ' title="' + sg.desc + '">'
       + sg.code
       + '<span style="font-family:sans-serif;font-size:9px;font-weight:400;opacity:.75">' + (isNew ? '★ new' : '#' + (s+1)) + '</span>'
@@ -6617,6 +6623,50 @@ function sparkOopItemSpent(item) {
   return sparkOopItemEffective(item);
 }
 
+/* Compute total OOP cost with per-section markup applied.
+   Falls back to the global oop_markup_percentage from agency_settings when
+   a section doesn't have an override in budget.oop_section_markups. */
+function sparkComputeOopWithSectionMarkup(data) {
+  var entries  = (data && data.oop) || [];
+  var settings = (data && data.settings) || [];
+  var budget   = (data && data.budget) || {};
+  var globalPct = sparkSettingVal(settings, 'markup', 'oop_markup_percentage', 20);
+  var sectionMarkups = budget.oop_section_markups || {};
+
+  /* Group active entries by section */
+  var bySec = {};
+  for (var i = 0; i < entries.length; i++) {
+    var e = entries[i];
+    if (e.is_active === false) continue;
+    var sid = e.section_id || (e.section ? e.section.id : '__none__');
+    if (!bySec[sid]) bySec[sid] = 0;
+    bySec[sid] += sparkOopItemEffective(e);
+  }
+
+  var total = 0;
+  for (var sid in bySec) {
+    var subtotal = bySec[sid];
+    var pct = (sectionMarkups[sid] != null) ? parseFloat(sectionMarkups[sid]) : globalPct;
+    total += subtotal * (1 + pct / 100);
+  }
+  return total;
+}
+
+async function sparkSetSectionMarkup(secId, pct) {
+  var budget = sparkCurrentData && sparkCurrentData.budget;
+  if (!budget) return;
+  var updated = {};
+  var existing = budget.oop_section_markups || {};
+  for (var k in existing) updated[k] = existing[k];
+  updated[secId] = parseFloat(pct) || 0;
+  budget.oop_section_markups = updated;
+  sparkShowSaving();
+  await sparkFetch('budgets?id=eq.' + budget.id, '', 'PATCH', { oop_section_markups: updated });
+  sparkHideSaving();
+  sparkRenderOopPanel();
+  sparkComputeSummary();
+}
+
 function sparkShowSaving() {
   var el = document.getElementById('sparkSavingIndicator');
   if (el) { el.className = 'spark-saving visible'; }
@@ -7060,8 +7110,7 @@ function sparkRenderSummary() {
   for (var i = 0; i < data.oop.length; i++) {
     if (data.oop[i].is_active !== false) totalOop += sparkOopItemEffective(data.oop[i]);
   }
-  var markupPct = sparkSettingVal(data.settings, 'markup', 'oop_markup_percentage', 20);
-  var totalOopWithMarkup = totalOop > 0 ? totalOop * (1 + markupPct / 100) : 0;
+  var totalOopWithMarkup = sparkComputeOopWithSectionMarkup(data);
   var totalAmount = totalLaborCost + totalFlCost + totalOopWithMarkup;
   var budget = data.budget;
   var rawPrice = budget.client_price || 0;
@@ -7073,7 +7122,7 @@ function sparkRenderSummary() {
   var h = '';
   h += '<div class="spark-summary-item"><div class="ss-label">Labor</div><div class="ss-value">' + sparkFmt(totalLaborCost) + '</div><div class="ss-sub">' + totalLaborHrs.toFixed(1) + ' hrs</div></div>';
   h += '<div class="spark-summary-item"><div class="ss-label">Freelancers</div><div class="ss-value" style="color:#5B4A8A">' + sparkFmt(totalFlCost) + '</div><div class="ss-sub">' + totalFlHrs.toFixed(1) + ' hrs</div></div>';
-  h += '<div class="spark-summary-item"><div class="ss-label">OOP</div><div class="ss-value">' + sparkFmt(totalOopWithMarkup) + '</div><div class="ss-sub">incl. ' + markupPct + '% markup</div></div>';
+  h += '<div class="spark-summary-item"><div class="ss-label">OOP</div><div class="ss-value">' + sparkFmt(totalOopWithMarkup) + '</div><div class="ss-sub">incl. markup</div></div>';
   h += '<div class="spark-summary-item"><div class="ss-label">Total Amount</div><div class="ss-value">' + sparkFmt(totalAmount) + '</div></div>';
   h += '<div class="spark-summary-item"><div class="ss-label">Client Price</div><div class="ss-value" style="color:var(--sand)">' + sparkFmt(clientPrice) + '</div>' + (discAmt > 0 ? '<div class="ss-sub">after ' + sparkFmt(discAmt) + ' disc.</div>' : '') + '</div>';
   h += '<div class="spark-summary-item"><div class="ss-label">Profit</div><div class="ss-value" style="color:' + (profit >= 0 ? '#81C784' : 'var(--ember)') + '">' + sparkFmt(profit) + '</div><div class="ss-sub">' + margin.toFixed(1) + '% margin</div></div>';
@@ -7871,6 +7920,7 @@ function sparkRenderOopContent() {
   var entries = data.oop;
   var settings = data.settings;
   var markupPct = sparkSettingVal(settings, 'markup', 'oop_markup_percentage', 20);
+  var sectionMarkups = (data.budget && data.budget.oop_section_markups) || {};
 
   if (!sections.length) { el.innerHTML = '<p style="color:var(--mid-gray)">No OOP sections found.</p>'; return; }
 
@@ -7909,6 +7959,7 @@ function sparkRenderOopContent() {
     var sec = sections[s];
     var secId = sec.id;
     var slug = sec.slug || '';
+    var secMarkupPct = (sectionMarkups[secId] != null) ? parseFloat(sectionMarkups[secId]) : markupPct;
     var secExpanded = sparkOopSectionExpanded[secId] !== false; /* default open */
     var secCats = catsBySec[secId] || [];
     var gc = sparkOopGridClass(slug);
@@ -7934,7 +7985,7 @@ function sparkRenderOopContent() {
       }
     }
     /* Apply markup on the effective subtotal — suppressed entirely when section is $0 */
-    var markupAmt = sectionSubtotal > 0 ? sectionSubtotal * (markupPct / 100) : 0;
+    var markupAmt = sectionSubtotal > 0 ? sectionSubtotal * (secMarkupPct / 100) : 0;
     var sectionTotal = sectionSubtotal + markupAmt;
     grandSubtotal += sectionSubtotal;
     grandTotal += sectionTotal;
@@ -8124,7 +8175,7 @@ function sparkRenderOopContent() {
 
       /* Section subtotal / markup / total */
       h += '<div class="spark-oop-subtotal"><span>' + deptName + ' Subtotal</span><span style="font-weight:600">' + sparkFmt(sectionSubtotal) + '</span></div>';
-      h += '<div class="spark-oop-markup-row"><span>Markup <input type="number" value="' + markupPct + '" min="0" max="100" step="1" disabled> %</span><span>' + sparkFmt(markupAmt) + '</span></div>';
+      h += '<div class="spark-oop-markup-row"><span>Markup <input type="number" value="' + secMarkupPct + '" min="0" max="200" step="0.5" onclick="event.stopPropagation()" onchange="sparkSetSectionMarkup(\'' + secId + '\',this.value)" title="Edit markup % for this section" style="width:44px;padding:2px 4px;border-radius:4px;border:1px solid rgba(128,128,128,.3);background:rgba(128,128,128,.08);color:inherit;font-size:11px;text-align:center;cursor:text"> %</span><span>' + sparkFmt(markupAmt) + '</span></div>';
       h += '<div class="spark-oop-dept-total"><span>' + deptName + ' Total</span><span>' + sparkFmt(sectionTotal) + '</span></div>';
 
       h += '</div>'; /* end dept-body */
@@ -8137,7 +8188,7 @@ function sparkRenderOopContent() {
   var grandMarkup = grandTotal - grandSubtotal;
   h += '<div style="margin-top:16px">';
   h += '<div class="spark-oop-subtotal" style="border-top:1px solid rgba(255,255,255,.08);padding-top:10px"><span>Out-of-Pocket Subtotal</span><span style="font-weight:600">' + sparkFmt(grandSubtotal) + '</span></div>';
-  h += '<div class="spark-oop-markup-row"><span>Markup ' + markupPct + '%</span><span>' + sparkFmt(grandMarkup) + '</span></div>';
+  h += '<div class="spark-oop-markup-row"><span>Markup (blended)</span><span>' + sparkFmt(grandMarkup) + '</span></div>';
   h += '<div class="spark-oop-grand-total" style="margin-top:8px"><span>Out-of-Pocket Total</span><span>' + sparkFmt(grandTotal) + '</span></div>';
   h += '</div>';
 
@@ -8231,8 +8282,7 @@ function sparkRenderBudgetContent(embedded) {
   for (var i = 0; i < data.oop.length; i++) {
     if (data.oop[i].is_active !== false) totalOop += sparkOopItemEffective(data.oop[i]);
   }
-  var markupPct = sparkSettingVal(settings, 'markup', 'oop_markup_percentage', 20);
-  var totalOopWithMarkup = totalOop > 0 ? totalOop * (1 + markupPct / 100) : 0;
+  var totalOopWithMarkup = sparkComputeOopWithSectionMarkup(data);
   var totalAmount = totalLaborCost + totalFreelancerCost + totalOopWithMarkup;
   var profit = clientPrice - totalAmount;
   var profitMargin = clientPrice > 0 ? (profit / clientPrice * 100) : 0;
