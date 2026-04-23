@@ -701,7 +701,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.79 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.80 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 23, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -983,6 +983,12 @@ var FURNACE_TEAM_MEMBERS = [];
 var SLACK_BOT_TOKEN = ''; /* loaded from agency_settings on init */
 var SUPA_POS = [];        /* purchase orders sent to clients, loaded from pos table */
 var HOURS_LAST_UPDATED = ''; /* human-readable date string, stored in agency_settings */
+var OPP_PHASES = [
+  {val: 'inquiry',      label: 'Phase 1 \u2014 Inquiry',        color: '#78909C'},
+  {val: 'discovery',    label: 'Phase 2 \u2014 Discovery',      color: '#5B9BD5'},
+  {val: 'negotiations', label: 'Phase 3.1 \u2014 Negotiations', color: '#F57F17'},
+  {val: 'sow_sent',     label: 'Phase 3.2 \u2014 SOW Sent',     color: '#81C784'}
+];
 var YTD_COLLAPSED = {};   /* client codes that are collapsed in YTD view */
 
 /* ── NATIVE ALLOCATION DATA ── */
@@ -3518,7 +3524,7 @@ async function renderOpportunities() {
   /* Fetch opportunities + labor entries in parallel */
   var opps = await sparkFetch('budgets',
     'status=in.(opportunity,lost)&visibility=eq.visible'
-    + '&select=id,name,status,client_price,has_discount,is_small_project,created_at,updated_at,project_id,projects(id,name,project_code,clients(id,name,client_number))'
+    + '&select=id,name,status,client_price,has_discount,is_small_project,opportunity_phase,created_at,updated_at,project_id,projects(id,name,project_code,clients(id,name,client_number))'
     + '&order=updated_at.desc');
 
   var activeOpps = (opps || []).filter(function(o) { return o.status === 'opportunity'; });
@@ -3614,7 +3620,6 @@ async function renderOpportunities() {
       c += '<button onclick="event.stopPropagation();oppDelete(\'' + o.id + '\',\'' + (proj.id || '') + '\')" style="padding:4px 10px;border-radius:5px;border:1px solid rgba(198,40,40,.4);background:transparent;color:#EF9A9A;cursor:pointer;font-size:10px;font-weight:700" title="Permanently delete">&#128465;</button>';
       c += '</div>';
     } else {
-      c += '<div style="margin-top:6px"><span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;background:rgba(91,74,138,.2);color:#A99FD8;text-transform:uppercase;letter-spacing:.05em">In Progress</span></div>';
       c += '<button onclick="event.stopPropagation();oppDelete(\'' + o.id + '\',\'' + (proj.id || '') + '\')" style="margin-top:8px;padding:4px 10px;border-radius:5px;border:1px solid rgba(0,0,0,.12);background:transparent;color:var(--mid-gray);cursor:pointer;font-size:10px;font-weight:700" title="Permanently delete">&#128465; Delete</button>';
     }
     c += '</div>';
@@ -3622,12 +3627,33 @@ async function renderOpportunities() {
     return c;
   }
 
-  if (active.length) {
-    h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--mid-gray);margin-bottom:10px">Active Opportunities (' + active.length + ')</div>';
-    for (var i = 0; i < active.length; i++) h += oppCard(active[i]);
+  /* Render active opportunities grouped by phase */
+  var anyActiveRendered = false;
+  for (var pg = 0; pg < OPP_PHASES.length; pg++) {
+    var phaseGroup = OPP_PHASES[pg];
+    var phaseOpps = active.filter(function(o) { return o.opportunity_phase === phaseGroup.val; });
+    if (!phaseOpps.length) continue;
+    anyActiveRendered = true;
+    h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px' + (pg > 0 || !anyActiveRendered ? ';margin-top:24px' : '') + '">';
+    h += '<div style="width:8px;height:8px;border-radius:50%;background:' + phaseGroup.color + ';flex-shrink:0"></div>';
+    h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:' + phaseGroup.color + '">' + phaseGroup.label + ' (' + phaseOpps.length + ')</div>';
+    h += '</div>';
+    for (var i = 0; i < phaseOpps.length; i++) h += oppCard(phaseOpps[i]);
+  }
+  /* Unphased group — opportunities with no phase set */
+  var unphased = active.filter(function(o) { return !o.opportunity_phase; });
+  if (unphased.length) {
+    h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px' + (anyActiveRendered ? ';margin-top:24px' : '') + '">';
+    h += '<div style="width:8px;height:8px;border-radius:50%;background:var(--mid-gray);flex-shrink:0"></div>';
+    h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--mid-gray)">No Phase Set (' + unphased.length + ')</div>';
+    h += '</div>';
+    for (var i = 0; i < unphased.length; i++) h += oppCard(unphased[i]);
+  }
+  if (!active.length) {
+    h += '<div style="color:var(--mid-gray);font-size:13px;padding:12px 0">No active opportunities.</div>';
   }
   if (lost.length) {
-    h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--mid-gray);margin:24px 0 10px">Not Closed (' + lost.length + ')</div>';
+    h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--mid-gray);margin:32px 0 10px">Not Closed (' + lost.length + ')</div>';
     for (var i = 0; i < lost.length; i++) h += oppCard(lost[i]);
   }
 
@@ -3664,11 +3690,28 @@ function oppFilterList(query) {
     active.sort(function(a,b){return sk(a)<sk(b)?-1:sk(a)>sk(b)?1:0;});
     lost.sort(function(a,b){return sk(a)<sk(b)?-1:sk(a)>sk(b)?1:0;});
     if (active.length) {
-      h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--mid-gray);margin-bottom:10px">Active Opportunities (' + active.length + ')</div>';
-      for (var i = 0; i < active.length; i++) h += el._oppCardFn(active[i]);
+      /* Render phase groups in search results too */
+      var _anyFilt = false;
+      for (var _pg = 0; _pg < OPP_PHASES.length; _pg++) {
+        var _pg2 = OPP_PHASES[_pg];
+        var _pf = active.filter(function(o) { return o.opportunity_phase === _pg2.val; });
+        if (!_pf.length) continue;
+        h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px' + (_anyFilt ? ';margin-top:24px' : '') + '">';
+        h += '<div style="width:8px;height:8px;border-radius:50%;background:' + _pg2.color + ';flex-shrink:0"></div>';
+        h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:' + _pg2.color + '">' + _pg2.label + ' (' + _pf.length + ')</div></div>';
+        for (var _i2 = 0; _i2 < _pf.length; _i2++) h += el._oppCardFn(_pf[_i2]);
+        _anyFilt = true;
+      }
+      var _uf = active.filter(function(o) { return !o.opportunity_phase; });
+      if (_uf.length) {
+        h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px' + (_anyFilt ? ';margin-top:24px' : '') + '">';
+        h += '<div style="width:8px;height:8px;border-radius:50%;background:var(--mid-gray);flex-shrink:0"></div>';
+        h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--mid-gray)">No Phase Set (' + _uf.length + ')</div></div>';
+        for (var _i3 = 0; _i3 < _uf.length; _i3++) h += el._oppCardFn(_uf[_i3]);
+      }
     }
     if (lost.length) {
-      h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--mid-gray);margin:24px 0 10px">Not Closed (' + lost.length + ')</div>';
+      h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--mid-gray);margin:32px 0 10px">Not Closed (' + lost.length + ')</div>';
       for (var i = 0; i < lost.length; i++) h += el._oppCardFn(lost[i]);
     }
   }
@@ -3732,10 +3775,25 @@ function oppRenderActionBar() {
   var clientLabel = [client.client_number, client.name].filter(Boolean).join(' · ');
   var projName = proj.name || budget.name || 'Untitled';
 
+  var curPhase = budget.opportunity_phase || '';
+  var phaseInfo = null;
+  for (var _pi = 0; _pi < OPP_PHASES.length; _pi++) { if (OPP_PHASES[_pi].val === curPhase) { phaseInfo = OPP_PHASES[_pi]; break; } }
+
   var h = '<div style="background:linear-gradient(135deg,#3D2E6B 0%,#5B4A8A 100%);border-radius:12px;padding:16px 20px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">';
   h += '<div>';
   if (clientLabel) h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.5);margin-bottom:5px">Opportunity Estimate &nbsp;·&nbsp; ' + clientLabel + '</div>';
+  h += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
   h += '<div style="font-size:18px;font-weight:700;color:#fff">' + projName + '</div>';
+  /* Phase dropdown */
+  h += '<select onchange="oppSetPhase(\'' + budget.id + '\',this.value)" style="padding:4px 10px;border-radius:20px;border:none;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;'
+    + (phaseInfo ? 'background:' + phaseInfo.color + ';color:#fff' : 'background:rgba(255,255,255,.15);color:rgba(255,255,255,.7)') + '">';
+  h += '<option value="">— Set Phase —</option>';
+  for (var _phi = 0; _phi < OPP_PHASES.length; _phi++) {
+    var _ph = OPP_PHASES[_phi];
+    h += '<option value="' + _ph.val + '"' + (curPhase === _ph.val ? ' selected' : '') + '>' + _ph.label + '</option>';
+  }
+  h += '</select>';
+  h += '</div>';
   h += '</div>';
   var projId = (budget.projects && budget.projects.id) ? budget.projects.id : '';
   h += '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">';
@@ -3752,6 +3810,16 @@ function oppRenderActionBar() {
   h += '</div>';
   h += '</div>';
   el.innerHTML = h;
+}
+
+async function oppSetPhase(budgetId, phase) {
+  /* PATCH budget with new phase value (empty string → null to keep DB clean) */
+  await sparkFetch('budgets?id=eq.' + budgetId, '', 'PATCH', { opportunity_phase: phase || null });
+  if (sparkCurrentData && sparkCurrentData.budget && sparkCurrentData.budget.id === budgetId) {
+    sparkCurrentData.budget.opportunity_phase = phase || null;
+    /* Re-render the action bar so the dropdown color updates */
+    oppRenderActionBar();
+  }
 }
 
 async function oppCreateNew() {
