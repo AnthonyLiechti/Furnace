@@ -710,7 +710,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.89 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 24, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.90 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 24, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -10302,7 +10302,7 @@ function getProjectList() {
   return list;
 }
 
-async function saveAllocationToSupabase(person, project, date, hours, weekOf) {
+async function saveAllocationToSupabase(person, project, date, hours, weekOf, existingSupaId) {
   if (!sparkAuth.connected) return true; /* not connected — local-only mode, not an error */
   if (!sparkConfig) {
     if (window.furnaceAPI && window.furnaceAPI.sparkReadConfig) {
@@ -10315,24 +10315,51 @@ async function saveAllocationToSupabase(person, project, date, hours, weekOf) {
     }
   }
   if (!sparkConfig) return false;
-  var token = sparkConfig.supabaseAnonKey;
+  var base = sparkConfig.supabaseUrl + '/rest/v1/allocations';
   var headers = {
     'apikey': sparkConfig.supabaseAnonKey,
-    'Authorization': 'Bearer ' + token,
+    'Authorization': 'Bearer ' + sparkConfig.supabaseAnonKey,
     'Content-Type': 'application/json'
   };
+  /* Detect real Supabase UUIDs vs temporary local IDs (local IDs start with 'a_') */
+  var hasRealId = existingSupaId && !String(existingSupaId).startsWith('a_');
   try {
     var resp;
-    if (hours > 0) {
-      headers['Prefer'] = 'return=minimal,resolution=merge-duplicates';
-      resp = await fetch(sparkConfig.supabaseUrl + '/rest/v1/allocations', {
+    if (hours <= 0) {
+      /* Delete — by real ID if we have it, otherwise by person+project+date */
+      var delUrl = hasRealId
+        ? base + '?id=eq.' + existingSupaId
+        : base + '?person=eq.' + encodeURIComponent(person) + '&project=eq.' + encodeURIComponent(project) + '&date=eq.' + date;
+      resp = await fetch(delUrl, { method: 'DELETE', headers: headers });
+    } else if (hasRealId) {
+      /* Update existing row by its UUID — guaranteed to hit the right row */
+      headers['Prefer'] = 'return=minimal';
+      resp = await fetch(base + '?id=eq.' + existingSupaId, {
+        method: 'PATCH', headers: headers,
+        body: JSON.stringify({ hours_per_day: hours, total_hours: hours, week_of: weekOf })
+      });
+    } else {
+      /* New row — insert and get back the real ID so future edits use PATCH */
+      headers['Prefer'] = 'return=representation,resolution=merge-duplicates';
+      resp = await fetch(base, {
         method: 'POST', headers: headers,
         body: JSON.stringify({ person: person, project: project, date: date, hours_per_day: hours, week_of: weekOf, total_hours: hours })
       });
-    } else {
-      resp = await fetch(sparkConfig.supabaseUrl + '/rest/v1/allocations?person=eq.' + encodeURIComponent(person) + '&project=eq.' + encodeURIComponent(project) + '&date=eq.' + date, {
-        method: 'DELETE', headers: headers
-      });
+      if (resp.ok) {
+        try {
+          var inserted = await resp.json();
+          if (inserted && inserted[0] && inserted[0].id) {
+            /* Backfill the real ID into our local allocations array */
+            var _allocs = ALLOCATIONS.allocations;
+            for (var _i = 0; _i < _allocs.length; _i++) {
+              if (_allocs[_i].person === person && _allocs[_i].project === project && _allocs[_i].date === date) {
+                _allocs[_i].id = inserted[0].id; break;
+              }
+            }
+          }
+        } catch(e) {}
+        return true;
+      }
     }
     if (!resp.ok) {
       var errText = await resp.text();
@@ -10389,6 +10416,7 @@ async function allocSetCell(project, person, dateISO, hours) {
     if (allocs[i].project === project && allocs[i].person === person && allocs[i].date === dateISO) { idx = i; break; }
   }
   var weekOf = getMondayOfWeek(dateISO);
+  var existingSupaId = idx >= 0 ? allocs[idx].id : null;
   if (hours <= 0) {
     if (idx >= 0) allocs.splice(idx, 1);
   } else if (idx >= 0) {
@@ -10408,7 +10436,7 @@ async function allocSetCell(project, person, dateISO, hours) {
   /* Save to Supabase — await so we know if it actually landed */
   var statusEl = document.getElementById('allocSaveStatus');
   if (statusEl) { statusEl.textContent = 'Saving…'; statusEl.style.color = ''; }
-  var ok = await saveAllocationToSupabase(person, project, dateISO, hours, weekOf);
+  var ok = await saveAllocationToSupabase(person, project, dateISO, hours, weekOf, existingSupaId);
   if (statusEl) {
     if (ok === false) {
       statusEl.textContent = '⚠ Not saved to cloud — check connection';
