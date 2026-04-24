@@ -710,7 +710,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.88 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 24, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.89 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 24, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -10462,7 +10462,7 @@ function getProjectPeople(project, mondayISO) {
 
 /* ── RENDER: MANAGE ALLOCATIONS ── */
 function renderAllocations() {
-  if (!allocWeekOf) allocWeekOf = getNextMonday();
+  if (!allocWeekOf) allocWeekOf = getCurrentMonday();
 
   var mc = document.getElementById('mainContent');
   var h = '';
@@ -10733,7 +10733,7 @@ function oopSaveModal(projName, projCode, dateISO, editId) {
 
 /* ── RENDER: OOP PLANNER ── */
 function renderOopPlanner() {
-  if (!allocWeekOf) allocWeekOf = getNextMonday();
+  if (!allocWeekOf) allocWeekOf = getCurrentMonday();
 
   var mc = document.getElementById('mainContent');
   var h = mc.innerHTML; /* keep the tab bar already written */
