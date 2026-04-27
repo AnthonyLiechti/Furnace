@@ -710,7 +710,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.91 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 27, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.92 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 27, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -10255,6 +10255,17 @@ function shiftWeek(mondayISO, delta) {
   d.setDate(d.getDate() + delta * 7);
   return d.toISOString().slice(0, 10);
 }
+function shiftOopMonth(mondayISO, delta) {
+  var d = new Date(mondayISO + 'T00:00:00');
+  var m = d.getMonth() + delta, y = d.getFullYear();
+  if (m > 11) { m -= 12; y++; }
+  if (m < 0)  { m += 12; y--; }
+  var first = new Date(y, m, 1);
+  var dow = first.getDay();
+  // Advance to the first Monday of that month
+  first.setDate(first.getDate() + (dow === 1 ? 0 : dow === 0 ? 1 : 8 - dow));
+  return first.toISOString().slice(0, 10);
+}
 function getMondayOfWeek(dateISO) {
   var d = new Date(dateISO + 'T00:00:00'); var day = d.getDay();
   d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
@@ -10790,10 +10801,15 @@ function renderOopPlanner() {
     h += '<button onclick="oopDayOffset=(oopDayOffset||0)+1;renderOopGrid()">&#9654;</button>';
     h += '<button onclick="oopDayOffset=0;renderOopGrid()" style="font-size:11px">Today</button>';
   } else {
-    var navStep = oopViewMode === 'month' ? 4 : 1;
-    h += '<button onclick="allocWeekOf=shiftWeek(allocWeekOf,-' + navStep + ');renderOopGrid()">&#9664;</button>';
-    h += '<div class="at-label" id="oopWeekLabel"></div>';
-    h += '<button onclick="allocWeekOf=shiftWeek(allocWeekOf,' + navStep + ');renderOopGrid()">&#9654;</button>';
+    if (oopViewMode === 'month') {
+      h += '<button onclick="allocWeekOf=shiftOopMonth(allocWeekOf,-1);renderOopGrid()">&#9664;</button>';
+      h += '<div class="at-label" id="oopWeekLabel"></div>';
+      h += '<button onclick="allocWeekOf=shiftOopMonth(allocWeekOf,1);renderOopGrid()">&#9654;</button>';
+    } else {
+      h += '<button onclick="allocWeekOf=shiftWeek(allocWeekOf,-1);renderOopGrid()">&#9664;</button>';
+      h += '<div class="at-label" id="oopWeekLabel"></div>';
+      h += '<button onclick="allocWeekOf=shiftWeek(allocWeekOf,1);renderOopGrid()">&#9654;</button>';
+    }
     h += '<button onclick="allocWeekOf=getCurrentMonday();renderOopGrid()" style="font-size:11px">Today</button>';
   }
   h += '<span id="oopSaveStatus" class="alloc-save-status"></span>';
