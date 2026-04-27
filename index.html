@@ -710,7 +710,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.90 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 24, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.91 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 27, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -10707,7 +10707,10 @@ function oopShowModal(projName, projCode, dateISO, editId) {
   var h = '<div class="oop-modal-overlay" id="oopModalOverlay" onclick="if(event.target===this)this.remove()">';
   h += '<div class="oop-modal">';
   h += '<h3>' + (isEdit ? 'Edit' : 'Add') + ' OOP Payment</h3>';
-  h += '<div style="font-size:11px;color:var(--mid-gray);margin-bottom:8px">' + projName + ' &middot; ' + dateISO + '</div>';
+  h += '<div style="font-size:11px;color:var(--mid-gray);margin-bottom:14px">' + projName + '</div>';
+
+  h += '<label>Date</label>';
+  h += '<input type="date" id="oopModalDate" value="' + dateISO + '" style="margin-bottom:10px">';
 
   h += '<label>Line Item Name</label>';
   h += '<input type="text" id="oopModalName" value="' + (isEdit ? (editEntry.lineItemName || '').replace(/"/g, '&quot;') : '') + '" placeholder="e.g. Captions, Stock Footage...">';
@@ -10744,14 +10747,16 @@ function oopSaveModal(projName, projCode, dateISO, editId) {
   var name = (document.getElementById('oopModalName').value || '').trim();
   var amount = parseFloat(document.getElementById('oopModalAmount').value) || 0;
   var notes = (document.getElementById('oopModalNotes').value || '').trim();
+  var dateEl = document.getElementById('oopModalDate');
+  var newDate = (dateEl && dateEl.value) ? dateEl.value : dateISO;
   if (!name || amount <= 0) { alert('Please enter a name and amount.'); return; }
 
   if (editId) {
     var paidEl = document.getElementById('oopModalPaid');
     var paid = paidEl ? paidEl.checked : false;
-    oopUpdateEntry(editId, { lineItemName: name, amount: amount, notes: notes, paid: paid });
+    oopUpdateEntry(editId, { lineItemName: name, amount: amount, notes: notes, paid: paid, date: newDate, weekOf: getMondayOfWeek(newDate) });
   } else {
-    oopAddEntry(projName, projCode, name, amount, dateISO, notes);
+    oopAddEntry(projName, projCode, name, amount, newDate, notes);
   }
 
   var overlay = document.getElementById('oopModalOverlay');
