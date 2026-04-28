@@ -713,7 +713,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.114 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.115 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -9417,32 +9417,70 @@ function renderRMFlGrid(entries, freelancers) {
   }
   h += '</tr>';
 
-  h += '</tbody></table>';
-
-  /* OOP cross-calendar: show scheduled OOP payments for this project */
-  if (projCode && OOP_SCHEDULE && OOP_SCHEDULE.entries && OOP_SCHEDULE.entries.length) {
-    var _colStart = cols[0].key;
-    var _colEndD = new Date(cols[cols.length - 1].key + 'T00:00:00'); _colEndD.setDate(_colEndD.getDate() + 6);
-    var _colEnd = _colEndD.toISOString().slice(0, 10);
-    var _oopVis = OOP_SCHEDULE.entries.filter(function(oe) {
-      return (oe.projectCode === projCode) && oe.date >= _colStart && oe.date <= _colEnd;
-    });
-    if (_oopVis.length) {
-      h += '<div style="margin-top:14px;padding:10px 12px;background:rgba(255,152,0,.05);border-radius:8px;border-left:3px solid rgba(255,152,0,.4)">';
-      h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#F57F17;margin-bottom:6px">OOP Payments in View</div>';
-      for (var oi = 0; oi < _oopVis.length; oi++) {
-        var oe = _oopVis[oi];
-        h += '<div style="display:flex;align-items:center;gap:8px;font-size:11px;padding:3px 0;border-bottom:1px solid rgba(255,152,0,.1)">';
-        h += '<span style="color:var(--mid-gray);white-space:nowrap">' + oe.date + '</span>';
-        h += '<span style="flex:1">' + (oe.lineItemName || oe.description || 'OOP item') + '</span>';
-        h += '<span style="font-weight:600;color:#F57F17">$' + Math.round(oe.amount || 0).toLocaleString() + '</span>';
-        if (oe.paid) h += '<span style="font-size:9px;color:#2E7D32;font-weight:700">\u2713 PAID</span>';
-        h += '</div>';
-      }
-      h += '</div>';
+  /* ── OOP rows integrated into grid ── */
+  var _oopByKey = {};
+  if (projCode && OOP_SCHEDULE && OOP_SCHEDULE.entries) {
+    for (var _oi = 0; _oi < OOP_SCHEDULE.entries.length; _oi++) {
+      var _oe = OOP_SCHEDULE.entries[_oi];
+      if (_oe.projectCode !== projCode) continue;
+      var _oopKey = rmFlViewMode === 'month' ? getMondayOfWeek(_oe.date) : _oe.date;
+      if (!_oopByKey[_oopKey]) _oopByKey[_oopKey] = [];
+      _oopByKey[_oopKey].push(_oe);
     }
   }
+  var _hasOopInRange = false;
+  for (var _oci = 0; _oci < cols.length; _oci++) { if (_oopByKey[cols[_oci].key]) { _hasOopInRange = true; break; } }
 
+  /* Pre-compute per-day OOP totals for grand total row */
+  var _dayOopTotals = {};
+  for (var _oci = 0; _oci < cols.length; _oci++) {
+    var _cts = _oopByKey[cols[_oci].key] || [], _t = 0;
+    for (var _di = 0; _di < _cts.length; _di++) _t += _cts[_di].amount || 0;
+    _dayOopTotals[cols[_oci].key] = _t;
+  }
+
+  if (_hasOopInRange) {
+    /* OOP section label */
+    h += '<tr style="background:rgba(255,152,0,.04)"><td style="padding:4px 10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#F57F17;border-top:2px solid rgba(255,152,0,.2)">OOP Payments</td>';
+    for (var _oci = 0; _oci < cols.length; _oci++) h += '<td style="border-top:2px solid rgba(255,152,0,.2);border-left:1px solid rgba(91,74,138,.04)"></td>';
+    h += '</tr>';
+    /* OOP data row */
+    h += '<tr style="background:rgba(255,152,0,.02)"><td style="padding:8px 10px;font-size:11px;font-weight:600;color:#F57F17;border-bottom:1px solid rgba(255,152,0,.1);vertical-align:top">Expenses</td>';
+    for (var _oci = 0; _oci < cols.length; _oci++) {
+      var col = cols[_oci];
+      var _coEnts = _oopByKey[col.key] || [], _cot = 0, _coAllPaid = true, _coAnyPaid = false;
+      for (var _di = 0; _di < _coEnts.length; _di++) { _cot += _coEnts[_di].amount || 0; if (_coEnts[_di].paid) _coAnyPaid = true; else _coAllPaid = false; }
+      if (!_coEnts.length) _coAllPaid = false;
+      var _coBg = col.isToday ? 'rgba(255,152,0,.07)' : (col.isWeekend ? (isDark ? 'rgba(255,255,255,.01)' : 'rgba(0,0,0,.018)') : 'transparent');
+      h += '<td style="padding:4px 3px;text-align:center;border-bottom:1px solid rgba(255,152,0,.1);border-left:1px solid rgba(91,74,138,.04);background:' + _coBg + ';opacity:' + (col.faded ? '.5' : '1') + '">';
+      if (_coEnts.length) {
+        h += '<div style="background:' + (_coAllPaid ? 'rgba(129,199,132,.15)' : 'rgba(255,152,0,.1)') + ';border-radius:4px;padding:4px 2px">';
+        h += '<div style="font-size:11px;font-weight:700;color:' + (_coAllPaid ? '#2E7D32' : '#F57F17') + '">' + sparkFmt(_cot) + '</div>';
+        if (_coEnts.length > 1) h += '<div style="font-size:9px;color:var(--mid-gray)">' + _coEnts.length + ' items</div>';
+        h += '<div style="font-size:9px;color:' + (_coAllPaid ? '#2E7D32' : '#F57F17') + '">' + (_coAllPaid ? '&#10003; Paid' : (_coAnyPaid ? '&#189; Part.' : 'Unpaid')) + '</div></div>';
+      } else {
+        h += '<div style="color:rgba(255,152,0,.15);font-size:14px">&middot;</div>';
+      }
+      h += '</td>';
+    }
+    h += '</tr>';
+  }
+
+  /* Grand Total Outgoing row (FL cost + OOP amount per day) */
+  h += '<tr style="background:rgba(0,0,0,.055);font-weight:700">';
+  h += '<td style="padding:7px 10px;font-size:10px;color:var(--abyss);text-transform:uppercase;letter-spacing:.05em;border-top:2px solid rgba(91,74,138,.12)">Total Out</td>';
+  for (var _oci = 0; _oci < cols.length; _oci++) {
+    var col = cols[_oci], _dayFlG = 0;
+    for (var _fgi = 0; _fgi < freelancers.length; _fgi++) {
+      var _ceG = lookup[freelancers[_fgi].tmId + '|' + col.key] || [];
+      for (var _egi = 0; _egi < _ceG.length; _egi++) _dayFlG += (_ceG[_egi].hours || 0) * (freelancers[_fgi].rate || 0);
+    }
+    var _dayG = _dayFlG + (_dayOopTotals[col.key] || 0);
+    h += '<td style="padding:7px 3px;text-align:center;font-size:11px;font-weight:700;color:' + (_dayG > 0 ? 'var(--abyss)' : 'var(--mid-gray)') + ';border-top:2px solid rgba(91,74,138,.12);border-left:1px solid rgba(91,74,138,.07)">' + (_dayG > 0 ? sparkFmt(_dayG) : '') + '</td>';
+  }
+  h += '</tr>';
+
+  h += '</tbody></table>';
   h += '</div>';
   return h;
 }
@@ -9809,11 +9847,14 @@ function renderRMOopContent() {
   var dmSurf2  = isDark ? 'var(--dm-surface2)': '#fff';
   var dmRowAlt = isDark ? 'rgba(255,255,255,.03)' : 'rgba(0,0,0,.02)';
 
+  /* Cash flow calendar always shown at top */
+  var calHtml = renderRMOopCalendar(RM_OOP.projCode);
+
   /* Filter to active entries with cost > 0 */
   var active = entries.filter(function(e) { return e.is_active !== false; });
 
   if (!active.length) {
-    return '<div style="padding:40px 24px;text-align:center;color:var(--mid-gray)">'
+    return calHtml + '<div style="padding:40px 24px;text-align:center;color:var(--mid-gray)">'
       + '<div style="font-size:14px;font-weight:600;margin-bottom:6px">No active OOP entries</div>'
       + '<div style="font-size:12px">This project has no out-of-pocket line items set up yet.</div>'
       + '</div>';
@@ -9830,7 +9871,7 @@ function renderRMOopContent() {
   }
 
   var grandTotal = 0, grandPaid = 0;
-  var h = '';
+  var h = '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mid-gray);margin-bottom:10px">&#128203; OOP Line Items</div>';
 
   for (var s = 0; s < secOrder.length; s++) {
     var sid = secOrder[s];
@@ -9895,12 +9936,167 @@ function renderRMOopContent() {
   }
   h += '</div>';
 
-  return h;
+  return calHtml + h;
 }
 
 function renderRMOopUpdate() {
   var el = document.getElementById('rmOopContent');
   if (el) el.innerHTML = renderRMOopContent();
+}
+
+/* ── Combined OOP + FL Cash Flow Calendar (shown in both FL and OOP tabs) ── */
+function renderRMOopCalendar(projCode) {
+  if (!rmFlWeekOf) rmFlWeekOf = getCurrentMonday();
+  var cols = rmFlGetColumns();
+  var colStart = cols[0].key;
+  var colEnd = cols[cols.length - 1].key;
+  var isDark = document.documentElement.classList.contains('dark');
+
+  /* OOP schedule entries for this project in the visible range */
+  var oopEnts = [];
+  var oopByDay = {}; /* col.key → [schedule entries] */
+  if (projCode && OOP_SCHEDULE && OOP_SCHEDULE.entries) {
+    for (var _oi = 0; _oi < OOP_SCHEDULE.entries.length; _oi++) {
+      var _oe = OOP_SCHEDULE.entries[_oi];
+      if (_oe.projectCode !== projCode) continue;
+      var _oKey = rmFlViewMode === 'month' ? getMondayOfWeek(_oe.date) : _oe.date;
+      if (_oKey < colStart || _oKey > colEnd) continue;
+      if (!oopByDay[_oKey]) oopByDay[_oKey] = [];
+      oopByDay[_oKey].push(_oe);
+      oopEnts.push(_oe);
+    }
+  }
+
+  /* FL entries for this project in range, grouped by person → day */
+  var flByPerson = {}, flPersonOrder = [];
+  var sb = SUPA_BUDGETS && SUPA_BUDGETS[projCode];
+  if (sb && sb._flEntries) {
+    for (var _fi = 0; _fi < sb._flEntries.length; _fi++) {
+      var _fe = sb._flEntries[_fi];
+      if (!flIsDateLabel(_fe.week_label || '')) continue;
+      var _fKey = rmFlViewMode === 'month' ? getMondayOfWeek(_fe.week_label) : _fe.week_label;
+      if (_fKey < colStart || _fKey > colEnd) continue;
+      var _fn = _fe._name || (_fe.team_member && _fe.team_member.name) || 'Freelancer';
+      var _fr = _fe.rate || 0;
+      if (!flByPerson[_fn]) { flByPerson[_fn] = { rate: _fr, days: {} }; flPersonOrder.push(_fn); }
+      if (!flByPerson[_fn].days[_fKey]) flByPerson[_fn].days[_fKey] = { hrs: 0, paid: false };
+      flByPerson[_fn].days[_fKey].hrs += _fe.hours || 0;
+      if (_fe.paid) flByPerson[_fn].days[_fKey].paid = true;
+    }
+  }
+
+  var hasAny = oopEnts.length > 0 || flPersonOrder.length > 0;
+
+  /* Toolbar */
+  var h = '<div style="background:rgba(91,74,138,.04);border-radius:10px;padding:16px;margin-bottom:18px;border:1px solid rgba(91,74,138,.1)">';
+  h += '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mid-gray);margin-bottom:10px">&#128197; Cash Flow Calendar</div>';
+  h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">';
+  if (rmFlViewMode === 'month') {
+    h += '<button onclick="rmFlWeekOf=shiftOopMonth(rmFlWeekOf,-1);renderRMOopUpdate();renderRMFlUpdate()" style="padding:4px 8px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer">&#9664;</button>';
+    var _rmd = new Date(rmFlWeekOf + 'T00:00:00');
+    h += '<span style="font-size:13px;font-weight:600;min-width:120px;text-align:center">' + _rmd.toLocaleDateString('en-US',{month:'long',year:'numeric'}) + '</span>';
+    h += '<button onclick="rmFlWeekOf=shiftOopMonth(rmFlWeekOf,1);renderRMOopUpdate();renderRMFlUpdate()" style="padding:4px 8px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer">&#9654;</button>';
+  } else {
+    h += '<button onclick="rmFlWeekOf=shiftWeek(rmFlWeekOf,-1);renderRMOopUpdate();renderRMFlUpdate()" style="padding:4px 8px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer">&#9664;</button>';
+    var _rwd = new Date(rmFlWeekOf + 'T00:00:00'), _rwe = new Date(_rwd); _rwe.setDate(_rwe.getDate() + 6);
+    h += '<span style="font-size:13px;font-weight:600;min-width:180px;text-align:center">' + _FL_MON[_rwd.getMonth()] + ' ' + _rwd.getDate() + '\u2013' + _FL_MON[_rwe.getMonth()] + ' ' + _rwe.getDate() + ', ' + _rwe.getFullYear() + '</span>';
+    h += '<button onclick="rmFlWeekOf=shiftWeek(rmFlWeekOf,1);renderRMOopUpdate();renderRMFlUpdate()" style="padding:4px 8px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer">&#9654;</button>';
+  }
+  h += '<button onclick="rmFlWeekOf=getCurrentMonday();renderRMOopUpdate();renderRMFlUpdate()" style="font-size:11px;padding:3px 8px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer">Today</button>';
+  h += '<div style="margin-left:auto;display:flex;gap:3px">';
+  var _rvms2 = ['week', 'month'];
+  for (var _rvi2 = 0; _rvi2 < _rvms2.length; _rvi2++) {
+    var _rvm2 = _rvms2[_rvi2], _risV2 = rmFlViewMode === _rvm2;
+    h += '<button onclick="rmFlViewMode=\'' + _rvm2 + '\';renderRMOopUpdate();renderRMFlUpdate()" style="padding:4px 10px;border-radius:5px;font-size:11px;border:1px solid rgba(91,74,138,.3);background:' + (_risV2 ? '#5B4A8A' : 'transparent') + ';color:' + (_risV2 ? '#fff' : '#5B4A8A') + ';cursor:pointer;font-weight:' + (_risV2 ? '700' : '400') + '">' + _rvm2.charAt(0).toUpperCase() + _rvm2.slice(1) + '</button>';
+  }
+  h += '</div></div>';
+
+  if (!hasAny) {
+    h += '<div style="padding:16px 0;text-align:center;color:var(--mid-gray);font-size:12px">No FL or OOP payments scheduled for this period.</div>';
+    h += '</div>';
+    return h;
+  }
+
+  /* Grid */
+  h += '<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:11px">';
+  /* Header */
+  h += '<thead><tr><th style="padding:5px 8px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mid-gray);min-width:130px;border-bottom:2px solid rgba(91,74,138,.15)">Type</th>';
+  for (var _ci2 = 0; _ci2 < cols.length; _ci2++) {
+    var _col2 = cols[_ci2];
+    var _thBg2 = _col2.isToday ? 'rgba(91,74,138,.15)' : (_col2.isWeekend ? (isDark ? 'rgba(255,255,255,.02)' : 'rgba(0,0,0,.025)') : 'transparent');
+    var _thClr2 = _col2.isToday ? '#5B4A8A' : (_col2.faded ? 'var(--mid-gray)' : (_col2.isWeekend ? 'var(--mid-gray)' : 'var(--abyss)'));
+    h += '<th style="padding:5px 3px;text-align:center;font-size:10px;font-weight:600;color:' + _thClr2 + ';background:' + _thBg2 + ';border-bottom:2px solid rgba(91,74,138,.15);white-space:nowrap;min-width:58px;opacity:' + (_col2.faded ? '.5' : '1') + '">' + _col2.label + '</th>';
+  }
+  h += '</tr></thead><tbody>';
+
+  /* FL rows */
+  if (flPersonOrder.length > 0) {
+    h += '<tr style="background:rgba(91,74,138,.04)"><td colspan="' + (cols.length + 1) + '" style="padding:4px 8px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#5B4A8A">Freelancers</td></tr>';
+    for (var _fpi = 0; _fpi < flPersonOrder.length; _fpi++) {
+      var _fpn = flPersonOrder[_fpi], _fpd = flByPerson[_fpn];
+      h += '<tr><td style="padding:6px 8px;font-size:11px;font-weight:600;color:#5B4A8A;border-bottom:1px solid rgba(91,74,138,.07)">' + _fpn + '<div style="font-size:9px;color:var(--mid-gray);font-weight:400">' + sparkFmt(_fpd.rate) + '/hr</div></td>';
+      for (var _ci2 = 0; _ci2 < cols.length; _ci2++) {
+        var _col2 = cols[_ci2], _fd = _fpd.days[_col2.key];
+        var _fCellBg = _col2.isToday ? 'rgba(91,74,138,.06)' : (_col2.isWeekend ? (isDark ? 'rgba(255,255,255,.01)' : 'rgba(0,0,0,.018)') : 'transparent');
+        /* Month view: click drills into week */
+        var _fClick = rmFlViewMode === 'month' ? 'rmFlWeekOf=\'' + _col2.key + '\';rmFlViewMode=\'week\';renderRMOopUpdate();renderRMFlUpdate()' : '';
+        h += '<td style="padding:3px 2px;text-align:center;border-bottom:1px solid rgba(91,74,138,.07);border-left:1px solid rgba(91,74,138,.04);background:' + _fCellBg + ';opacity:' + (_col2.faded ? '.5' : '1') + (_fClick ? ';cursor:pointer' : '') + '"' + (_fClick ? ' onclick="' + _fClick + '"' : '') + '>';
+        if (_fd && _fd.hrs > 0) {
+          h += '<div style="background:' + (_fd.paid ? 'rgba(129,199,132,.15)' : 'rgba(91,74,138,.1)') + ';border-radius:4px;padding:3px 2px">';
+          h += '<div style="font-size:11px;font-weight:700;color:' + (_fd.paid ? '#2E7D32' : '#5B4A8A') + '">' + _fd.hrs + 'h</div>';
+          h += '<div style="font-size:9px;color:' + (_fd.paid ? '#2E7D32' : '#9575CD') + '">' + sparkFmt(_fd.hrs * _fpd.rate) + '</div></div>';
+        } else {
+          h += '<div style="color:rgba(91,74,138,.15);font-size:14px">&middot;</div>';
+        }
+        h += '</td>';
+      }
+      h += '</tr>';
+    }
+  }
+
+  /* OOP rows */
+  if (oopEnts.length > 0) {
+    h += '<tr style="background:rgba(255,152,0,.04)"><td colspan="' + (cols.length + 1) + '" style="padding:4px 8px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#F57F17;border-top:1px solid rgba(255,152,0,.2)">OOP Payments</td></tr>';
+    h += '<tr><td style="padding:6px 8px;font-size:11px;font-weight:600;color:#F57F17;border-bottom:1px solid rgba(255,152,0,.1)">Expenses</td>';
+    for (var _ci2 = 0; _ci2 < cols.length; _ci2++) {
+      var _col2 = cols[_ci2], _coEnts = oopByDay[_col2.key] || [];
+      var _cot2 = 0, _coAll2 = true, _coAny2 = false;
+      for (var _di2 = 0; _di2 < _coEnts.length; _di2++) { _cot2 += _coEnts[_di2].amount || 0; if (_coEnts[_di2].paid) _coAny2 = true; else _coAll2 = false; }
+      if (!_coEnts.length) _coAll2 = false;
+      var _oBg = _col2.isToday ? 'rgba(255,152,0,.07)' : (_col2.isWeekend ? (isDark ? 'rgba(255,255,255,.01)' : 'rgba(0,0,0,.018)') : 'transparent');
+      var _oClick = rmFlViewMode === 'month' ? 'rmFlWeekOf=\'' + _col2.key + '\';rmFlViewMode=\'week\';renderRMOopUpdate();renderRMFlUpdate()' : '';
+      h += '<td style="padding:3px 2px;text-align:center;border-bottom:1px solid rgba(255,152,0,.1);border-left:1px solid rgba(255,152,0,.05);background:' + _oBg + ';opacity:' + (_col2.faded ? '.5' : '1') + (_oClick ? ';cursor:pointer' : '') + '"' + (_oClick ? ' onclick="' + _oClick + '"' : '') + '>';
+      if (_coEnts.length) {
+        h += '<div style="background:' + (_coAll2 ? 'rgba(129,199,132,.15)' : 'rgba(255,152,0,.1)') + ';border-radius:4px;padding:3px 2px">';
+        h += '<div style="font-size:11px;font-weight:700;color:' + (_coAll2 ? '#2E7D32' : '#F57F17') + '">' + sparkFmt(_cot2) + '</div>';
+        if (_coEnts.length > 1) h += '<div style="font-size:9px;color:var(--mid-gray)">' + _coEnts.length + ' items</div>';
+        h += '<div style="font-size:9px;color:' + (_coAll2 ? '#2E7D32' : '#F57F17') + '">' + (_coAll2 ? '&#10003; Paid' : (_coAny2 ? '&#189; Part.' : 'Unpaid')) + '</div></div>';
+      } else {
+        h += '<div style="color:rgba(255,152,0,.15);font-size:14px">&middot;</div>';
+      }
+      h += '</td>';
+    }
+    h += '</tr>';
+  }
+
+  /* Grand Total Outgoing row */
+  h += '<tr style="background:rgba(0,0,0,.055);font-weight:700"><td style="padding:7px 8px;font-size:10px;color:var(--abyss);text-transform:uppercase;letter-spacing:.05em;border-top:2px solid rgba(91,74,138,.12)">Total Out</td>';
+  for (var _ci2 = 0; _ci2 < cols.length; _ci2++) {
+    var _col2 = cols[_ci2], _dayFlG2 = 0;
+    for (var _fpi = 0; _fpi < flPersonOrder.length; _fpi++) {
+      var _fpd2 = flByPerson[flPersonOrder[_fpi]];
+      var _fd2 = _fpd2.days[_col2.key];
+      if (_fd2) _dayFlG2 += _fd2.hrs * _fpd2.rate;
+    }
+    var _coEnts2 = oopByDay[_col2.key] || [], _cot3 = 0;
+    for (var _di2 = 0; _di2 < _coEnts2.length; _di2++) _cot3 += _coEnts2[_di2].amount || 0;
+    var _dayG2 = _dayFlG2 + _cot3;
+    h += '<td style="padding:7px 3px;text-align:center;font-size:11px;font-weight:700;color:' + (_dayG2 > 0 ? 'var(--abyss)' : 'var(--mid-gray)') + ';border-top:2px solid rgba(91,74,138,.12);border-left:1px solid rgba(91,74,138,.07)">' + (_dayG2 > 0 ? sparkFmt(_dayG2) : '') + '</td>';
+  }
+  h += '</tr>';
+
+  h += '</tbody></table></div></div>';
+  return h;
 }
 
 async function rmOopLoadProject(projCode) {
