@@ -713,7 +713,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.112 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.113 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -7354,8 +7354,9 @@ function sparkRenderLaborContent() {
       ? sparkCurrentData.budget.projects.project_code
       : PROJ_CODE_MAP[sparkCurrentData.budget.project_id];
   }
-  var _actByPersonPhase = {}; /* name -> phase_key -> hours */
-  var _actPrimaryNames  = {}; /* full person_name -> total hours (for outside-budget detection) */
+  var _actByPersonPhase  = {}; /* name -> phase_key -> hours */
+  var _actPrimaryNames   = {}; /* full person_name -> total hours (for outside-budget detection) */
+  var _actFirstNameCount = {}; /* first name -> count of distinct full names (guards against Jeff B / Jeff C collision) */
   if (_projCode && SUPA_ACTUALS_ALL) {
     for (var _ai = 0; _ai < SUPA_ACTUALS_ALL.length; _ai++) {
       var _ae = SUPA_ACTUALS_ALL[_ai];
@@ -7368,12 +7369,21 @@ function sparkRenderLaborContent() {
       if (!_actByPersonPhase[_pn]) _actByPersonPhase[_pn] = { _total: 0 };
       _actByPersonPhase[_pn][_pk2] = (_actByPersonPhase[_pn][_pk2] || 0) + (_ae.hours || 0);
       _actByPersonPhase[_pn]._total = (_actByPersonPhase[_pn]._total || 0) + (_ae.hours || 0);
-      /* Also index by first name only as a fallback (handles truncated 7pace display names) */
+      /* Also index by first name only as a fallback (handles truncated 7pace display names)
+         Only safe when first name is unique among actuals on this project — tracked via _firstNameCount */
       var _firstName = _pn.split(' ')[0];
       if (_firstName && _firstName !== _pn) {
-        if (!_actByPersonPhase[_firstName]) _actByPersonPhase[_firstName] = { _total: 0 };
-        _actByPersonPhase[_firstName][_pk2] = (_actByPersonPhase[_firstName][_pk2] || 0) + (_ae.hours || 0);
-        _actByPersonPhase[_firstName]._total = (_actByPersonPhase[_firstName]._total || 0) + (_ae.hours || 0);
+        if (!_actFirstNameCount) _actFirstNameCount = {};
+        _actFirstNameCount[_firstName] = (_actFirstNameCount[_firstName] || 0) + 1;
+        /* Only build first-name index if this first name belongs to exactly one full name */
+        if (_actFirstNameCount[_firstName] === 1) {
+          if (!_actByPersonPhase[_firstName]) _actByPersonPhase[_firstName] = { _total: 0 };
+          _actByPersonPhase[_firstName][_pk2] = (_actByPersonPhase[_firstName][_pk2] || 0) + (_ae.hours || 0);
+          _actByPersonPhase[_firstName]._total = (_actByPersonPhase[_firstName]._total || 0) + (_ae.hours || 0);
+        } else {
+          /* Ambiguous first name — remove the first-name key so it can't cause false matches */
+          delete _actByPersonPhase[_firstName];
+        }
       }
     }
   }
