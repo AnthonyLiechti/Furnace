@@ -712,7 +712,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.97 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.98 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -770,8 +770,8 @@ let displayUnit = 'hours';
 let openClients = {};
 let showFinalized = false;
 let showFlaggedAll = false; /* Needs Attention: false=active only, true=all projects */
-var flaggedDismissedOop = new Set(JSON.parse(localStorage.getItem('flaggedDismissedOop') || '[]'));
-var flaggedDismissedFl  = new Set(JSON.parse(localStorage.getItem('flaggedDismissedFl')  || '[]'));
+var flaggedCollapsedOop = new Set(); /* collapsed project IDs in OOP Unscheduled section */
+var flaggedCollapsedFl  = new Set(); /* collapsed project IDs in FL Unplanned section */
 let showInactiveClients = false;
 let sidebarSearch = '';
 
@@ -2741,16 +2741,15 @@ function renderProject(projectId) {
   }
 }
 
-/* ── NEEDS ATTENTION: dismiss helpers ── */
-function flagDismiss(type, projId) {
-  if (type === 'oop') { flaggedDismissedOop.add(projId); localStorage.setItem('flaggedDismissedOop', JSON.stringify([...flaggedDismissedOop])); }
-  else                { flaggedDismissedFl.add(projId);  localStorage.setItem('flaggedDismissedFl',  JSON.stringify([...flaggedDismissedFl]));  }
+/* ── NEEDS ATTENTION: helpers ── */
+function flagToggleCollapse(type, projId) {
+  var s = (type === 'oop') ? flaggedCollapsedOop : flaggedCollapsedFl;
+  if (s.has(projId)) s.delete(projId); else s.add(projId);
   renderFlagged();
 }
-function flagRestore(type) {
-  if (type === 'oop') { flaggedDismissedOop.clear(); localStorage.setItem('flaggedDismissedOop', '[]'); }
-  else                { flaggedDismissedFl.clear();  localStorage.setItem('flaggedDismissedFl',  '[]'); }
-  renderFlagged();
+function naScrollTo(id) {
+  var el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 /* ── RENDER: FLAGGED ── */
@@ -2855,14 +2854,15 @@ function renderFlagged() {
 
   /* Summary counts at top */
   var totalIssues = noBudget.length + budgetNoLabor.length + needsOop.length + possiblyDone.length + _oopUnschedCount + _flUnpaidCount;
+  var _naCardStyle = 'border-radius:8px;padding:14px;text-align:center;cursor:pointer;transition:opacity .15s';
   h += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:12px;margin-bottom:24px">';
-  h += '<div class="oop-checklist-card" style="border-radius:8px;padding:14px;text-align:center;border-left:4px solid #E53935"><div style="font-size:28px;font-weight:700;color:#E53935">' + noBudget.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">No Budget</div></div>';
-  h += '<div class="oop-checklist-card" style="border-radius:8px;padding:14px;text-align:center;border-left:4px solid var(--honey)"><div style="font-size:28px;font-weight:700;color:var(--honey)">' + budgetNoLabor.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Needs Labor</div></div>';
-  h += '<div class="oop-checklist-card" style="border-radius:8px;padding:14px;text-align:center;border-left:4px solid #FF9800"><div style="font-size:28px;font-weight:700;color:#FF9800">' + needsOop.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Needs OOP</div></div>';
-  h += '<div class="oop-checklist-card" style="border-radius:8px;padding:14px;text-align:center;border-left:4px solid #CE93D8"><div style="font-size:28px;font-weight:700;color:#CE93D8">' + _oopUnschedCount + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">OOP Unscheduled</div></div>';
-  h += '<div class="oop-checklist-card" style="border-radius:8px;padding:14px;text-align:center;border-left:4px solid #5B4A8A"><div style="font-size:28px;font-weight:700;color:#5B4A8A">' + _flUnpaidCount + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">FL Unplanned</div></div>';
-  h += '<div class="oop-checklist-card" style="border-radius:8px;padding:14px;text-align:center;border-left:4px solid #1565C0"><div style="font-size:28px;font-weight:700;color:#1565C0">' + possiblyDone.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Possibly Done</div></div>';
-  h += '<div class="oop-checklist-card" style="border-radius:8px;padding:14px;text-align:center;border-left:4px solid #81C784"><div style="font-size:28px;font-weight:700;color:#81C784">' + fullyLoaded.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Fully Loaded</div></div>';
+  h += '<div class="oop-checklist-card" style="' + _naCardStyle + ';border-left:4px solid #E53935" onclick="naScrollTo(\'na-no-budget\')" title="Jump to No Budget"><div style="font-size:28px;font-weight:700;color:#E53935">' + noBudget.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">No Budget</div></div>';
+  h += '<div class="oop-checklist-card" style="' + _naCardStyle + ';border-left:4px solid var(--honey)" onclick="naScrollTo(\'na-needs-labor\')" title="Jump to Needs Labor"><div style="font-size:28px;font-weight:700;color:var(--honey)">' + budgetNoLabor.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Needs Labor</div></div>';
+  h += '<div class="oop-checklist-card" style="' + _naCardStyle + ';border-left:4px solid #FF9800" onclick="naScrollTo(\'na-needs-oop\')" title="Jump to Needs OOP"><div style="font-size:28px;font-weight:700;color:#FF9800">' + needsOop.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Needs OOP</div></div>';
+  h += '<div class="oop-checklist-card" style="' + _naCardStyle + ';border-left:4px solid #CE93D8" onclick="naScrollTo(\'na-oop-unsched\')" title="Jump to OOP Unscheduled"><div style="font-size:28px;font-weight:700;color:#CE93D8">' + _oopUnschedCount + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">OOP Unscheduled</div></div>';
+  h += '<div class="oop-checklist-card" style="' + _naCardStyle + ';border-left:4px solid #5B4A8A" onclick="naScrollTo(\'na-fl-unplanned\')" title="Jump to FL Unplanned"><div style="font-size:28px;font-weight:700;color:#5B4A8A">' + _flUnpaidCount + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">FL Unplanned</div></div>';
+  h += '<div class="oop-checklist-card" style="' + _naCardStyle + ';border-left:4px solid #1565C0" onclick="naScrollTo(\'na-possibly-done\')" title="Jump to Possibly Done"><div style="font-size:28px;font-weight:700;color:#1565C0">' + possiblyDone.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Possibly Done</div></div>';
+  h += '<div class="oop-checklist-card" style="' + _naCardStyle + ';border-left:4px solid #81C784"><div style="font-size:28px;font-weight:700;color:#81C784">' + fullyLoaded.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Fully Loaded</div></div>';
   h += '</div>';
 
   /* Helper to render a flagged card */
@@ -2883,7 +2883,7 @@ function renderFlagged() {
 
   /* ── 1. NO BUDGET ── */
   if (noBudget.length) {
-    h += '<div class="section-title" style="color:#E53935">No Furnace Budget (' + noBudget.length + ')</div>';
+    h += '<div id="na-no-budget" class="section-title" style="color:#E53935">No Furnace Budget (' + noBudget.length + ')</div>';
     h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">These projects have no budget data in Furnace. Click into any project to create a new budget, or port data from an existing Google Sheets snapshot.</p>';
     for (var i = 0; i < noBudget.length; i++) {
       var p = noBudget[i];
@@ -2895,7 +2895,7 @@ function renderFlagged() {
 
   /* ── 2. BUDGET ONLY — NO LABOR ── */
   if (budgetNoLabor.length) {
-    h += '<div class="section-title" style="color:var(--honey)">Has Budget — Needs Labor Hours (' + budgetNoLabor.length + ')</div>';
+    h += '<div id="na-needs-labor" class="section-title" style="color:var(--honey)">Has Budget — Needs Labor Hours (' + budgetNoLabor.length + ')</div>';
     h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">These projects have a budget amount set but no labor hour estimates per person. Open the Budget Snapshot and add team members to the Labor Fee section.</p>';
     for (var i = 0; i < budgetNoLabor.length; i++) {
       h += flagCard(budgetNoLabor[i], 'var(--honey)', 'Budget set but no labor hours entered', 'Open Budget Snapshot \u2192 Labor Fee section to add team hour estimates');
@@ -2904,7 +2904,7 @@ function renderFlagged() {
 
   /* ── 3. NEEDS OOP DATA ── */
   if (needsOop.length) {
-    h += '<div class="section-title" style="color:#FF9800">Needs OOP Data (' + needsOop.length + ')</div>';
+    h += '<div id="na-needs-oop" class="section-title" style="color:#FF9800">Needs OOP Data (' + needsOop.length + ')</div>';
     h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">These projects have labor estimates but no out-of-pocket costs entered. Toggle "No OOP" on the project if this project has no out-of-pocket expenses, or fill in the OOP sections.</p>';
     for (var i = 0; i < needsOop.length; i++) {
       var p = needsOop[i];
@@ -2951,43 +2951,40 @@ function renderFlagged() {
   }
 
   if (unscheduledOop.length) {
-    var _oopVisible = unscheduledOop.filter(function(uo) { return !flaggedDismissedOop.has(uo.project.id); });
-    var _oopDismissedCt = unscheduledOop.length - _oopVisible.length;
-    h += '<div class="section-title" style="color:#CE93D8">OOP Unscheduled (' + totalUnschedItems + ' item' + (totalUnschedItems !== 1 ? 's' : '') + ' across ' + unscheduledOop.length + ' project' + (unscheduledOop.length !== 1 ? 's' : '') + ')</div>';
-    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">Line items with costs not yet added to the payment schedule. Total outstanding: <strong style="color:#CE93D8">$' + Math.round(totalUnschedAmount).toLocaleString() + '</strong>. Schedule payments in Manage Resources \u2192 Out-of-Pocket, or mark as paid on the project page.</p>';
+    h += '<div id="na-oop-unsched" class="section-title" style="color:#CE93D8">OOP Unscheduled (' + totalUnschedItems + ' item' + (totalUnschedItems !== 1 ? 's' : '') + ' across ' + unscheduledOop.length + ' project' + (unscheduledOop.length !== 1 ? 's' : '') + ')</div>';
+    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">Line items with costs not yet added to the payment schedule. Total outstanding: <strong style="color:#CE93D8">$' + Math.round(totalUnschedAmount).toLocaleString() + '</strong>. Click a project to open it in the OOP resource planner.</p>';
 
-    for (var ui = 0; ui < _oopVisible.length; ui++) {
-      var uo = _oopVisible[ui];
+    for (var ui = 0; ui < unscheduledOop.length; ui++) {
+      var uo = unscheduledOop[ui];
       var projTotal = 0;
       for (var j = 0; j < uo.items.length; j++) projTotal += uo.items[j].total;
+      var _oopCollapsed = flaggedCollapsedOop.has(uo.project.id);
+      var _oopArrow = _oopCollapsed ? '&#9654;' : '&#9660;';
 
       h += '<div class="oop-checklist-card" style="border-radius:8px;border-left:4px solid #CE93D8;padding:14px 16px;margin-bottom:12px">';
-      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
-      h += '<div style="font-weight:600;cursor:pointer" onclick="navigate(\'project:' + uo.project.id + '\')">' + uo.project.code + ' — ' + uo.project.name + '</div>';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center' + (_oopCollapsed ? '' : ';margin-bottom:8px') + '">';
+      h += '<div style="font-weight:600;cursor:pointer" onclick="goToRMOop(\'' + uo.project.code + '\')">' + uo.project.code + ' \u2014 ' + uo.project.name + '</div>';
       h += '<div style="display:flex;align-items:center;gap:10px">';
-      h += '<div style="font-weight:700;color:#CE93D8">' + uo.items.length + ' item' + (uo.items.length > 1 ? 's' : '') + ' · $' + Math.round(projTotal).toLocaleString() + '</div>';
-      h += '<button onclick="event.stopPropagation();flagDismiss(\'oop\',\'' + uo.project.id + '\')" title="Dismiss this project" style="background:none;border:1px solid rgba(128,128,128,.3);border-radius:4px;padding:2px 7px;font-size:12px;color:var(--mid-gray);cursor:pointer;line-height:1.4">&times; Close</button>';
+      h += '<div style="font-weight:700;color:#CE93D8">' + uo.items.length + ' item' + (uo.items.length > 1 ? 's' : '') + ' \u00b7 $' + Math.round(projTotal).toLocaleString() + '</div>';
+      h += '<button onclick="event.stopPropagation();flagToggleCollapse(\'oop\',\'' + uo.project.id + '\')" title="' + (_oopCollapsed ? 'Expand' : 'Collapse') + '" style="background:none;border:none;font-size:14px;color:var(--mid-gray);cursor:pointer;padding:2px 4px;line-height:1">' + _oopArrow + '</button>';
       h += '</div></div>';
 
-      /* Individual line items */
-      h += '<div style="display:grid;grid-template-columns:1fr 100px 100px;gap:4px;font-size:12px;color:var(--mid-gray);padding:4px 0;border-bottom:1px solid rgba(128,128,128,.2)">';
-      h += '<div style="font-weight:600">Line Item</div><div style="text-align:right;font-weight:600">Amount</div><div style="text-align:right;font-weight:600">Status</div>';
-      h += '</div>';
-
-      for (var j = 0; j < uo.items.length; j++) {
-        var li = uo.items[j];
-        var itemName = li.item.line_item_name || 'Unnamed';
-        h += '<div style="display:grid;grid-template-columns:1fr 100px 100px;gap:4px;font-size:12px;padding:4px 0;border-bottom:1px solid rgba(128,128,128,.1);cursor:pointer" onclick="navigate(\'project:' + uo.project.id + '\')">';
-        h += '<div>' + itemName + '</div>';
-        h += '<div style="text-align:right;font-weight:600">$' + Math.round(li.total).toLocaleString() + '</div>';
-        h += '<div style="text-align:right"><span style="background:rgba(245,127,23,.15);color:#FFB74D;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600">Unscheduled</span></div>';
+      if (!_oopCollapsed) {
+        /* Individual line items */
+        h += '<div style="display:grid;grid-template-columns:1fr 100px 100px;gap:4px;font-size:12px;color:var(--mid-gray);padding:4px 0;border-bottom:1px solid rgba(128,128,128,.2)">';
+        h += '<div style="font-weight:600">Line Item</div><div style="text-align:right;font-weight:600">Amount</div><div style="text-align:right;font-weight:600">Status</div>';
         h += '</div>';
+        for (var j = 0; j < uo.items.length; j++) {
+          var li = uo.items[j];
+          var itemName = li.item.line_item_name || 'Unnamed';
+          h += '<div style="display:grid;grid-template-columns:1fr 100px 100px;gap:4px;font-size:12px;padding:4px 0;border-bottom:1px solid rgba(128,128,128,.1);cursor:pointer" onclick="goToRMOop(\'' + uo.project.code + '\')">';
+          h += '<div>' + itemName + '</div>';
+          h += '<div style="text-align:right;font-weight:600">$' + Math.round(li.total).toLocaleString() + '</div>';
+          h += '<div style="text-align:right"><span style="background:rgba(245,127,23,.15);color:#FFB74D;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600">Unscheduled</span></div>';
+          h += '</div>';
+        }
       }
-
       h += '</div>';
-    }
-    if (_oopDismissedCt > 0) {
-      h += '<div style="font-size:12px;color:var(--mid-gray);padding:6px 4px">' + _oopDismissedCt + ' project' + (_oopDismissedCt !== 1 ? 's' : '') + ' closed &mdash; <a href="#" onclick="flagRestore(\'oop\');return false" style="color:#CE93D8">restore</a></div>';
     }
   }
 
@@ -3017,15 +3014,15 @@ function renderFlagged() {
   }
 
   if (unpaidFlProjects.length) {
-    var _flVisible = unpaidFlProjects.filter(function(ufp) { return !flaggedDismissedFl.has(ufp.project.id); });
-    var _flDismissedCt = unpaidFlProjects.length - _flVisible.length;
-    h += '<div class="section-title" style="color:#9575CD">Freelancers Unplanned (' + totalFlUnpaidItems + ' entr' + (totalFlUnpaidItems !== 1 ? 'ies' : 'y') + ' across ' + unpaidFlProjects.length + ' project' + (unpaidFlProjects.length !== 1 ? 's' : '') + ')</div>';
-    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">Freelancer entries without a scheduled calendar week. Total unplanned: <strong style="color:#9575CD">$' + Math.round(totalFlUnpaidCost).toLocaleString() + '</strong>. Assign weeks in the Budget Snapshot \u2192 Freelancers planner.</p>';
+    h += '<div id="na-fl-unplanned" class="section-title" style="color:#9575CD">Freelancers Unplanned (' + totalFlUnpaidItems + ' entr' + (totalFlUnpaidItems !== 1 ? 'ies' : 'y') + ' across ' + unpaidFlProjects.length + ' project' + (unpaidFlProjects.length !== 1 ? 's' : '') + ')</div>';
+    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">Freelancer entries without a scheduled calendar week. Total unplanned: <strong style="color:#9575CD">$' + Math.round(totalFlUnpaidCost).toLocaleString() + '</strong>. Click a project to assign weeks in the Freelancer resource planner.</p>';
 
-    for (var ui = 0; ui < _flVisible.length; ui++) {
-      var ufp = _flVisible[ui];
+    for (var ui = 0; ui < unpaidFlProjects.length; ui++) {
+      var ufp = unpaidFlProjects[ui];
       var projFlTotal = 0;
       for (var j = 0; j < ufp.weeks.length; j++) projFlTotal += ufp.weeks[j].cost;
+      var _flCollapsed = flaggedCollapsedFl.has(ufp.project.id);
+      var _flArrow = _flCollapsed ? '&#9654;' : '&#9660;';
 
       /* Group weeks by freelancer name */
       var byFreelancer = {};
@@ -3039,42 +3036,41 @@ function renderFlagged() {
       }
 
       h += '<div class="oop-checklist-card" style="border-radius:8px;border-left:4px solid #9575CD;padding:14px 16px;margin-bottom:12px">';
-      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
-      h += '<div style="font-weight:600;cursor:pointer" onclick="navigate(\'project:' + ufp.project.id + '\')">' + ufp.project.code + ' — ' + ufp.project.name + '</div>';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center' + (_flCollapsed ? '' : ';margin-bottom:8px') + '">';
+      h += '<div style="font-weight:600;cursor:pointer" onclick="goToRMFreelancers(\'' + ufp.project.code + '\')">' + ufp.project.code + ' \u2014 ' + ufp.project.name + '</div>';
       h += '<div style="display:flex;align-items:center;gap:10px">';
-      h += '<div style="font-weight:700;color:#9575CD">' + ufp.weeks.length + ' entr' + (ufp.weeks.length !== 1 ? 'ies' : 'y') + ' · $' + Math.round(projFlTotal).toLocaleString() + '</div>';
-      h += '<button onclick="event.stopPropagation();flagDismiss(\'fl\',\'' + ufp.project.id + '\')" title="Dismiss this project" style="background:none;border:1px solid rgba(128,128,128,.3);border-radius:4px;padding:2px 7px;font-size:12px;color:var(--mid-gray);cursor:pointer;line-height:1.4">&times; Close</button>';
+      h += '<div style="font-weight:700;color:#9575CD">' + ufp.weeks.length + ' entr' + (ufp.weeks.length !== 1 ? 'ies' : 'y') + ' \u00b7 $' + Math.round(projFlTotal).toLocaleString() + '</div>';
+      h += '<button onclick="event.stopPropagation();flagToggleCollapse(\'fl\',\'' + ufp.project.id + '\')" title="' + (_flCollapsed ? 'Expand' : 'Collapse') + '" style="background:none;border:none;font-size:14px;color:var(--mid-gray);cursor:pointer;padding:2px 4px;line-height:1">' + _flArrow + '</button>';
       h += '</div></div>';
 
-      var flNames = Object.keys(byFreelancer);
-      for (var fi = 0; fi < flNames.length; fi++) {
-        var flName = flNames[fi];
-        var flData = byFreelancer[flName];
-        h += '<div style="font-size:12px;font-weight:600;color:#9575CD;padding:6px 0 2px;cursor:pointer" onclick="navigate(\'project:' + ufp.project.id + '\')">' + flName + ' — $' + Math.round(flData.cost).toLocaleString() + ' unplanned</div>';
-        h += '<div style="display:grid;grid-template-columns:1fr 60px 80px 100px;gap:4px;font-size:11px;color:var(--mid-gray);padding:3px 0;border-bottom:1px solid rgba(128,128,128,.2)">';
-        h += '<div style="font-weight:600">Label</div><div style="text-align:right;font-weight:600">Hrs</div><div style="text-align:right;font-weight:600">Rate</div><div style="text-align:right;font-weight:600">Cost</div>';
-        h += '</div>';
-        for (var wi = 0; wi < flData.weeks.length; wi++) {
-          var fw = flData.weeks[wi];
-          var wlbl = fw.entry.week_label || '';
-          h += '<div style="display:grid;grid-template-columns:1fr 60px 80px 100px;gap:4px;font-size:11px;padding:3px 0;border-bottom:1px solid rgba(128,128,128,.1);cursor:pointer" onclick="navigate(\'project:' + ufp.project.id + '\')">';
-          h += '<div>' + (wlbl ? wlbl : '<em style="color:var(--mid-gray)">No label</em>') + '</div>';
-          h += '<div style="text-align:right">' + (fw.entry.hours || 0) + 'h</div>';
-          h += '<div style="text-align:right">$' + (fw.entry.rate || 0) + '/hr</div>';
-          h += '<div style="text-align:right;font-weight:600">$' + Math.round(fw.cost).toLocaleString() + '</div>';
+      if (!_flCollapsed) {
+        var flNames = Object.keys(byFreelancer);
+        for (var fi = 0; fi < flNames.length; fi++) {
+          var flName = flNames[fi];
+          var flData = byFreelancer[flName];
+          h += '<div style="font-size:12px;font-weight:600;color:#9575CD;padding:6px 0 2px;cursor:pointer" onclick="goToRMFreelancers(\'' + ufp.project.code + '\')">' + flName + ' \u2014 $' + Math.round(flData.cost).toLocaleString() + ' unplanned</div>';
+          h += '<div style="display:grid;grid-template-columns:1fr 60px 80px 100px;gap:4px;font-size:11px;color:var(--mid-gray);padding:3px 0;border-bottom:1px solid rgba(128,128,128,.2)">';
+          h += '<div style="font-weight:600">Label</div><div style="text-align:right;font-weight:600">Hrs</div><div style="text-align:right;font-weight:600">Rate</div><div style="text-align:right;font-weight:600">Cost</div>';
           h += '</div>';
+          for (var wi = 0; wi < flData.weeks.length; wi++) {
+            var fw = flData.weeks[wi];
+            var wlbl = fw.entry.week_label || '';
+            h += '<div style="display:grid;grid-template-columns:1fr 60px 80px 100px;gap:4px;font-size:11px;padding:3px 0;border-bottom:1px solid rgba(128,128,128,.1);cursor:pointer" onclick="goToRMFreelancers(\'' + ufp.project.code + '\')">';
+            h += '<div>' + (wlbl ? wlbl : '<em style="color:var(--mid-gray)">No label</em>') + '</div>';
+            h += '<div style="text-align:right">' + (fw.entry.hours || 0) + 'h</div>';
+            h += '<div style="text-align:right">$' + (fw.entry.rate || 0) + '/hr</div>';
+            h += '<div style="text-align:right;font-weight:600">$' + Math.round(fw.cost).toLocaleString() + '</div>';
+            h += '</div>';
+          }
         }
       }
       h += '</div>';
-    }
-    if (_flDismissedCt > 0) {
-      h += '<div style="font-size:12px;color:var(--mid-gray);padding:6px 4px">' + _flDismissedCt + ' project' + (_flDismissedCt !== 1 ? 's' : '') + ' closed &mdash; <a href="#" onclick="flagRestore(\'fl\');return false" style="color:#9575CD">restore</a></div>';
     }
   }
 
   /* ── 4. POSSIBLY FINISHED ── */
   if (possiblyDone.length) {
-    h += '<div class="section-title" style="color:#1565C0">Possibly Finished — Confirm Status (' + possiblyDone.length + ')</div>';
+    h += '<div id="na-possibly-done" class="section-title" style="color:#1565C0">Possibly Finished — Confirm Status (' + possiblyDone.length + ')</div>';
     h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">These projects have consumed 95%+ of their budgeted hours. If finished, mark them as "Finished" in the Project Overview to move them to Completed.</p>';
     for (var i = 0; i < possiblyDone.length; i++) {
       var f = possiblyDone[i];
