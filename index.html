@@ -713,7 +713,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.116 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.117 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -2238,17 +2238,8 @@ function renderProjFinancials(p) {
     h += '<div style="font-size:12px;color:var(--mid-gray);padding:8px 0;font-style:italic">Marked as no freelancers on this project.</div>';
   } else if (flBudget > 0) {
     var flUnpaid = flBudget - flSpent;
-    /* Compute internal cost total using fully_burdened_rate from team_member */
-    var flCostInternal = 0;
-    var _flArr = sb._flEntries || [];
-    var _flHasSentinel = false;
-    for (var _fci = 0; _fci < _flArr.length; _fci++) { if (_flArr[_fci].week_label === '__budget__') { _flHasSentinel = true; break; } }
-    for (var _fci = 0; _fci < _flArr.length; _fci++) {
-      var _fce = _flArr[_fci];
-      if (_flHasSentinel && _fce.week_label !== '__budget__') continue;
-      var _costRate = (_fce.team_member && _fce.team_member.fully_burdened_rate) ? _fce.team_member.fully_burdened_rate : (_fce.rate || 0);
-      flCostInternal += (_fce.hours || 0) * _costRate;
-    }
+    /* FL Internal Cost = 50% of actual paid (accounting convention) */
+    var flCostInternal = flSpent * 0.5;
     h += '<div class="snap-financials">';
     h += '<div class="snap-fin-item"><div class="sf-label">FL Billable Price</div><div class="sf-value" style="color:#CE93D8">$' + Math.round(flBudget).toLocaleString() + '</div><div class="sf-sub">' + (sb._flEntries || []).length + ' entries</div></div>';
     h += '<div class="snap-fin-item"><div class="sf-label">FL Internal Cost</div><div class="sf-value" style="color:#F57F17">$' + Math.round(flCostInternal).toLocaleString() + '</div><div class="sf-sub">at cost rate</div></div>';
@@ -5446,14 +5437,7 @@ async function updateTeamMemberRate(tmId, field, value) {
           }
         }
         if (changed) {
-          var newFlTotal = 0, newFlSpent = 0;
-          for (var fk = 0; fk < sbCheck._flEntries.length; fk++) {
-            var fc = (sbCheck._flEntries[fk].hours || 0) * (sbCheck._flEntries[fk].rate || 0);
-            newFlTotal += fc;
-            if (sbCheck._flEntries[fk].paid) newFlSpent += fc;
-          }
-          sbCheck.flTotal = newFlTotal;
-          sbCheck.flSpent = newFlSpent;
+          flRecomputeTotals(sbCheck);
         }
       }
     }
@@ -7699,9 +7683,9 @@ async function sparkAddSelectedMembers() {
 /* ── Freelancers Section (OOP-style, per-week line items) ── */
 
 /* Recompute flTotal / flSpent on a cached SUPA_BUDGETS object.
-   Budget sentinel entries (week_label === '__budget__') define the budget;
-   regular week entries count only toward flSpent (when paid).
-   If no sentinel exists, falls back to summing all entries (old behaviour). */
+   Budget sentinel entries (week_label === '__budget__') define the budget (flTotal).
+   flSpent is always the sum of paid day-by-day entries (ISO date week_labels).
+   If no sentinel exists, falls back to summing all entries for flTotal (old behaviour). */
 function flRecomputeTotals(sb) {
   var entries = sb._flEntries || [];
   var hasSentinel = false;
@@ -7713,10 +7697,10 @@ function flRecomputeTotals(sb) {
     var _fe = entries[_i];
     var _cost = (_fe.hours || 0) * (_fe.rate || 0);
     if (_fe.week_label === '__budget__') {
-      flTot += _cost;
-      if (_fe.paid) flSp += _cost; /* sentinel drives both total and paid when present */
+      flTot += _cost; /* sentinel defines the budget total only */
     } else {
-      if (!hasSentinel) { flTot += _cost; if (_fe.paid) flSp += _cost; }
+      if (!hasSentinel) flTot += _cost; /* no sentinel → old behaviour */
+      if (_fe.paid) flSp += _cost; /* day-by-day paid entries always drive flSpent */
     }
   }
   sb.flTotal = flTot;
@@ -12571,7 +12555,7 @@ async function flTogglePaidGlobal(entryId, isChecked, projCode) {
         entries[i].paid = isChecked;
         entries[i].paid_date = isChecked ? today : null;
       }
-      if (entries[i].paid) flSpentNew += (entries[i].hours || 0) * (entries[i].rate || 0);
+      if (entries[i].paid && flIsDateLabel(entries[i].week_label || '')) flSpentNew += (entries[i].hours || 0) * (entries[i].rate || 0);
     }
     SUPA_BUDGETS[projCode].flSpent = flSpentNew;
   }
