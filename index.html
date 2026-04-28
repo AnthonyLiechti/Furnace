@@ -712,7 +712,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.102 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.104 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -9593,11 +9593,19 @@ var RM_OOP = { projCode: null, budgetId: null, entries: [] };
 var rmOopPatchTimers = {};
 
 function goToRMOop(projCode) {
-  rtView = 'oop';
-  RM_OOP.projCode = projCode || null;
-  RM_OOP.entries = [];
-  RM_OOP.budgetId = null;
-  navigate('resource');
+  /* Navigate to the OOP payment calendar (Manage Resources → Out-of-Pocket tab) */
+  /* Find project name from code so the sidebar pre-selects it */
+  var _projName = '';
+  if (projCode) {
+    outer: for (var _ci = 0; _ci < CLIENTS.length; _ci++) {
+      for (var _pi = 0; _pi < CLIENTS[_ci].projects.length; _pi++) {
+        if (CLIENTS[_ci].projects[_pi].code === projCode) { _projName = CLIENTS[_ci].projects[_pi].name; break outer; }
+      }
+    }
+  }
+  allocResourceTab = 'oop';
+  if (_projName) oopSelectedProject = _projName;
+  navigate('allocations');
 }
 
 function renderRMOop() {
