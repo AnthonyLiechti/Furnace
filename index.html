@@ -713,7 +713,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.111 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.112 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -2154,9 +2154,23 @@ function renderProjFinancials(p) {
       _pfActLaborCost += (_pfae.hours || 0) * _pfaeRate;
     }
   }
-  /* Use pre-computed flTotal/flSpent — works for all week_label formats (ISO dates, human-readable, __budget__) */
-  var _pfActFlCost = noFl ? 0 : (sb.flTotal || 0);   /* all scheduled FL */
-  var _pfActFlPaid = noFl ? 0 : (sb.flSpent || 0);   /* paid only */
+  /* Actuals FL: sum calendar entries directly (non-sentinel), fall back to sentinel if no calendar entries exist */
+  var _pfActFlCost = 0, _pfActFlPaid = 0;
+  if (!noFl) {
+    var _pfFlEnts = sb._flEntries || [];
+    var _pfHasCal = false;
+    for (var _pfci = 0; _pfci < _pfFlEnts.length; _pfci++) { if (_pfFlEnts[_pfci].week_label !== '__budget__') { _pfHasCal = true; break; } }
+    for (var _pffi = 0; _pffi < _pfFlEnts.length; _pffi++) {
+      var _pffe = _pfFlEnts[_pffi];
+      var _pffc = (_pffe.hours || 0) * (_pffe.rate || 0);
+      if (_pffe.week_label === '__budget__') {
+        if (!_pfHasCal) { _pfActFlCost += _pffc; if (_pffe.paid) _pfActFlPaid += _pffc; }
+      } else {
+        _pfActFlCost += _pffc;
+        if (_pffe.paid) _pfActFlPaid += _pffc;
+      }
+    }
+  }
   var _pfActOopScheduled = noOop ? 0 : sbOopBudget(sb); /* all active OOP × markup */
   var _pfActOopSpent = sb.oopSpent || 0;                /* paid only */
   var _pfActProfit = tcvPrice - _pfActLaborCost - _pfActFlCost - _pfActOopScheduled;
@@ -7240,9 +7254,18 @@ function sparkRenderSummary() {
     }
   }
   var _sbA = _projCodeA ? SUPA_BUDGETS[_projCodeA] : null;
-  /* Use pre-computed flTotal/flSpent — handles all week_label formats */
-  var _actFlCost  = _sbA ? (_sbA.flTotal || 0) : 0;  /* all scheduled FL */
-  var _actFlPaid  = _sbA ? (_sbA.flSpent || 0) : 0;  /* paid only */
+  /* Actuals FL: calendar entries first, fall back to sentinel if no calendar entries */
+  var _actFlCost = 0, _actFlPaid = 0;
+  if (_sbA && _sbA._flEntries) {
+    var _actFlEnts = _sbA._flEntries;
+    var _actHasCal = false;
+    for (var _aci = 0; _aci < _actFlEnts.length; _aci++) { if (_actFlEnts[_aci].week_label !== '__budget__') { _actHasCal = true; break; } }
+    for (var _afi = 0; _afi < _actFlEnts.length; _afi++) {
+      var _afe = _actFlEnts[_afi]; var _afc = (_afe.hours || 0) * (_afe.rate || 0);
+      if (_afe.week_label === '__budget__') { if (!_actHasCal) { _actFlCost += _afc; if (_afe.paid) _actFlPaid += _afc; } }
+      else { _actFlCost += _afc; if (_afe.paid) _actFlPaid += _afc; }
+    }
+  }
   var _actOopScheduled = _sbA ? sbOopBudget(_sbA) : 0; /* all active OOP × markup */
   var _actOopSpent = _sbA ? (_sbA.oopSpent || 0) : 0;   /* paid only */
   var _actProfit = clientPrice - _actLaborCost - _actFlCost - _actOopScheduled;
@@ -7681,9 +7704,9 @@ function flRecomputeTotals(sb) {
     var _cost = (_fe.hours || 0) * (_fe.rate || 0);
     if (_fe.week_label === '__budget__') {
       flTot += _cost;
+      if (_fe.paid) flSp += _cost; /* sentinel drives both total and paid when present */
     } else {
-      if (!hasSentinel) flTot += _cost;
-      if (_fe.paid) flSp += _cost;
+      if (!hasSentinel) { flTot += _cost; if (_fe.paid) flSp += _cost; }
     }
   }
   sb.flTotal = flTot;
