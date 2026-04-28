@@ -710,7 +710,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.94 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 27, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.95 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -7602,6 +7602,56 @@ async function sparkPatchFlAndRefresh(entryId, field, val) {
   sparkRenderSummary();
 }
 
+/* Sets budget hours for a freelancer — creates __budget__ sentinel if one doesn't exist yet */
+async function sparkSetFlBudgetHours(tmId, hours) {
+  if (!sparkCurrentData || !sparkCurrentData.budget) return;
+  var entries = sparkCurrentData.freelancerEntries || [];
+  var budgetEntry = null, grpRate = 0, grpName = '';
+  for (var i = 0; i < entries.length; i++) {
+    if (entries[i].team_member_id === tmId) {
+      grpRate = entries[i].rate || grpRate;
+      if (entries[i].team_member && entries[i].team_member.name) grpName = entries[i].team_member.name;
+      if (entries[i].week_label === '__budget__') { budgetEntry = entries[i]; }
+    }
+  }
+  if (budgetEntry) {
+    /* PATCH the existing sentinel */
+    await sparkPatchFlAndRefresh(budgetEntry.id, 'hours', hours);
+  } else {
+    /* Create a new __budget__ sentinel */
+    sparkShowSaving();
+    var result = await sparkFetch('freelancer_budget_entries', '', 'POST', {
+      budget_id: sparkCurrentData.budget.id,
+      team_member_id: tmId,
+      week_label: '__budget__',
+      hours: parseFloat(hours) || 0,
+      rate: grpRate,
+      paid: false,
+      display_order: -1
+    });
+    if (result && result.length) {
+      result[0].team_member = { id: tmId, name: grpName };
+      sparkCurrentData.freelancerEntries.unshift(result[0]);
+    }
+    var _pCode = (sparkCurrentData.budget.projects && sparkCurrentData.budget.projects.project_code)
+      ? sparkCurrentData.budget.projects.project_code : PROJ_CODE_MAP[sparkCurrentData.budget.project_id];
+    if (_pCode && SUPA_BUDGETS && SUPA_BUDGETS[_pCode]) {
+      SUPA_BUDGETS[_pCode]._flEntries = sparkCurrentData.freelancerEntries;
+      flRecomputeTotals(SUPA_BUDGETS[_pCode]);
+      if (CLIENTS) {
+        for (var _ci = 0; _ci < CLIENTS.length; _ci++) {
+          for (var _pi = 0; _pi < CLIENTS[_ci].projects.length; _pi++) {
+            if (CLIENTS[_ci].projects[_pi].code === _pCode) { renderProjFinancials(CLIENTS[_ci].projects[_pi]); break; }
+          }
+        }
+      }
+    }
+    sparkHideSaving();
+    sparkRenderFreelancersContent();
+    sparkRenderSummary();
+  }
+}
+
 async function sparkToggleFlPaid(entryId, isChecked) {
   sparkShowSaving();
   var today = new Date().toISOString().slice(0, 10);
@@ -7688,8 +7738,10 @@ function sparkRenderFreelancersContent() {
   if (!tmOrder.length) {
     el.innerHTML = '<div style="padding:14px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">'
       + '<span style="font-size:12px;color:var(--mid-gray)">No freelancers assigned to this project.</span>'
-      + '<button onclick="goToRMFreelancers(\'' + (_projCode||'') + '\')" style="padding:6px 16px;border-radius:6px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-size:12px;font-weight:600">Manage in Resource Center \u2192</button>'
-      + '</div>';
+      + '<div style="display:flex;gap:8px">'
+      + '<button onclick="sparkShowAddFreelancer()" style="padding:6px 16px;border-radius:6px;border:none;background:var(--honey);color:#fff;cursor:pointer;font-size:12px;font-weight:600">+ Add Freelancer</button>'
+      + '<button onclick="goToRMFreelancers(\'' + (_projCode||'') + '\')" style="padding:6px 16px;border-radius:6px;border:1px solid rgba(91,74,138,.3);background:transparent;color:#5B4A8A;cursor:pointer;font-size:12px;font-weight:600">Manage in Resource Center \u2192</button>'
+      + '</div></div>';
     return;
   }
 
@@ -7736,14 +7788,14 @@ function sparkRenderFreelancersContent() {
     h += '<td style="padding:8px 12px;font-size:12px;font-weight:600">' + name + '</td>';
     h += '<td style="padding:8px 12px;font-size:11px;color:var(--mid-gray);text-align:right">' + sparkFmtDec(grpRate) + '/hr</td>';
 
-    /* Editable snapshot budget hours */
+    /* Editable snapshot budget hours — always editable; creates sentinel if missing */
     h += '<td style="padding:6px 12px;text-align:center">';
     if (budgetEntry) {
-      h += '<input type="number" min="0" step="0.5" value="' + budgHrs + '" onchange="sparkPatchFlAndRefresh(\'' + budgetEntry.id + '\',\'hours\',parseFloat(this.value)||0)" style="width:60px;padding:3px 6px;border-radius:5px;border:1px solid rgba(91,74,138,.3);font-size:13px;font-weight:700;text-align:right;color:#5B4A8A;background:var(--white)">';
-      h += '<span style="font-size:10px;color:var(--mid-gray);margin-left:3px">hrs</span>';
+      h += '<input type="number" min="0" step="0.5" value="' + budgHrs + '" onchange="sparkSetFlBudgetHours(\'' + tmId + '\',parseFloat(this.value)||0)" style="width:60px;padding:3px 6px;border-radius:5px;border:1px solid rgba(91,74,138,.3);font-size:13px;font-weight:700;text-align:right;color:#5B4A8A;background:var(--white)">';
     } else {
-      h += '<span style="font-size:12px;font-weight:700;color:#5B4A8A">' + budgHrs.toFixed(1) + '</span><span style="font-size:10px;color:var(--mid-gray);margin-left:3px">hrs</span>';
+      h += '<input type="number" min="0" step="0.5" value="' + (budgHrs || '') + '" placeholder="0" onchange="sparkSetFlBudgetHours(\'' + tmId + '\',parseFloat(this.value)||0)" style="width:60px;padding:3px 6px;border-radius:5px;border:1px dashed rgba(91,74,138,.4);font-size:13px;font-weight:700;text-align:right;color:#5B4A8A;background:transparent" title="Enter total budget hours">';
     }
+    h += '<span style="font-size:10px;color:var(--mid-gray);margin-left:3px">hrs</span>';
     h += '</td>';
 
     h += '<td style="padding:8px 12px;font-size:12px;font-weight:600;text-align:right;color:#5B4A8A">' + sparkFmt(budgCost) + '</td>';
@@ -7774,9 +7826,10 @@ function sparkRenderFreelancersContent() {
   h += '</tr>';
   h += '</tbody></table>';
 
-  /* Manage link */
-  h += '<div style="padding:10px 12px 4px;display:flex;justify-content:flex-end">';
-  h += '<button onclick="goToRMFreelancers(\'' + (_projCode||'') + '\')" style="padding:6px 16px;border-radius:6px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-size:12px;font-weight:600">Manage Schedules &amp; Payments \u2192</button>';
+  /* Footer: Add + Manage buttons */
+  h += '<div style="padding:10px 12px 4px;display:flex;justify-content:space-between;align-items:center">';
+  h += '<button onclick="sparkShowAddFreelancer()" style="padding:6px 14px;border-radius:6px;border:none;background:var(--honey);color:#fff;cursor:pointer;font-size:12px;font-weight:600">+ Add Freelancer</button>';
+  h += '<button onclick="goToRMFreelancers(\'' + (_projCode||'') + '\')" style="padding:6px 16px;border-radius:6px;border:1px solid rgba(91,74,138,.3);background:transparent;color:#5B4A8A;cursor:pointer;font-size:12px;font-weight:600">Manage Schedules &amp; Payments \u2192</button>';
   h += '</div>';
 
   el.innerHTML = h;
