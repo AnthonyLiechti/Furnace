@@ -713,7 +713,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.117 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.118 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -12314,71 +12314,90 @@ function renderFlCalMonth(el, lbl) {
     el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--mid-gray)">No freelancer entries for this project.</div>'; return;
   }
   var baseDate = new Date(flWeekOf + 'T00:00:00');
+  var month = baseDate.getMonth(), year = baseDate.getFullYear();
   var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  if (lbl) lbl.innerHTML = monthNames[baseDate.getMonth()] + ' ' + baseDate.getFullYear();
-  var monthEnd = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0);
-  var firstDay = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
-  while (firstDay.getDay() !== 1) firstDay.setDate(firstDay.getDate() - 1);
-  var weeks = [], cursor = new Date(firstDay);
-  while (cursor <= monthEnd || weeks.length < 4) {
-    weeks.push(cursor.toISOString().slice(0, 10));
-    cursor.setDate(cursor.getDate() + 7);
-    if (weeks.length >= 6) break;
-  }
+  if (lbl) lbl.innerHTML = monthNames[month] + ' ' + year;
+
+  /* Grid start: Monday on or before 1st of month */
+  var firstOfMonth = new Date(year, month, 1);
+  var fdow = firstOfMonth.getDay();
+  var gridStart = new Date(firstOfMonth);
+  gridStart.setDate(gridStart.getDate() - (fdow === 0 ? 6 : fdow - 1));
+  var lastDay = new Date(year, month + 1, 0);
+
   var freelancers = flGetFreelancers(sb);
   if (!freelancers.length) { el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--mid-gray)">No freelancers found for this project.</div>'; return; }
-  var todayMon = getCurrentMonday(), curMonth = baseDate.getMonth();
-  var gridCols = '150px'; for (var w = 0; w < weeks.length; w++) gridCols += ' 1fr'; gridCols += ' 80px';
-  var h = '<div class="oop-grid" style="grid-template-columns:' + gridCols + '">';
-  /* Header */
-  h += '<div class="oop-corner" style="font-size:10px;color:' + _dmMid + '">Freelancer</div>';
-  for (var w = 0; w < weeks.length; w++) {
-    var wd = new Date(weeks[w] + 'T00:00:00'), fd2 = new Date(weeks[w] + 'T00:00:00'); fd2.setDate(fd2.getDate() + 4);
-    var isNow = weeks[w] === todayMon;
-    var inMonth = wd.getMonth() === curMonth || fd2.getMonth() === curMonth;
-    h += '<div class="oop-col-hdr" style="' + (isNow ? 'background:rgba(48,109,124,.08)' : '') + ';text-align:center;flex-direction:column;opacity:' + (inMonth ? '1' : '0.4') + '">';
-    h += '<span class="oop-day" style="' + (isNow ? 'color:var(--ocean)' : '') + '">' + _FL_MON[wd.getMonth()] + ' ' + wd.getDate() + '</span>';
-    h += '<span style="font-size:9px;color:' + _dmMid + '">&ndash;' + _FL_MON[fd2.getMonth()] + ' ' + fd2.getDate() + '</span>';
-    h += '</div>';
+
+  var _todayISO = new Date().toISOString().slice(0, 10);
+  var _dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  var h = '';
+
+  /* Day-of-week header */
+  h += '<div style="display:grid;grid-template-columns:repeat(7,1fr);border-radius:8px 8px 0 0;overflow:hidden;border:1px solid ' + _dmBorder + ';border-bottom:none">';
+  for (var _di = 0; _di < 7; _di++) {
+    var _isWknd = _di >= 5;
+    h += '<div style="padding:6px 0;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:' + (_isWknd ? _dmMid : _dmText) + ';background:rgba(91,74,138,.06);border-right:' + (_di < 6 ? '1px solid ' + _dmBorder : 'none') + '">' + _dayNames[_di] + '</div>';
   }
-  h += '<div class="oop-col-hdr" style="font-size:10px;text-align:center">Month</div>';
-  /* FL rows */
-  for (var fi = 0; fi < freelancers.length; fi++) {
-    var fl = freelancers[fi], rowTotal = 0;
-    h += '<div class="oop-row-hdr" style="flex-direction:column;align-items:flex-start;padding:8px 12px;gap:2px">';
-    h += '<div style="font-weight:600;font-size:12px">' + fl.name + '</div>';
-    h += '<div style="font-size:10px;color:#5B4A8A">$' + Math.round(fl.rate) + '/hr</div></div>';
-    for (var w = 0; w < weeks.length; w++) {
-      var entry = flGetWeekEntry(sb, fl.tmId, weeks[w]);
-      var isNow = weeks[w] === todayMon;
-      var wd2 = new Date(weeks[w] + 'T00:00:00'), fd3 = new Date(weeks[w] + 'T00:00:00'); fd3.setDate(fd3.getDate() + 4);
-      var inMonth = wd2.getMonth() === curMonth || fd3.getMonth() === curMonth;
-      h += '<div class="oop-cell" style="' + (isNow ? 'background:rgba(48,109,124,.04)' : '') + ';opacity:' + (inMonth ? '1' : '0.4') + ';cursor:pointer;min-height:70px" onclick="flShowCalModal(\'' + flProjFilter + '\',\'' + fl.tmId + '\',\'' + weeks[w] + '\',' + (entry ? '\'' + entry.id + '\'' : 'null') + ')">';
-      if (entry && (entry.hours || 0) > 0) {
-        var amt = (entry.hours || 0) * (entry.rate || fl.rate); rowTotal += inMonth ? amt : 0;
-        h += '<div class="oop-chip ' + (entry.paid ? 'paid' : 'scheduled') + '" style="font-size:9px;padding:4px 6px;display:block;text-align:center">';
-        h += '<div style="font-weight:700">' + parseFloat(entry.hours).toFixed(1) + ' hrs</div>';
-        h += '<div>$' + Math.round(amt).toLocaleString() + '</div>';
-        h += '<div>' + (entry.paid ? '&#10003; Paid' : 'Unpaid') + '</div></div>';
-      } else if (inMonth) { h += '<div style="font-size:18px;color:' + _dmBorder + ';text-align:center;margin-top:12px">+</div>'; }
-      h += '</div>';
+  h += '</div>';
+
+  /* Calendar day cells */
+  h += '<div style="display:grid;grid-template-columns:repeat(7,1fr);border:1px solid ' + _dmBorder + ';border-radius:0 0 8px 8px;overflow:hidden">';
+  var cur = new Date(gridStart);
+  var cellIdx = 0;
+  while (true) {
+    var dayISO = cur.toISOString().slice(0, 10);
+    var inMonth = cur.getMonth() === month;
+    var isToday = dayISO === _todayISO;
+    var isWeekend = cur.getDay() === 0 || cur.getDay() === 6;
+    var colIdx = cellIdx % 7;
+    if (!inMonth && cur > lastDay && colIdx === 0) break;
+    var cellBg = isToday ? 'rgba(48,109,124,.08)' : (isWeekend ? (_isDark ? 'rgba(255,255,255,.01)' : 'rgba(0,0,0,.02)') : 'transparent');
+    h += '<div style="min-height:90px;padding:4px;background:' + cellBg + ';border-right:' + (colIdx < 6 ? '1px solid ' + _dmBorder : 'none') + ';border-bottom:1px solid ' + _dmBorder + ';opacity:' + (inMonth ? '1' : '.35') + ';cursor:pointer" onclick="flDayClick(\'' + flProjFilter + '\',\'' + dayISO + '\')">';
+    h += '<div style="font-size:12px;font-weight:' + (isToday ? '700' : '500') + ';color:' + (isToday ? 'var(--ocean)' : _dmText) + ';margin-bottom:3px">' + cur.getDate() + '</div>';
+    /* FL chips for this day */
+    for (var fi = 0; fi < freelancers.length; fi++) {
+      var fl = freelancers[fi];
+      var entry = flGetWeekEntry(sb, fl.tmId, dayISO);
+      if (!entry || !(entry.hours > 0)) continue;
+      var amt = (entry.hours || 0) * (entry.rate || fl.rate);
+      var chipBg = entry.paid ? 'rgba(46,125,50,.15)' : 'rgba(91,74,138,.15)';
+      var chipClr = entry.paid ? '#2E7D32' : '#5B4A8A';
+      var shortName = fl.name.split(' ')[0];
+      h += '<div onclick="event.stopPropagation();flShowCalModal(\'' + flProjFilter + '\',\'' + fl.tmId + '\',\'' + dayISO + '\',\'' + entry.id + '\')" style="background:' + chipBg + ';color:' + chipClr + ';border-radius:3px;padding:2px 4px;margin-bottom:2px;font-size:9px;font-weight:600;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + shortName + ' \u00b7 ' + parseFloat(entry.hours).toFixed(1) + 'h \u00b7 $' + Math.round(amt).toLocaleString() + '</div>';
     }
-    h += '<div class="oop-total-cell">' + (rowTotal > 0 ? '$' + Math.round(rowTotal).toLocaleString() : '&mdash;') + '</div>';
+    h += '</div>';
+    cur.setDate(cur.getDate() + 1);
+    cellIdx++;
   }
-  /* Grand total */
-  h += '<div class="oop-row-hdr" style="font-size:10px;color:' + _dmMid + '">All FLs</div>';
-  var monthGrand = 0;
-  for (var w = 0; w < weeks.length; w++) {
-    var wd3 = new Date(weeks[w] + 'T00:00:00'), fd4 = new Date(weeks[w] + 'T00:00:00'); fd4.setDate(fd4.getDate() + 4);
-    var inMonth = wd3.getMonth() === curMonth || fd4.getMonth() === curMonth;
-    var colTot = 0;
-    for (var fi = 0; fi < freelancers.length; fi++) { var ent = flGetWeekEntry(sb, freelancers[fi].tmId, weeks[w]); if (ent && inMonth) colTot += (ent.hours || 0) * (ent.rate || freelancers[fi].rate); }
-    monthGrand += colTot;
-    h += '<div class="oop-grand-total" style="background:var(--abyss);color:var(--white);border-bottom:1px solid rgba(255,255,255,.1);text-align:center;opacity:' + (inMonth ? '1' : '0.4') + '">' + (colTot > 0 ? '$' + Math.round(colTot).toLocaleString() : '&mdash;') + '</div>';
-  }
-  h += '<div class="oop-grand-total" style="text-align:center;color:var(--honey)">$' + Math.round(monthGrand).toLocaleString() + '</div></div>';
+  h += '</div>';
+
   h += flRenderUnscheduled(sb, freelancers, _dmSurf, _dmBorder, _dmMid, _dmText);
   el.innerHTML = h;
+}
+
+function flDayClick(projCode, dayISO) {
+  var sb = SUPA_BUDGETS && SUPA_BUDGETS[projCode];
+  var freelancers = flGetFreelancers(sb);
+  if (!freelancers.length) return;
+  if (freelancers.length === 1) {
+    flShowCalModal(projCode, freelancers[0].tmId, dayISO, null);
+    return;
+  }
+  var existing = document.getElementById('flDayPicker');
+  if (existing) existing.remove();
+  var _d = new Date(dayISO + 'T00:00:00');
+  var _dayLong = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var h = '<div id="flDayPicker" onclick="document.getElementById(\'flDayPicker\').remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9000;display:flex;align-items:center;justify-content:center">';
+  h += '<div onclick="event.stopPropagation()" style="background:var(--panel);border-radius:10px;padding:20px;min-width:220px;box-shadow:0 8px 32px rgba(0,0,0,.25)">';
+  h += '<div style="font-size:13px;font-weight:700;margin-bottom:4px">' + _dayLong[_d.getDay()] + ', ' + _FL_MON[_d.getMonth()] + ' ' + _d.getDate() + '</div>';
+  h += '<div style="font-size:11px;color:var(--mid-gray);margin-bottom:14px">Select a freelancer</div>';
+  for (var i = 0; i < freelancers.length; i++) {
+    var fl = freelancers[i];
+    h += '<button onclick="document.getElementById(\'flDayPicker\').remove();flShowCalModal(\'' + projCode + '\',\'' + fl.tmId + '\',\'' + dayISO + '\',null)" style="display:block;width:100%;text-align:left;padding:8px 12px;margin-bottom:6px;border-radius:6px;border:1px solid rgba(91,74,138,.2);background:transparent;cursor:pointer;font-size:12px;font-weight:600;color:#5B4A8A">' + fl.name + '</button>';
+  }
+  h += '<button onclick="document.getElementById(\'flDayPicker\').remove()" style="display:block;width:100%;text-align:center;padding:6px;border-radius:6px;border:none;background:transparent;cursor:pointer;font-size:11px;color:var(--mid-gray);margin-top:4px">Cancel</button>';
+  h += '</div></div>';
+  document.body.insertAdjacentHTML('beforeend', h);
 }
 
 function flRenderUnscheduled(sb, freelancers, _dmSurf, _dmBorder, _dmMid, _dmText) {
