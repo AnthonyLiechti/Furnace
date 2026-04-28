@@ -713,7 +713,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.115 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.116 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -9214,30 +9214,17 @@ function renderRMFlContent() {
 
   var h = '';
 
-  /* ── Toolbar ── */
-  h += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0 12px;flex-wrap:wrap">';
-  if (rmFlViewMode === 'month') {
-    h += '<button onclick="rmFlWeekOf=shiftOopMonth(rmFlWeekOf,-1);renderRMFlUpdate()" style="padding:4px 8px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer">&#9664;</button>';
-    var _rmd = new Date(rmFlWeekOf + 'T00:00:00');
-    h += '<span style="font-size:13px;font-weight:600;min-width:120px;text-align:center">' + _rmd.toLocaleDateString('en-US',{month:'long',year:'numeric'}) + '</span>';
-    h += '<button onclick="rmFlWeekOf=shiftOopMonth(rmFlWeekOf,1);renderRMFlUpdate()" style="padding:4px 8px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer">&#9654;</button>';
-  } else {
-    h += '<button onclick="rmFlWeekOf=shiftWeek(rmFlWeekOf,-1);renderRMFlUpdate()" style="padding:4px 8px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer">&#9664;</button>';
-    var _rwd = new Date(rmFlWeekOf + 'T00:00:00'), _rwe = new Date(_rwd); _rwe.setDate(_rwe.getDate() + 6);
-    h += '<span style="font-size:13px;font-weight:600;min-width:180px;text-align:center">' + _FL_MON[_rwd.getMonth()] + ' ' + _rwd.getDate() + '\u2013' + _FL_MON[_rwe.getMonth()] + ' ' + _rwe.getDate() + ', ' + _rwe.getFullYear() + '</span>';
-    h += '<button onclick="rmFlWeekOf=shiftWeek(rmFlWeekOf,1);renderRMFlUpdate()" style="padding:4px 8px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer">&#9654;</button>';
-  }
-  h += '<button onclick="rmFlWeekOf=getCurrentMonday();renderRMFlUpdate()" style="font-size:11px;padding:3px 8px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer">Today</button>';
-  h += '<div style="margin-left:auto;display:flex;gap:3px">';
-  var _rvms = ['week', 'month'];
-  for (var _rvi = 0; _rvi < _rvms.length; _rvi++) {
-    var _rvm = _rvms[_rvi], _risV = rmFlViewMode === _rvm;
-    h += '<button onclick="rmFlViewMode=\'' + _rvm + '\';renderRMFlUpdate()" style="padding:4px 10px;border-radius:5px;font-size:11px;border:1px solid rgba(91,74,138,.3);background:' + (_risV ? '#5B4A8A' : 'transparent') + ';color:' + (_risV ? '#fff' : '#5B4A8A') + ';cursor:pointer;font-weight:' + (_risV ? '700' : '400') + '">' + _rvm.charAt(0).toUpperCase() + _rvm.slice(1) + '</button>';
-  }
-  h += '</div></div>';
+  /* ── Toolbar: Month nav only ── */
+  var _rmd = new Date(rmFlWeekOf + 'T00:00:00');
+  h += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0 16px">';
+  h += '<button onclick="rmFlWeekOf=shiftOopMonth(rmFlWeekOf,-1);renderRMFlUpdate()" style="padding:4px 10px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer;font-size:14px">&#9664;</button>';
+  h += '<span style="font-size:16px;font-weight:700;min-width:170px;text-align:center">' + _rmd.toLocaleDateString('en-US',{month:'long',year:'numeric'}) + '</span>';
+  h += '<button onclick="rmFlWeekOf=shiftOopMonth(rmFlWeekOf,1);renderRMFlUpdate()" style="padding:4px 10px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer;font-size:14px">&#9654;</button>';
+  h += '<button onclick="rmFlWeekOf=getCurrentMonday();renderRMFlUpdate()" style="font-size:11px;padding:3px 10px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer;margin-left:4px">Today</button>';
+  h += '</div>';
 
-  /* ── Calendar grid ── */
-  h += renderRMFlGrid(entries, freelancers);
+  /* ── Monthly calendar grid ── */
+  h += renderRMMonthGrid(RM_FL.projCode, entries, freelancers);
 
   /* ── Footer ── */
   h += '<div style="padding:10px 0 2px">';
@@ -9250,6 +9237,121 @@ function renderRMFlContent() {
 function renderRMFlUpdate() {
   var el = document.getElementById('rmFlContent');
   if (el) el.innerHTML = renderRMFlContent();
+}
+
+function renderRMMonthGrid(projCode, flEntries, freelancers) {
+  if (!rmFlWeekOf) rmFlWeekOf = getCurrentMonday();
+  var isDark = document.documentElement.classList.contains('dark');
+  var _todayISO = new Date().toISOString().slice(0, 10);
+  var anchor = new Date(rmFlWeekOf + 'T00:00:00');
+  var month = anchor.getMonth(), year = anchor.getFullYear();
+
+  /* Grid start: Monday on or before 1st of month */
+  var firstOfMonth = new Date(year, month, 1);
+  var fdow = firstOfMonth.getDay();
+  var gridStart = new Date(firstOfMonth);
+  gridStart.setDate(gridStart.getDate() - (fdow === 0 ? 6 : fdow - 1));
+  var lastDay = new Date(year, month + 1, 0);
+
+  /* FL lookup: tmId|dayISO → [entries] */
+  var flLookup = {};
+  for (var i = 0; i < flEntries.length; i++) {
+    var e = flEntries[i];
+    if (!flIsDateLabel(e.week_label || '')) continue;
+    var k = e.team_member_id + '|' + e.week_label;
+    if (!flLookup[k]) flLookup[k] = [];
+    flLookup[k].push(e);
+  }
+
+  /* OOP lookup: dayISO → [schedule entries] */
+  var oopByDay = {};
+  if (projCode && OOP_SCHEDULE && OOP_SCHEDULE.entries) {
+    for (var _oi = 0; _oi < OOP_SCHEDULE.entries.length; _oi++) {
+      var _oe = OOP_SCHEDULE.entries[_oi];
+      if (_oe.projectCode !== projCode) continue;
+      if (!oopByDay[_oe.date]) oopByDay[_oe.date] = [];
+      oopByDay[_oe.date].push(_oe);
+    }
+  }
+
+  var _dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  var h = '';
+
+  /* Day-of-week header row */
+  h += '<div style="display:grid;grid-template-columns:repeat(7,1fr);border-radius:8px 8px 0 0;overflow:hidden;border:1px solid rgba(91,74,138,.15);border-bottom:none">';
+  for (var _di = 0; _di < 7; _di++) {
+    var _isWknd = _di >= 5;
+    h += '<div style="padding:6px 0;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:' + (_isWknd ? 'var(--mid-gray)' : 'var(--abyss)') + ';background:rgba(91,74,138,.06);border-right:' + (_di < 6 ? '1px solid rgba(91,74,138,.1)' : 'none') + '">' + _dayNames[_di] + '</div>';
+  }
+  h += '</div>';
+
+  /* Calendar cells */
+  h += '<div style="display:grid;grid-template-columns:repeat(7,1fr);border:1px solid rgba(91,74,138,.15);border-radius:0 0 8px 8px;overflow:hidden">';
+  var cur = new Date(gridStart);
+  var cellIdx = 0;
+  while (true) {
+    var dayISO = cur.toISOString().slice(0, 10);
+    var inMonth = cur.getMonth() === month;
+    var isToday = dayISO === _todayISO;
+    var isWeekend = cur.getDay() === 0 || cur.getDay() === 6;
+    var colIdx = cellIdx % 7;
+    if (!inMonth && cur > lastDay && colIdx === 0) break;
+    var cellBg = isToday ? 'rgba(91,74,138,.1)' : (isWeekend ? (isDark ? 'rgba(255,255,255,.01)' : 'rgba(0,0,0,.02)') : 'transparent');
+    h += '<div style="min-height:90px;padding:4px;background:' + cellBg + ';border-right:' + (colIdx < 6 ? '1px solid rgba(91,74,138,.1)' : 'none') + ';border-bottom:1px solid rgba(91,74,138,.1);position:relative;cursor:pointer;opacity:' + (inMonth ? '1' : '.35') + '" onclick="rmFlDayClick(\'' + projCode + '\',\'' + dayISO + '\')">';
+    h += '<div style="font-size:12px;font-weight:' + (isToday ? '700' : '500') + ';color:' + (isToday ? '#5B4A8A' : 'var(--abyss)') + ';margin-bottom:3px">' + cur.getDate() + '</div>';
+    /* FL chips */
+    for (var _fi = 0; _fi < freelancers.length; _fi++) {
+      var _fl = freelancers[_fi];
+      var _ck = _fl.tmId + '|' + dayISO;
+      var _cEnts = flLookup[_ck] || [];
+      if (!_cEnts.length) continue;
+      var _hrs = 0, _paid = false;
+      for (var _ei = 0; _ei < _cEnts.length; _ei++) { _hrs += _cEnts[_ei].hours || 0; if (_cEnts[_ei].paid) _paid = true; }
+      var _chipBg = _paid ? 'rgba(46,125,50,.12)' : 'rgba(91,74,138,.12)';
+      var _chipClr = _paid ? '#2E7D32' : '#5B4A8A';
+      var _shortName = _fl.name.split(' ')[0];
+      h += '<div onclick="event.stopPropagation();rmFlOpenCellModal(\'' + projCode + '\',\'' + _fl.tmId + '\',\'' + dayISO + '\')" style="background:' + _chipBg + ';color:' + _chipClr + ';border-radius:3px;padding:2px 4px;margin-bottom:2px;font-size:9px;font-weight:600;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _shortName + ' \u00b7 ' + _hrs + 'h</div>';
+    }
+    /* OOP chips */
+    var _oopDay = oopByDay[dayISO] || [];
+    for (var _oi2 = 0; _oi2 < _oopDay.length; _oi2++) {
+      var _oop = _oopDay[_oi2];
+      var _oChipBg = _oop.paid ? 'rgba(46,125,50,.12)' : 'rgba(245,127,23,.12)';
+      var _oChipClr = _oop.paid ? '#2E7D32' : '#F57F17';
+      h += '<div style="background:' + _oChipBg + ';color:' + _oChipClr + ';border-radius:3px;padding:2px 4px;margin-bottom:2px;font-size:9px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + (_oop.lineItemName || 'OOP') + '">' + sparkFmt(_oop.amount) + ' OOP</div>';
+    }
+    h += '</div>';
+    cur.setDate(cur.getDate() + 1);
+    cellIdx++;
+  }
+  h += '</div>';
+  return h;
+}
+
+function rmFlDayClick(projCode, dayISO) {
+  var entries = RM_FL.entries || [];
+  var freelancers = rmFlGetFreelancers(entries);
+  if (!freelancers.length) return;
+  if (freelancers.length === 1) {
+    rmFlOpenCellModal(projCode, freelancers[0].tmId, dayISO);
+    return;
+  }
+  /* Multiple freelancers: show picker overlay */
+  var existingOverlay = document.getElementById('rmFlDayPicker');
+  if (existingOverlay) existingOverlay.remove();
+  var _d = new Date(dayISO + 'T00:00:00');
+  var _dayLong = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var h = '<div id="rmFlDayPicker" onclick="document.getElementById(\'rmFlDayPicker\').remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9000;display:flex;align-items:center;justify-content:center">';
+  h += '<div onclick="event.stopPropagation()" style="background:var(--panel);border-radius:10px;padding:20px;min-width:220px;box-shadow:0 8px 32px rgba(0,0,0,.25)">';
+  h += '<div style="font-size:13px;font-weight:700;margin-bottom:4px">' + _dayLong[_d.getDay()] + ', ' + _FL_MON[_d.getMonth()] + ' ' + _d.getDate() + '</div>';
+  h += '<div style="font-size:11px;color:var(--mid-gray);margin-bottom:14px">Select a freelancer</div>';
+  for (var i = 0; i < freelancers.length; i++) {
+    var fl = freelancers[i];
+    h += '<button onclick="document.getElementById(\'rmFlDayPicker\').remove();rmFlOpenCellModal(\'' + projCode + '\',\'' + fl.tmId + '\',\'' + dayISO + '\')" style="display:block;width:100%;text-align:left;padding:8px 12px;margin-bottom:6px;border-radius:6px;border:1px solid rgba(91,74,138,.2);background:transparent;cursor:pointer;font-size:12px;font-weight:600;color:#5B4A8A">' + fl.name + '</button>';
+  }
+  h += '<button onclick="document.getElementById(\'rmFlDayPicker\').remove()" style="display:block;width:100%;text-align:center;padding:6px;border-radius:6px;border:none;background:transparent;cursor:pointer;font-size:11px;color:var(--mid-gray);margin-top:4px">Cancel</button>';
+  h += '</div></div>';
+  document.body.insertAdjacentHTML('beforeend', h);
 }
 
 function rmFlGetFreelancers(entries) {
@@ -9947,69 +10049,37 @@ function renderRMOopUpdate() {
 /* ── Combined OOP + FL Cash Flow Calendar (shown in both FL and OOP tabs) ── */
 function renderRMOopCalendar(projCode) {
   if (!rmFlWeekOf) rmFlWeekOf = getCurrentMonday();
-  var cols = rmFlGetColumns();
-  var colStart = cols[0].key;
-  var colEnd = cols[cols.length - 1].key;
-  var isDark = document.documentElement.classList.contains('dark');
 
-  /* OOP schedule entries for this project in the visible range */
-  var oopEnts = [];
-  var oopByDay = {}; /* col.key → [schedule entries] */
-  if (projCode && OOP_SCHEDULE && OOP_SCHEDULE.entries) {
-    for (var _oi = 0; _oi < OOP_SCHEDULE.entries.length; _oi++) {
-      var _oe = OOP_SCHEDULE.entries[_oi];
-      if (_oe.projectCode !== projCode) continue;
-      var _oKey = rmFlViewMode === 'month' ? getMondayOfWeek(_oe.date) : _oe.date;
-      if (_oKey < colStart || _oKey > colEnd) continue;
-      if (!oopByDay[_oKey]) oopByDay[_oKey] = [];
-      oopByDay[_oKey].push(_oe);
-      oopEnts.push(_oe);
-    }
-  }
-
-  /* FL entries for this project in range, grouped by person → day */
-  var flByPerson = {}, flPersonOrder = [];
+  /* FL entries and freelancers for this project */
+  var flEntries = [];
+  var freelancers = [];
   var sb = SUPA_BUDGETS && SUPA_BUDGETS[projCode];
   if (sb && sb._flEntries) {
-    for (var _fi = 0; _fi < sb._flEntries.length; _fi++) {
-      var _fe = sb._flEntries[_fi];
-      if (!flIsDateLabel(_fe.week_label || '')) continue;
-      var _fKey = rmFlViewMode === 'month' ? getMondayOfWeek(_fe.week_label) : _fe.week_label;
-      if (_fKey < colStart || _fKey > colEnd) continue;
-      var _fn = _fe._name || (_fe.team_member && _fe.team_member.name) || 'Freelancer';
-      var _fr = _fe.rate || 0;
-      if (!flByPerson[_fn]) { flByPerson[_fn] = { rate: _fr, days: {} }; flPersonOrder.push(_fn); }
-      if (!flByPerson[_fn].days[_fKey]) flByPerson[_fn].days[_fKey] = { hrs: 0, paid: false };
-      flByPerson[_fn].days[_fKey].hrs += _fe.hours || 0;
-      if (_fe.paid) flByPerson[_fn].days[_fKey].paid = true;
+    flEntries = sb._flEntries;
+    freelancers = rmFlGetFreelancers(flEntries);
+  }
+
+  /* Check if any OOP scheduled */
+  var hasOop = false;
+  if (projCode && OOP_SCHEDULE && OOP_SCHEDULE.entries) {
+    for (var _oi = 0; _oi < OOP_SCHEDULE.entries.length; _oi++) {
+      if (OOP_SCHEDULE.entries[_oi].projectCode === projCode) { hasOop = true; break; }
     }
   }
 
-  var hasAny = oopEnts.length > 0 || flPersonOrder.length > 0;
+  var hasAny = hasOop || freelancers.length > 0;
+  var _rmd = new Date(rmFlWeekOf + 'T00:00:00');
 
-  /* Toolbar */
   var h = '<div style="background:rgba(91,74,138,.04);border-radius:10px;padding:16px;margin-bottom:18px;border:1px solid rgba(91,74,138,.1)">';
   h += '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mid-gray);margin-bottom:10px">&#128197; Cash Flow Calendar</div>';
-  h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">';
-  if (rmFlViewMode === 'month') {
-    h += '<button onclick="rmFlWeekOf=shiftOopMonth(rmFlWeekOf,-1);renderRMOopUpdate();renderRMFlUpdate()" style="padding:4px 8px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer">&#9664;</button>';
-    var _rmd = new Date(rmFlWeekOf + 'T00:00:00');
-    h += '<span style="font-size:13px;font-weight:600;min-width:120px;text-align:center">' + _rmd.toLocaleDateString('en-US',{month:'long',year:'numeric'}) + '</span>';
-    h += '<button onclick="rmFlWeekOf=shiftOopMonth(rmFlWeekOf,1);renderRMOopUpdate();renderRMFlUpdate()" style="padding:4px 8px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer">&#9654;</button>';
-  } else {
-    h += '<button onclick="rmFlWeekOf=shiftWeek(rmFlWeekOf,-1);renderRMOopUpdate();renderRMFlUpdate()" style="padding:4px 8px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer">&#9664;</button>';
-    var _rwd = new Date(rmFlWeekOf + 'T00:00:00'), _rwe = new Date(_rwd); _rwe.setDate(_rwe.getDate() + 6);
-    h += '<span style="font-size:13px;font-weight:600;min-width:180px;text-align:center">' + _FL_MON[_rwd.getMonth()] + ' ' + _rwd.getDate() + '\u2013' + _FL_MON[_rwe.getMonth()] + ' ' + _rwe.getDate() + ', ' + _rwe.getFullYear() + '</span>';
-    h += '<button onclick="rmFlWeekOf=shiftWeek(rmFlWeekOf,1);renderRMOopUpdate();renderRMFlUpdate()" style="padding:4px 8px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer">&#9654;</button>';
-  }
-  h += '<button onclick="rmFlWeekOf=getCurrentMonday();renderRMOopUpdate();renderRMFlUpdate()" style="font-size:11px;padding:3px 8px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer">Today</button>';
-  h += '<div style="margin-left:auto;display:flex;gap:3px">';
-  var _rvms2 = ['week', 'month'];
-  for (var _rvi2 = 0; _rvi2 < _rvms2.length; _rvi2++) {
-    var _rvm2 = _rvms2[_rvi2], _risV2 = rmFlViewMode === _rvm2;
-    h += '<button onclick="rmFlViewMode=\'' + _rvm2 + '\';renderRMOopUpdate();renderRMFlUpdate()" style="padding:4px 10px;border-radius:5px;font-size:11px;border:1px solid rgba(91,74,138,.3);background:' + (_risV2 ? '#5B4A8A' : 'transparent') + ';color:' + (_risV2 ? '#fff' : '#5B4A8A') + ';cursor:pointer;font-weight:' + (_risV2 ? '700' : '400') + '">' + _rvm2.charAt(0).toUpperCase() + _rvm2.slice(1) + '</button>';
-  }
-  h += '</div></div>';
+
+  /* Month nav toolbar */
+  h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">';
+  h += '<button onclick="rmFlWeekOf=shiftOopMonth(rmFlWeekOf,-1);renderRMOopUpdate();renderRMFlUpdate()" style="padding:4px 10px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer;font-size:14px">&#9664;</button>';
+  h += '<span style="font-size:15px;font-weight:700;min-width:160px;text-align:center">' + _rmd.toLocaleDateString('en-US',{month:'long',year:'numeric'}) + '</span>';
+  h += '<button onclick="rmFlWeekOf=shiftOopMonth(rmFlWeekOf,1);renderRMOopUpdate();renderRMFlUpdate()" style="padding:4px 10px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer;font-size:14px">&#9654;</button>';
+  h += '<button onclick="rmFlWeekOf=getCurrentMonday();renderRMOopUpdate();renderRMFlUpdate()" style="font-size:11px;padding:3px 10px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer;margin-left:4px">Today</button>';
+  h += '</div>';
 
   if (!hasAny) {
     h += '<div style="padding:16px 0;text-align:center;color:var(--mid-gray);font-size:12px">No FL or OOP payments scheduled for this period.</div>';
@@ -10017,85 +10087,8 @@ function renderRMOopCalendar(projCode) {
     return h;
   }
 
-  /* Grid */
-  h += '<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:11px">';
-  /* Header */
-  h += '<thead><tr><th style="padding:5px 8px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mid-gray);min-width:130px;border-bottom:2px solid rgba(91,74,138,.15)">Type</th>';
-  for (var _ci2 = 0; _ci2 < cols.length; _ci2++) {
-    var _col2 = cols[_ci2];
-    var _thBg2 = _col2.isToday ? 'rgba(91,74,138,.15)' : (_col2.isWeekend ? (isDark ? 'rgba(255,255,255,.02)' : 'rgba(0,0,0,.025)') : 'transparent');
-    var _thClr2 = _col2.isToday ? '#5B4A8A' : (_col2.faded ? 'var(--mid-gray)' : (_col2.isWeekend ? 'var(--mid-gray)' : 'var(--abyss)'));
-    h += '<th style="padding:5px 3px;text-align:center;font-size:10px;font-weight:600;color:' + _thClr2 + ';background:' + _thBg2 + ';border-bottom:2px solid rgba(91,74,138,.15);white-space:nowrap;min-width:58px;opacity:' + (_col2.faded ? '.5' : '1') + '">' + _col2.label + '</th>';
-  }
-  h += '</tr></thead><tbody>';
-
-  /* FL rows */
-  if (flPersonOrder.length > 0) {
-    h += '<tr style="background:rgba(91,74,138,.04)"><td colspan="' + (cols.length + 1) + '" style="padding:4px 8px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#5B4A8A">Freelancers</td></tr>';
-    for (var _fpi = 0; _fpi < flPersonOrder.length; _fpi++) {
-      var _fpn = flPersonOrder[_fpi], _fpd = flByPerson[_fpn];
-      h += '<tr><td style="padding:6px 8px;font-size:11px;font-weight:600;color:#5B4A8A;border-bottom:1px solid rgba(91,74,138,.07)">' + _fpn + '<div style="font-size:9px;color:var(--mid-gray);font-weight:400">' + sparkFmt(_fpd.rate) + '/hr</div></td>';
-      for (var _ci2 = 0; _ci2 < cols.length; _ci2++) {
-        var _col2 = cols[_ci2], _fd = _fpd.days[_col2.key];
-        var _fCellBg = _col2.isToday ? 'rgba(91,74,138,.06)' : (_col2.isWeekend ? (isDark ? 'rgba(255,255,255,.01)' : 'rgba(0,0,0,.018)') : 'transparent');
-        /* Month view: click drills into week */
-        var _fClick = rmFlViewMode === 'month' ? 'rmFlWeekOf=\'' + _col2.key + '\';rmFlViewMode=\'week\';renderRMOopUpdate();renderRMFlUpdate()' : '';
-        h += '<td style="padding:3px 2px;text-align:center;border-bottom:1px solid rgba(91,74,138,.07);border-left:1px solid rgba(91,74,138,.04);background:' + _fCellBg + ';opacity:' + (_col2.faded ? '.5' : '1') + (_fClick ? ';cursor:pointer' : '') + '"' + (_fClick ? ' onclick="' + _fClick + '"' : '') + '>';
-        if (_fd && _fd.hrs > 0) {
-          h += '<div style="background:' + (_fd.paid ? 'rgba(129,199,132,.15)' : 'rgba(91,74,138,.1)') + ';border-radius:4px;padding:3px 2px">';
-          h += '<div style="font-size:11px;font-weight:700;color:' + (_fd.paid ? '#2E7D32' : '#5B4A8A') + '">' + _fd.hrs + 'h</div>';
-          h += '<div style="font-size:9px;color:' + (_fd.paid ? '#2E7D32' : '#9575CD') + '">' + sparkFmt(_fd.hrs * _fpd.rate) + '</div></div>';
-        } else {
-          h += '<div style="color:rgba(91,74,138,.15);font-size:14px">&middot;</div>';
-        }
-        h += '</td>';
-      }
-      h += '</tr>';
-    }
-  }
-
-  /* OOP rows */
-  if (oopEnts.length > 0) {
-    h += '<tr style="background:rgba(255,152,0,.04)"><td colspan="' + (cols.length + 1) + '" style="padding:4px 8px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#F57F17;border-top:1px solid rgba(255,152,0,.2)">OOP Payments</td></tr>';
-    h += '<tr><td style="padding:6px 8px;font-size:11px;font-weight:600;color:#F57F17;border-bottom:1px solid rgba(255,152,0,.1)">Expenses</td>';
-    for (var _ci2 = 0; _ci2 < cols.length; _ci2++) {
-      var _col2 = cols[_ci2], _coEnts = oopByDay[_col2.key] || [];
-      var _cot2 = 0, _coAll2 = true, _coAny2 = false;
-      for (var _di2 = 0; _di2 < _coEnts.length; _di2++) { _cot2 += _coEnts[_di2].amount || 0; if (_coEnts[_di2].paid) _coAny2 = true; else _coAll2 = false; }
-      if (!_coEnts.length) _coAll2 = false;
-      var _oBg = _col2.isToday ? 'rgba(255,152,0,.07)' : (_col2.isWeekend ? (isDark ? 'rgba(255,255,255,.01)' : 'rgba(0,0,0,.018)') : 'transparent');
-      var _oClick = rmFlViewMode === 'month' ? 'rmFlWeekOf=\'' + _col2.key + '\';rmFlViewMode=\'week\';renderRMOopUpdate();renderRMFlUpdate()' : '';
-      h += '<td style="padding:3px 2px;text-align:center;border-bottom:1px solid rgba(255,152,0,.1);border-left:1px solid rgba(255,152,0,.05);background:' + _oBg + ';opacity:' + (_col2.faded ? '.5' : '1') + (_oClick ? ';cursor:pointer' : '') + '"' + (_oClick ? ' onclick="' + _oClick + '"' : '') + '>';
-      if (_coEnts.length) {
-        h += '<div style="background:' + (_coAll2 ? 'rgba(129,199,132,.15)' : 'rgba(255,152,0,.1)') + ';border-radius:4px;padding:3px 2px">';
-        h += '<div style="font-size:11px;font-weight:700;color:' + (_coAll2 ? '#2E7D32' : '#F57F17') + '">' + sparkFmt(_cot2) + '</div>';
-        if (_coEnts.length > 1) h += '<div style="font-size:9px;color:var(--mid-gray)">' + _coEnts.length + ' items</div>';
-        h += '<div style="font-size:9px;color:' + (_coAll2 ? '#2E7D32' : '#F57F17') + '">' + (_coAll2 ? '&#10003; Paid' : (_coAny2 ? '&#189; Part.' : 'Unpaid')) + '</div></div>';
-      } else {
-        h += '<div style="color:rgba(255,152,0,.15);font-size:14px">&middot;</div>';
-      }
-      h += '</td>';
-    }
-    h += '</tr>';
-  }
-
-  /* Grand Total Outgoing row */
-  h += '<tr style="background:rgba(0,0,0,.055);font-weight:700"><td style="padding:7px 8px;font-size:10px;color:var(--abyss);text-transform:uppercase;letter-spacing:.05em;border-top:2px solid rgba(91,74,138,.12)">Total Out</td>';
-  for (var _ci2 = 0; _ci2 < cols.length; _ci2++) {
-    var _col2 = cols[_ci2], _dayFlG2 = 0;
-    for (var _fpi = 0; _fpi < flPersonOrder.length; _fpi++) {
-      var _fpd2 = flByPerson[flPersonOrder[_fpi]];
-      var _fd2 = _fpd2.days[_col2.key];
-      if (_fd2) _dayFlG2 += _fd2.hrs * _fpd2.rate;
-    }
-    var _coEnts2 = oopByDay[_col2.key] || [], _cot3 = 0;
-    for (var _di2 = 0; _di2 < _coEnts2.length; _di2++) _cot3 += _coEnts2[_di2].amount || 0;
-    var _dayG2 = _dayFlG2 + _cot3;
-    h += '<td style="padding:7px 3px;text-align:center;font-size:11px;font-weight:700;color:' + (_dayG2 > 0 ? 'var(--abyss)' : 'var(--mid-gray)') + ';border-top:2px solid rgba(91,74,138,.12);border-left:1px solid rgba(91,74,138,.07)">' + (_dayG2 > 0 ? sparkFmt(_dayG2) : '') + '</td>';
-  }
-  h += '</tr>';
-
-  h += '</tbody></table></div></div>';
+  h += renderRMMonthGrid(projCode, flEntries, freelancers);
+  h += '</div>';
   return h;
 }
 
