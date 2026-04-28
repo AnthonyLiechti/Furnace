@@ -712,7 +712,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.100 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.102 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -11547,6 +11547,43 @@ function renderOopGridDay(el, lbl, projCode) {
     h += '</div>';
   }
 
+  /* FL cross-calendar: show freelancer hours for the week containing this day */
+  var _flDayD = new Date(today);
+  var _flDow = _flDayD.getDay(); /* 0=Sun,1=Mon...6=Sat */
+  var _flDaysToMon = _flDow === 0 ? -6 : 1 - _flDow;
+  var _flMon = new Date(_flDayD); _flMon.setDate(_flMon.getDate() + _flDaysToMon);
+  var _flMonStr = _flMon.toISOString().slice(0, 10);
+  var _flSbD = SUPA_BUDGETS && SUPA_BUDGETS[projCode];
+  if (_flSbD && _flSbD._flEntries) {
+    var _flDayEnts = _flSbD._flEntries.filter(function(fe) { return flIsDateLabel(fe.week_label || '') && fe.week_label === _flMonStr; });
+    if (_flDayEnts.length) {
+      var _flByPersonD = {};
+      for (var _fdi = 0; _fdi < _flDayEnts.length; _fdi++) {
+        var _fde = _flDayEnts[_fdi];
+        var _fdn = _fde._name || (_fde.team_member && _fde.team_member.name) || 'Freelancer';
+        if (!_flByPersonD[_fdn]) _flByPersonD[_fdn] = { hrs: 0, paid: false };
+        _flByPersonD[_fdn].hrs += _fde.hours || 0;
+        if (_fde.paid) _flByPersonD[_fdn].paid = true;
+      }
+      h += '<div style="margin-top:20px;padding-top:16px;border-top:1px solid ' + _dmBorder + '">';
+      h += '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#9575CD;font-weight:600;margin-bottom:8px">Freelancers \u2014 Week of ' + _flMonStr + '</div>';
+      var _flDayTotHrs = 0;
+      for (var _fdpn in _flByPersonD) {
+        var _fdp = _flByPersonD[_fdpn];
+        _flDayTotHrs += _fdp.hrs;
+        h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:12px;border-bottom:1px solid rgba(149,117,205,.1)">';
+        h += '<span>' + _fdpn + '</span>';
+        h += '<span style="display:flex;align-items:center;gap:8px">';
+        h += '<span style="font-weight:600;color:#9575CD">' + _fdp.hrs + 'h</span>';
+        h += '<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:8px;' + (_fdp.paid ? 'background:rgba(46,125,50,.15);color:#2E7D32' : 'background:rgba(149,117,205,.15);color:#9575CD') + '">' + (_fdp.paid ? 'Paid' : 'Unpaid') + '</span>';
+        h += '</span></div>';
+      }
+      h += '<div style="display:flex;justify-content:space-between;padding:8px 0 0;font-size:13px;font-weight:700;border-top:1px solid rgba(149,117,205,.2);margin-top:4px">';
+      h += '<span style="color:#9575CD">FL Total</span><span style="color:#9575CD">' + _flDayTotHrs + 'h</span></div>';
+      h += '</div>';
+    }
+  }
+
   h += '</div>';
   el.innerHTML = h;
 }
@@ -11626,6 +11663,22 @@ function renderOopGridMonth(el, lbl, projCode) {
       }
       if (dayEntries.length === 0 && isThisMonth) {
         h += '<div style="font-size:14px;color:' + _dmBorder + ';text-align:center;margin-top:8px">+</div>';
+      }
+      /* FL cross-calendar: show freelancer hours as purple chips on Monday cell */
+      if (d === 0 && isThisMonth) {
+        var _flSbM = SUPA_BUDGETS && SUPA_BUDGETS[projCode];
+        if (_flSbM && _flSbM._flEntries) {
+          var _flMonEnts = _flSbM._flEntries.filter(function(fe) { return flIsDateLabel(fe.week_label || '') && fe.week_label === weekDays[0]; });
+          var _flMonByPerson = {};
+          for (var _fmi = 0; _fmi < _flMonEnts.length; _fmi++) {
+            var _fme = _flMonEnts[_fmi];
+            var _fmn = _fme._name || (_fme.team_member && _fme.team_member.name) || 'FL';
+            _flMonByPerson[_fmn] = (_flMonByPerson[_fmn] || 0) + (_fme.hours || 0);
+          }
+          for (var _fmpn in _flMonByPerson) {
+            h += '<div style="font-size:9px;padding:2px 5px;border-radius:3px;background:rgba(149,117,205,.2);color:#9575CD;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + _fmpn + ' \u2014 FL week">' + _fmpn.split(' ')[0] + ' ' + _flMonByPerson[_fmpn] + 'h</div>';
+          }
+        }
       }
       h += '</div>';
     }
