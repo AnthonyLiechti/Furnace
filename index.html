@@ -713,7 +713,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.106 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.107 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -7179,13 +7179,22 @@ function sparkRenderSummary() {
   var _projCodeA = (data.budget.projects && data.budget.projects.project_code)
     ? data.budget.projects.project_code
     : (PROJ_CODE_MAP && PROJ_CODE_MAP[data.budget.project_id]);
+  /* Build name → fully_burdened_rate lookup from team members */
+  var _tmRateMap = {};
+  if (FURNACE_TEAM_MEMBERS) {
+    for (var _tmi = 0; _tmi < FURNACE_TEAM_MEMBERS.length; _tmi++) {
+      var _tm = FURNACE_TEAM_MEMBERS[_tmi];
+      if (_tm.name && _tm.fully_burdened_rate) _tmRateMap[_tm.name] = _tm.fully_burdened_rate;
+    }
+  }
   var _actLaborHrs = 0, _actLaborCost = 0;
   if (_projCodeA && SUPA_ACTUALS_ALL) {
     for (var _ai = 0; _ai < SUPA_ACTUALS_ALL.length; _ai++) {
       var _ae = SUPA_ACTUALS_ALL[_ai];
       if (_ae.project_code !== _projCodeA) continue;
+      var _aeRate = (_ae.person_name && _tmRateMap[_ae.person_name]) ? _tmRateMap[_ae.person_name] : (_ae.billable_rate || 200);
       _actLaborHrs += (_ae.hours || 0);
-      _actLaborCost += (_ae.hours || 0) * 200;
+      _actLaborCost += (_ae.hours || 0) * _aeRate;
     }
   }
   var _sbA = _projCodeA ? SUPA_BUDGETS[_projCodeA] : null;
