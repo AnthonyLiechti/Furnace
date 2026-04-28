@@ -333,9 +333,10 @@ body { font-family: Arial, 'TT Hoves Pro', sans-serif; background: var(--light-g
 .spark-oop-grid-talent { grid-template-columns:1.5fr 1fr 70px 90px 60px 90px 1.2fr; }
 .spark-oop-grid-travel { grid-template-columns:1.5fr 1fr 70px 90px 60px 60px 90px 1fr; }
 /* 3-tier OOP grid — all columns in ONE horizontal row */
-.spark-oop-tier-hdr { display:flex; gap:0; padding:0 4px 0 24px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; align-items:stretch; }
-.spark-oop-tier-hdr > div:first-child { flex:1.4; }
-.oop-tier-group { text-align:center; padding:5px 8px; border-radius:4px 4px 0 0; flex:1; }
+.spark-oop-tier-hdr { display:flex; gap:2px; padding:0 4px 0 24px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; align-items:stretch; }
+.spark-oop-tier-hdr > div:first-child { flex:1.4; min-width:0; }
+.spark-oop-tier-hdr > div:last-child  { flex:1;   min-width:0; }
+.oop-tier-group { text-align:center; padding:5px 8px; border-radius:4px 4px 0 0; flex:none; }
 .oop-tier-group.planned { background:rgba(48,109,124,.12); color:var(--ocean); }
 .oop-tier-group.adjusted { background:rgba(255,183,77,.12); color:#F57F17; }
 .oop-tier-group.actual { background:rgba(129,199,132,.12); color:#2E7D32; }
@@ -343,6 +344,7 @@ body { font-family: Arial, 'TT Hoves Pro', sans-serif; background: var(--light-g
 .spark-oop-col-hdr-3tier > div { flex:0 0 56px; text-align:center; }
 .spark-oop-col-hdr-3tier > div:first-child { flex:1.4; text-align:left; }
 .spark-oop-col-hdr-3tier > div:last-child { flex:1; text-align:left; }
+.spark-oop-col-hdr-3tier .pln { color:var(--ocean); }
 .spark-oop-col-hdr-3tier .adj { color:#F57F17; }
 .spark-oop-col-hdr-3tier .act { color:#2E7D32; }
 .spark-oop-line-item-3tier { display:flex; gap:2px; align-items:center; padding:4px 4px 4px 24px; border-bottom:1px solid var(--light-gray); font-size:12px; }
@@ -710,7 +712,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.95 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.96 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -7946,29 +7948,39 @@ function sparkOopGridClass(slug) {
 }
 
 function sparkOopColHeaders(slug) {
+  var hasDays  = (slug === 'talent' || slug === 'travel-meals');
+  var hasHead  = (slug === 'travel-meals');
+  /* Per-tier column count: Count + Rate [+ Days] [+ Head] + Total */
+  var planCols = 2 + (hasDays ? 1 : 0) + (hasHead ? 1 : 0) + 1;
+  var adjCols  = planCols;
+  var actCols  = planCols + 1; /* +Paid */
+  /* Width of each tier group = numCols×56px + (numCols-1)×2px (gap between cols) */
+  function tw(n) { return 'calc(' + n + '*56px + ' + (n-1) + '*2px)'; }
+
   var h = '<div class="spark-oop-tier-hdr">';
-  h += '<div class="oop-tier-label" style="grid-column:1"></div>';
-  h += '<div class="oop-tier-group planned">PLANNED</div>';
-  h += '<div class="oop-tier-group adjusted">ADJUSTED</div>';
-  h += '<div class="oop-tier-group actual">ACTUAL</div>';
-  h += '<div></div><div></div><div></div>';
+  h += '<div></div>'; /* Line Item spacer — flex:1.4 from CSS */
+  h += '<div class="oop-tier-group planned" style="width:' + tw(planCols) + '">PLANNED</div>';
+  h += '<div class="oop-tier-group adjusted" style="width:' + tw(adjCols)  + '">ADJUSTED</div>';
+  h += '<div class="oop-tier-group actual"   style="width:' + tw(actCols)  + '">ACTUAL</div>';
+  h += '<div></div>'; /* Notes spacer — flex:1 from CSS */
   h += '</div>';
+
   h += '<div class="spark-oop-col-hdr-3tier">';
   h += '<div>Line Item</div>';
-  /* Planned */
-  h += '<div class="num">Count</div><div class="num">Rate</div>';
-  if (slug === 'talent' || slug === 'travel-meals') h += '<div class="num">Days</div>';
-  if (slug === 'travel-meals') h += '<div class="num">Head</div>';
-  h += '<div class="num">Total</div>';
-  /* Adjusted */
+  /* Planned — ocean blue */
+  h += '<div class="num pln">Count</div><div class="num pln">Rate</div>';
+  if (hasDays) h += '<div class="num pln">Days</div>';
+  if (hasHead) h += '<div class="num pln">Head</div>';
+  h += '<div class="num pln">Total</div>';
+  /* Adjusted — amber */
   h += '<div class="num adj">Count</div><div class="num adj">Rate</div>';
-  if (slug === 'talent' || slug === 'travel-meals') h += '<div class="num adj">Days</div>';
-  if (slug === 'travel-meals') h += '<div class="num adj">Head</div>';
+  if (hasDays) h += '<div class="num adj">Days</div>';
+  if (hasHead) h += '<div class="num adj">Head</div>';
   h += '<div class="num adj">Total</div>';
-  /* Actual */
+  /* Actual — green */
   h += '<div class="num act">Count</div><div class="num act">Rate</div>';
-  if (slug === 'talent' || slug === 'travel-meals') h += '<div class="num act">Days</div>';
-  if (slug === 'travel-meals') h += '<div class="num act">Head</div>';
+  if (hasDays) h += '<div class="num act">Days</div>';
+  if (hasHead) h += '<div class="num act">Head</div>';
   h += '<div class="num act">Total</div>';
   h += '<div class="num act">Paid</div>';
   h += '<div>Notes</div>';
