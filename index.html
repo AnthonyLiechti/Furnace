@@ -713,7 +713,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.110 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.111 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -2154,16 +2154,9 @@ function renderProjFinancials(p) {
       _pfActLaborCost += (_pfae.hours || 0) * _pfaeRate;
     }
   }
-  var _pfActFlCost = 0, _pfActFlPaid = 0;
-  if (sb._flEntries) {
-    for (var _pffi = 0; _pffi < sb._flEntries.length; _pffi++) {
-      var _pffe = sb._flEntries[_pffi];
-      if (!flIsDateLabel(_pffe.week_label || '')) continue;
-      var _pffc = (_pffe.hours || 0) * (_pffe.rate || 0);
-      _pfActFlCost += _pffc;
-      if (_pffe.paid) _pfActFlPaid += _pffc;
-    }
-  }
+  /* Use pre-computed flTotal/flSpent — works for all week_label formats (ISO dates, human-readable, __budget__) */
+  var _pfActFlCost = noFl ? 0 : (sb.flTotal || 0);   /* all scheduled FL */
+  var _pfActFlPaid = noFl ? 0 : (sb.flSpent || 0);   /* paid only */
   var _pfActOopScheduled = noOop ? 0 : sbOopBudget(sb); /* all active OOP × markup */
   var _pfActOopSpent = sb.oopSpent || 0;                /* paid only */
   var _pfActProfit = tcvPrice - _pfActLaborCost - _pfActFlCost - _pfActOopScheduled;
@@ -7247,17 +7240,9 @@ function sparkRenderSummary() {
     }
   }
   var _sbA = _projCodeA ? SUPA_BUDGETS[_projCodeA] : null;
-  /* FL actual: all scheduled calendar entries (ISO-date week_label), paid or not */
-  var _actFlCost = 0, _actFlPaid = 0;
-  if (_sbA && _sbA._flEntries) {
-    for (var _fi = 0; _fi < _sbA._flEntries.length; _fi++) {
-      var _fe = _sbA._flEntries[_fi];
-      if (!flIsDateLabel(_fe.week_label || '')) continue;
-      var _fc = (_fe.hours || 0) * (_fe.rate || 0);
-      _actFlCost += _fc;
-      if (_fe.paid) _actFlPaid += _fc;
-    }
-  }
+  /* Use pre-computed flTotal/flSpent — handles all week_label formats */
+  var _actFlCost  = _sbA ? (_sbA.flTotal || 0) : 0;  /* all scheduled FL */
+  var _actFlPaid  = _sbA ? (_sbA.flSpent || 0) : 0;  /* paid only */
   var _actOopScheduled = _sbA ? sbOopBudget(_sbA) : 0; /* all active OOP × markup */
   var _actOopSpent = _sbA ? (_sbA.oopSpent || 0) : 0;   /* paid only */
   var _actProfit = clientPrice - _actLaborCost - _actFlCost - _actOopScheduled;
