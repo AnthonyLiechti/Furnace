@@ -712,7 +712,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.99 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.100 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -770,6 +770,8 @@ let displayUnit = 'hours';
 let openClients = {};
 let showFinalized = false;
 let showFlaggedAll = false; /* Needs Attention: false=active only, true=all projects */
+var rmFlViewMode = 'week'; /* RM freelancer calendar view: 'week' | 'month' */
+var rmFlWeekOf   = null;   /* RM freelancer calendar anchor Monday ISO string */
 var flaggedCollapsedOop = new Set(); /* collapsed project IDs in OOP Unscheduled section */
 var flaggedCollapsedFl  = new Set(); /* collapsed project IDs in FL Unplanned section */
 let showInactiveClients = false;
@@ -7781,12 +7783,12 @@ function sparkRenderFreelancersContent() {
   h += '<thead><tr style="background:rgba(91,74,138,.07)">';
   h += '<th style="text-align:left;padding:6px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--mid-gray)">Freelancer</th>';
   h += '<th style="text-align:right;padding:6px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--mid-gray)">Rate</th>';
-  h += '<th style="text-align:center;padding:6px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--mid-gray)">Budget Hrs</th>';
-  h += '<th style="text-align:right;padding:6px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--mid-gray)">Cost</th>';
-  h += '<th style="text-align:center;padding:6px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--mid-gray)">Scheduled / Paid</th>';
+  h += '<th style="text-align:center;padding:6px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#5B4A8A;background:rgba(91,74,138,.06)">Planned</th>';
+  h += '<th style="text-align:center;padding:6px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#F57F17;background:rgba(255,183,77,.06)">Adjusted</th>';
+  h += '<th style="text-align:center;padding:6px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#2E7D32;background:rgba(129,199,132,.06)">Actual</th>';
   h += '</tr></thead><tbody>';
 
-  var grandBudgHrs = 0, grandBudgCost = 0, grandPaidHrs = 0;
+  var grandBudgHrs = 0, grandBudgCost = 0, grandPaidHrs = 0, grandWeekHrs = 0;
 
   for (var g = 0; g < tmOrder.length; g++) {
     var tmId = tmOrder[g];
@@ -7814,35 +7816,41 @@ function sparkRenderFreelancersContent() {
     grandBudgHrs  += budgHrs;
     grandBudgCost += budgCost;
     grandPaidHrs  += grpPaidHrs;
+    grandWeekHrs  += grpWeekHrs;
 
     h += '<tr style="border-top:1px solid var(--canvas)">';
     h += '<td style="padding:8px 12px;font-size:12px;font-weight:600">' + name + '</td>';
     h += '<td style="padding:8px 12px;font-size:11px;color:var(--mid-gray);text-align:right">' + sparkFmtDec(grpRate) + '/hr</td>';
 
-    /* Editable snapshot budget hours — always editable; creates sentinel if missing */
-    h += '<td style="padding:6px 12px;text-align:center">';
+    /* Planned (editable __budget__ sentinel hours) */
+    h += '<td style="padding:6px 12px;text-align:center;background:rgba(91,74,138,.03)">';
     if (budgetEntry) {
-      h += '<input type="number" min="0" step="0.5" value="' + budgHrs + '" onchange="sparkSetFlBudgetHours(\'' + tmId + '\',parseFloat(this.value)||0)" style="width:60px;padding:3px 6px;border-radius:5px;border:1px solid rgba(91,74,138,.3);font-size:13px;font-weight:700;text-align:right;color:#5B4A8A;background:var(--white)">';
+      h += '<input type="number" min="0" step="0.5" value="' + budgHrs + '" onchange="sparkSetFlBudgetHours(\'' + tmId + '\',parseFloat(this.value)||0)" style="width:60px;padding:3px 6px;border-radius:5px;border:1px solid rgba(91,74,138,.3);font-size:13px;font-weight:700;text-align:center;color:#5B4A8A;background:var(--white)">';
     } else {
-      h += '<input type="number" min="0" step="0.5" value="' + (budgHrs || '') + '" placeholder="0" onchange="sparkSetFlBudgetHours(\'' + tmId + '\',parseFloat(this.value)||0)" style="width:60px;padding:3px 6px;border-radius:5px;border:1px dashed rgba(91,74,138,.4);font-size:13px;font-weight:700;text-align:right;color:#5B4A8A;background:transparent" title="Enter total budget hours">';
+      h += '<input type="number" min="0" step="0.5" value="" placeholder="0" onchange="sparkSetFlBudgetHours(\'' + tmId + '\',parseFloat(this.value)||0)" style="width:60px;padding:3px 6px;border-radius:5px;border:1px dashed rgba(91,74,138,.4);font-size:13px;font-weight:700;text-align:center;color:#5B4A8A;background:transparent" title="Enter planned hours">';
     }
-    h += '<span style="font-size:10px;color:var(--mid-gray);margin-left:3px">hrs</span>';
+    h += '<div style="font-size:10px;color:var(--mid-gray)">' + sparkFmt(budgCost) + '</div>';
     h += '</td>';
 
-    h += '<td style="padding:8px 12px;font-size:12px;font-weight:600;text-align:right;color:#5B4A8A">' + sparkFmt(budgCost) + '</td>';
-
-    /* Scheduled / paid summary */
-    h += '<td style="padding:8px 12px;text-align:center;font-size:11px">';
-    if (weekEntries.length > 0) {
-      h += '<span style="color:var(--mid-gray)">' + grpWeekHrs.toFixed(1) + ' sched</span>';
-      h += '<span style="margin:0 5px;color:var(--canvas)">·</span>';
-      if (unpaidHrs > 0) {
-        h += '<span style="color:var(--ember);font-weight:600">' + unpaidHrs.toFixed(1) + ' unpaid</span>';
-      } else {
-        h += '<span style="color:#81C784;font-weight:600">✓ all paid</span>';
-      }
+    /* Adjusted (sum of all calendar entries; red if over planned) */
+    var _adjOver = grpWeekHrs > budgHrs && budgHrs > 0;
+    h += '<td style="padding:8px 12px;text-align:center;font-size:12px;background:rgba(255,183,77,.03)">';
+    if (grpWeekHrs > 0) {
+      h += '<span style="font-weight:700;color:' + (_adjOver ? 'var(--ember)' : '#F57F17') + '">' + grpWeekHrs.toFixed(1) + 'h</span>';
+      h += '<div style="font-size:10px;color:var(--mid-gray)">' + sparkFmt(grpWeekHrs * grpRate) + '</div>';
+      if (_adjOver) h += '<div style="font-size:9px;color:var(--ember);font-weight:700">\u2191 OVER</div>';
     } else {
-      h += '<span style="color:var(--mid-gray)">No weeks yet</span>';
+      h += '<span style="color:var(--mid-gray)">\u2014</span>';
+    }
+    h += '</td>';
+
+    /* Actual (paid hours) */
+    h += '<td style="padding:8px 12px;text-align:center;font-size:12px;background:rgba(129,199,132,.03)">';
+    if (grpPaidHrs > 0) {
+      h += '<span style="font-weight:700;color:#2E7D32">' + grpPaidHrs.toFixed(1) + 'h</span>';
+      h += '<div style="font-size:10px;color:var(--mid-gray)">' + sparkFmt(grpPaidHrs * grpRate) + '</div>';
+    } else {
+      h += '<span style="color:var(--mid-gray)">\u2014</span>';
     }
     h += '</td>';
     h += '</tr>';
@@ -7851,9 +7859,9 @@ function sparkRenderFreelancersContent() {
   /* Totals row */
   h += '<tr style="border-top:2px solid var(--canvas);background:rgba(91,74,138,.06)">';
   h += '<td colspan="2" style="padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--mid-gray)">Totals</td>';
-  h += '<td style="padding:7px 12px;text-align:center;font-size:12px;font-weight:700;color:#5B4A8A">' + grandBudgHrs.toFixed(1) + ' <span style="font-size:10px;color:var(--mid-gray);font-weight:400">hrs</span></td>';
-  h += '<td style="padding:7px 12px;text-align:right;font-size:12px;font-weight:700;color:#5B4A8A">' + sparkFmt(grandBudgCost) + '</td>';
-  h += '<td style="padding:7px 12px;text-align:center;font-size:12px;color:#81C784;font-weight:600">' + grandPaidHrs.toFixed(1) + ' hrs paid</td>';
+  h += '<td style="padding:7px 12px;text-align:center;font-size:12px;font-weight:700;color:#5B4A8A;background:rgba(91,74,138,.06)">' + grandBudgHrs.toFixed(1) + 'h<div style="font-size:10px;color:var(--mid-gray);font-weight:400">' + sparkFmt(grandBudgCost) + '</div></td>';
+  h += '<td style="padding:7px 12px;text-align:center;font-size:12px;font-weight:700;color:#F57F17;background:rgba(255,183,77,.04)">' + grandWeekHrs.toFixed(1) + 'h</td>';
+  h += '<td style="padding:7px 12px;text-align:center;font-size:12px;color:#2E7D32;font-weight:600;background:rgba(129,199,132,.04)">' + grandPaidHrs.toFixed(1) + 'h</td>';
   h += '</tr>';
   h += '</tbody></table>';
 
@@ -9042,160 +9050,49 @@ function renderRMFreelancers() {
 }
 
 function renderRMFlContent() {
+  if (!rmFlWeekOf) rmFlWeekOf = getCurrentMonday();
   var entries = RM_FL.entries || [];
-  var isDark = document.documentElement.classList.contains('dark');
-  /* Dark-aware tokens for inline styles */
-  var dmText    = isDark ? 'var(--dm-text)'    : 'var(--abyss)';
-  var dmBorder  = isDark ? 'var(--dm-border)'  : 'var(--canvas)';
-  var dmSurf2   = isDark ? 'var(--dm-surface2)': '#fff';
-  var dmRowAlt  = isDark ? 'rgba(255,255,255,.03)' : 'rgba(0,0,0,.02)';
+  var freelancers = rmFlGetFreelancers(entries);
 
-  if (!entries.length) {
+  if (!freelancers.length) {
     return '<div style="padding:24px;text-align:center;color:var(--mid-gray)">'
-      + '<div style="font-size:14px;font-weight:600;margin-bottom:6px;color:' + dmText + '">No freelancers assigned</div>'
+      + '<div style="font-size:14px;font-weight:600;margin-bottom:6px">No freelancers assigned</div>'
       + '<div style="font-size:12px;margin-bottom:16px">Add freelancers to track hours and payments.</div>'
       + '<button onclick="rmFlShowAddFreelancer()" style="padding:8px 20px;border-radius:6px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-size:13px;font-weight:600">+ Add Freelancer</button>'
       + '</div>';
   }
 
-  /* Group by team_member_id */
-  var groups = {}, tmOrder = [];
-  for (var i = 0; i < entries.length; i++) {
-    var e = entries[i], tid = e.team_member_id;
-    if (!groups[tid]) { groups[tid] = { member: e.team_member, entries: [] }; tmOrder.push(tid); }
-    groups[tid].entries.push(e);
+  var h = '';
+
+  /* ── Toolbar ── */
+  h += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0 12px;flex-wrap:wrap">';
+  if (rmFlViewMode === 'month') {
+    h += '<button onclick="rmFlWeekOf=shiftOopMonth(rmFlWeekOf,-1);renderRMFlUpdate()" style="padding:4px 8px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer">&#9664;</button>';
+    var _rmd = new Date(rmFlWeekOf + 'T00:00:00');
+    h += '<span style="font-size:13px;font-weight:600;min-width:120px;text-align:center">' + _rmd.toLocaleDateString('en-US',{month:'long',year:'numeric'}) + '</span>';
+    h += '<button onclick="rmFlWeekOf=shiftOopMonth(rmFlWeekOf,1);renderRMFlUpdate()" style="padding:4px 8px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer">&#9654;</button>';
+  } else {
+    h += '<button onclick="rmFlWeekOf=shiftWeek(rmFlWeekOf,-1);renderRMFlUpdate()" style="padding:4px 8px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer">&#9664;</button>';
+    var _rwd = new Date(rmFlWeekOf + 'T00:00:00'), _rwe = new Date(_rwd); _rwe.setDate(_rwe.getDate() + 4);
+    h += '<span style="font-size:13px;font-weight:600;min-width:160px;text-align:center">' + _FL_MON[_rwd.getMonth()] + ' ' + _rwd.getDate() + '\u2013' + _FL_MON[_rwe.getMonth()] + ' ' + _rwe.getDate() + ', ' + _rwe.getFullYear() + '</span>';
+    h += '<button onclick="rmFlWeekOf=shiftWeek(rmFlWeekOf,1);renderRMFlUpdate()" style="padding:4px 8px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer">&#9654;</button>';
   }
-
-  var h = '', grandBudgHrs = 0, grandBudgCost = 0, grandPaidHrs = 0, grandPaidCost = 0;
-
-  for (var g = 0; g < tmOrder.length; g++) {
-    var tmId = tmOrder[g];
-    var grp = groups[tmId];
-    var name = (grp.member && grp.member.name) || 'Unknown';
-    var grpEntries = grp.entries;
-
-    var budgetEntry = null, weekEntries = [], grpRate = 0;
-    for (var i = 0; i < grpEntries.length; i++) {
-      grpRate = grpEntries[i].rate || grpRate;
-      if (grpEntries[i].week_label === '__budget__') budgetEntry = grpEntries[i];
-      else weekEntries.push(grpEntries[i]);
-    }
-
-    var budgHrs  = budgetEntry ? (budgetEntry.hours || 0) : weekEntries.reduce(function(s,e){ return s+(e.hours||0); }, 0);
-    var budgCost = budgHrs * grpRate;
-
-    var grpPaidHrs = 0, grpPaidCost = 0, grpWeekHrs = 0;
-    for (var i = 0; i < weekEntries.length; i++) {
-      var wh = weekEntries[i].hours || 0; grpWeekHrs += wh;
-      if (weekEntries[i].paid) { grpPaidHrs += wh; grpPaidCost += wh * grpRate; }
-    }
-    var unpaidHrs = Math.max(0, grpWeekHrs - grpPaidHrs);
-    grandBudgHrs  += budgHrs;  grandBudgCost  += budgCost;
-    grandPaidHrs  += grpPaidHrs; grandPaidCost += grpPaidCost;
-
-    h += '<div style="border:1px solid rgba(91,74,138,.25);border-radius:8px;margin-top:8px;overflow:hidden">';
-
-    /* Header */
-    var _curBillRate   = grp.member && grp.member.billable_rate;
-    var _rateMismatch  = _curBillRate && grpRate && (grpRate !== _curBillRate);
-    h += '<div style="background:#5B4A8A;color:#fff;padding:9px 12px;display:flex;align-items:center;justify-content:space-between">';
-    h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-weight:700;font-size:13px">' + name + '</span>';
-    h += '<span style="font-size:11px;opacity:.65">' + sparkFmtDec(grpRate) + '/hr</span>';
-    if (_rateMismatch) {
-      h += '<span title="Rate on this project (' + sparkFmtDec(grpRate) + '/hr) differs from current default rate (' + sparkFmtDec(_curBillRate) + '/hr)" style="font-size:9px;font-weight:700;background:rgba(255,193,7,.22);color:#FFD54F;border:1px solid rgba(255,213,79,.4);border-radius:10px;padding:2px 8px;white-space:nowrap;letter-spacing:.02em;cursor:default">Historical Rate &middot; current ' + sparkFmtDec(_curBillRate) + '/hr</span>';
-    }
-    h += '</div>';
-    h += '<button onclick="rmFlRemoveFreelancer(\'' + tmId + '\')" title="Remove freelancer" style="background:none;border:none;color:rgba(255,255,255,.45);cursor:pointer;font-size:20px;line-height:1;padding:0 4px" onmouseenter="this.style.color=\'#fff\'" onmouseleave="this.style.color=\'rgba(255,255,255,.45)\'">×</button>';
-    h += '</div>';
-
-    /* Budget bucket (snapshot hours) */
-    h += '<div style="padding:8px 12px;background:rgba(91,74,138,.08);display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(91,74,138,.12)">';
-    h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#5B4A8A;white-space:nowrap">Snapshot Budget</div>';
-    if (budgetEntry) {
-      h += '<input type="number" min="0" step="0.5" value="' + budgHrs + '" onchange="rmFlPatch(\'' + budgetEntry.id + '\',\'hours\',parseFloat(this.value)||0)" style="width:60px;padding:3px 6px;border-radius:5px;border:1px solid rgba(91,74,138,.3);font-size:13px;font-weight:700;text-align:right;color:#5B4A8A;background:' + dmSurf2 + '">';
-      h += '<span style="font-size:12px;color:var(--mid-gray)">hrs</span>';
-      h += '<span style="font-size:12px;font-weight:600;color:#5B4A8A;margin-left:4px">' + sparkFmt(budgCost) + '</span>';
-    } else {
-      h += '<span style="font-size:13px;font-weight:700;color:#5B4A8A">' + budgHrs.toFixed(1) + ' hrs · ' + sparkFmt(budgCost) + '</span>';
-      h += '<span style="font-size:10px;color:var(--mid-gray);margin-left:4px">(from week entries)</span>';
-    }
-    h += '</div>';
-
-    /* Stats */
-    h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;padding:10px 12px;gap:8px;background:rgba(91,74,138,.04)">';
-    h += '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mid-gray);margin-bottom:3px">Scheduled</div>';
-    h += '<div style="font-size:15px;font-weight:700;color:#5B4A8A">' + grpWeekHrs.toFixed(1) + ' hrs</div>';
-    h += '<div style="font-size:11px;color:var(--mid-gray)">' + sparkFmt(grpWeekHrs * grpRate) + '</div></div>';
-    h += '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mid-gray);margin-bottom:3px">Paid</div>';
-    h += '<div style="font-size:15px;font-weight:700;color:#81C784">' + grpPaidHrs.toFixed(1) + ' hrs</div>';
-    h += '<div style="font-size:11px;color:var(--mid-gray)">' + sparkFmt(grpPaidCost) + '</div></div>';
-    h += '<div style="display:flex;flex-direction:column;justify-content:space-between">';
-    if (unpaidHrs > 0) {
-      h += '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mid-gray);margin-bottom:3px">Unpaid</div>';
-      h += '<div style="font-size:15px;font-weight:700;color:var(--ember)">' + unpaidHrs.toFixed(1) + ' hrs</div>';
-      h += '<div style="font-size:11px;color:var(--mid-gray)">' + sparkFmt(unpaidHrs * grpRate) + '</div></div>';
-      h += '<button onclick="rmFlMarkAllPaid(\'' + tmId + '\')" style="margin-top:6px;padding:4px 10px;border-radius:5px;border:none;background:#81C784;color:#1B5E20;cursor:pointer;font-size:10px;font-weight:700">Mark All Paid</button>';
-    } else if (grpWeekHrs > 0) {
-      h += '<div style="display:flex;align-items:center;gap:4px;margin-top:auto"><span style="font-size:18px">✓</span><span style="font-size:11px;font-weight:600;color:#81C784">All Paid</span></div>';
-    }
-    h += '</div></div>';
-
-    /* Week rows */
-    h += '<div style="border-top:1px solid rgba(91,74,138,.15)">';
-    if (weekEntries.length > 0) {
-      h += '<div style="display:grid;grid-template-columns:1fr 110px 1fr auto;gap:8px;padding:5px 12px 3px;background:rgba(91,74,138,.05)">';
-      h += '<div style="font-size:9px;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Label</div>';
-      h += '<div style="font-size:9px;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px;font-weight:700;text-align:right">Hrs · Cost</div>';
-      h += '<div style="font-size:9px;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Paid &amp; Date</div>';
-      h += '<div></div></div>';
-    }
-    for (var wi = 0; wi < weekEntries.length; wi++) {
-      var we = weekEntries[wi];
-      var weHrs  = we.hours || 0;
-      var weCost = weHrs * (we.rate || 0);
-      var rowBg  = we.paid ? 'rgba(129,199,132,.07)' : (wi % 2 === 0 ? 'transparent' : dmRowAlt);
-      h += '<div style="display:grid;grid-template-columns:1fr 110px 1fr auto;align-items:center;gap:8px;padding:6px 12px;background:' + rowBg + '">';
-      /* Editable label */
-      h += '<input type="text" value="' + (we.week_label || 'Week').replace(/"/g,'&quot;') + '" onchange="rmFlDebouncedPatch(\'' + we.id + '\',\'week_label\',this.value)" style="font-size:12px;font-weight:500;color:' + dmText + ';background:transparent;border:none;border-bottom:1px dashed ' + dmBorder + ';outline:none;width:100%;padding:1px 0">';
-      /* Hours + cost */
-      h += '<div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">';
-      h += '<input type="number" min="0" step="0.5" value="' + weHrs + '" onchange="rmFlPatch(\'' + we.id + '\',\'hours\',parseFloat(this.value)||0)" style="width:52px;padding:4px 6px;border-radius:5px;border:1px solid ' + dmBorder + ';font-size:12px;font-weight:600;text-align:right;color:' + dmText + ';background:' + dmSurf2 + '">';
-      h += '<span style="font-size:10px;color:var(--mid-gray);white-space:nowrap">' + sparkFmt(weCost) + '</span>';
-      h += '</div>';
-      /* Paid checkbox + date */
-      h += '<div style="display:flex;align-items:center;gap:6px">';
-      h += '<input type="checkbox"' + (we.paid ? ' checked' : '') + ' onchange="rmFlTogglePaid(\'' + we.id + '\',this.checked)" title="Mark paid" style="cursor:pointer;width:15px;height:15px;accent-color:#81C784;flex-shrink:0">';
-      if (we.paid) {
-        h += '<input type="date" value="' + (we.paid_date || '') + '" onchange="rmFlDebouncedPatch(\'' + we.id + '\',\'paid_date\',this.value)" style="font-size:11px;border:1px solid ' + dmBorder + ';border-radius:5px;padding:2px 5px;color:#81C784;font-weight:600;background:' + dmSurf2 + ';outline:none">';
-      } else {
-        h += '<span style="font-size:10px;color:var(--mid-gray)">Unpaid</span>';
-      }
-      h += '</div>';
-      /* Delete */
-      h += '<button onclick="rmFlDeleteEntry(\'' + we.id + '\')" title="Remove week" style="background:none;border:none;cursor:pointer;color:var(--mid-gray);font-size:15px;line-height:1;padding:0 2px" onmouseenter="this.style.color=\'var(--ember)\'" onmouseleave="this.style.color=\'var(--mid-gray)\'">×</button>';
-      h += '</div>';
-    }
-
-    /* Add week — label-first entry point */
-    h += '<div style="padding:8px 12px 10px;display:flex;align-items:center;gap:8px">';
-    h += '<input type="text" id="rmFlNewLabel_' + tmId + '" placeholder="Label new week\u2026 (e.g. Week of Apr 21)" onkeydown="if(event.key===\'Enter\')rmFlAddWeek(\'' + tmId + '\',this.value)" style="flex:1;padding:4px 8px;border-radius:5px;border:1px solid ' + dmBorder + ';font-size:12px;color:' + dmText + ';background:' + dmSurf2 + ';outline:none">';
-    h += '<button onclick="rmFlAddWeek(\'' + tmId + '\',document.getElementById(\'rmFlNewLabel_' + tmId + '\').value)" style="padding:4px 12px;border-radius:5px;border:1px solid rgba(91,74,138,.4);background:transparent;color:#5B4A8A;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap">+ Add Week</button>';
-    h += '</div>';
-
-    h += '</div>'; /* end week rows */
-    h += '</div>'; /* end card */
+  h += '<button onclick="rmFlWeekOf=getCurrentMonday();renderRMFlUpdate()" style="font-size:11px;padding:3px 8px;border-radius:5px;border:1px solid var(--canvas);background:transparent;cursor:pointer">Today</button>';
+  h += '<div style="margin-left:auto;display:flex;gap:3px">';
+  var _rvms = ['week', 'month'];
+  for (var _rvi = 0; _rvi < _rvms.length; _rvi++) {
+    var _rvm = _rvms[_rvi], _risV = rmFlViewMode === _rvm;
+    h += '<button onclick="rmFlViewMode=\'' + _rvm + '\';renderRMFlUpdate()" style="padding:4px 10px;border-radius:5px;font-size:11px;border:1px solid rgba(91,74,138,.3);background:' + (_risV ? '#5B4A8A' : 'transparent') + ';color:' + (_risV ? '#fff' : '#5B4A8A') + ';cursor:pointer;font-weight:' + (_risV ? '700' : '400') + '">' + _rvm.charAt(0).toUpperCase() + _rvm.slice(1) + '</button>';
   }
+  h += '</div></div>';
 
-  /* Grand totals */
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 14px;margin-top:10px;background:rgba(91,74,138,.09);border-radius:8px">';
-  h += '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#5B4A8A;opacity:.8;margin-bottom:2px">Total Budget</div>';
-  h += '<span style="font-weight:700;color:#5B4A8A">' + grandBudgHrs.toFixed(1) + ' hrs · ' + sparkFmt(grandBudgCost) + '</span></div>';
-  h += '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#81C784;opacity:.8;margin-bottom:2px">Total Paid</div>';
-  h += '<span style="font-weight:700;color:#81C784">' + grandPaidHrs.toFixed(1) + ' hrs · ' + sparkFmt(grandPaidCost) + '</span></div>';
+  /* ── Calendar grid ── */
+  h += renderRMFlGrid(entries, freelancers);
+
+  /* ── Footer ── */
+  h += '<div style="padding:10px 0 2px">';
+  h += '<button onclick="rmFlShowAddFreelancer()" style="padding:6px 16px;border-radius:6px;border:1px dashed #5B4A8A;background:transparent;color:#5B4A8A;cursor:pointer;font-size:12px;font-weight:600">+ Add Freelancer</button>';
   h += '</div>';
-
-  /* Add Freelancer */
-  h += '<div style="padding:10px 0 2px"><button onclick="rmFlShowAddFreelancer()" style="padding:6px 16px;border-radius:6px;border:1px dashed #5B4A8A;background:transparent;color:#5B4A8A;cursor:pointer;font-size:12px;font-weight:600">+ Add Freelancer</button></div>';
 
   return h;
 }
@@ -9203,6 +9100,315 @@ function renderRMFlContent() {
 function renderRMFlUpdate() {
   var el = document.getElementById('rmFlContent');
   if (el) el.innerHTML = renderRMFlContent();
+}
+
+function rmFlGetFreelancers(entries) {
+  var seen = {}, result = [];
+  for (var i = 0; i < entries.length; i++) {
+    var e = entries[i], tid = e.team_member_id;
+    if (!seen[tid]) { seen[tid] = true; result.push({ tmId: tid, name: e._name || (e.team_member && e.team_member.name) || 'Unknown', rate: e.rate || 0 }); }
+  }
+  return result;
+}
+
+function rmFlGetTiers(entries, tmId) {
+  var planned = 0, adjusted = 0, actual = 0;
+  for (var i = 0; i < entries.length; i++) {
+    var e = entries[i];
+    if (e.team_member_id !== tmId) continue;
+    if (e.week_label === '__budget__') { planned += e.hours || 0; continue; }
+    if (flIsDateLabel(e.week_label || '')) { adjusted += e.hours || 0; if (e.paid) actual += e.hours || 0; }
+  }
+  return { planned: planned, adjusted: adjusted, actual: actual };
+}
+
+function rmFlGetColumns() {
+  if (!rmFlWeekOf) rmFlWeekOf = getCurrentMonday();
+  var cols = [];
+  if (rmFlViewMode === 'month') {
+    var d = new Date(rmFlWeekOf + 'T00:00:00'), tm = d.getMonth(), ty = d.getFullYear();
+    var first = new Date(ty, tm, 1), dow = first.getDay();
+    first.setDate(first.getDate() - (dow === 0 ? 6 : dow - 1));
+    var endOM = new Date(ty, tm + 1, 0), cur = new Date(first);
+    while (cur <= endOM) {
+      var iso = cur.toISOString().slice(0, 10);
+      cols.push({ key: iso, label: _FL_MON[cur.getMonth()] + ' ' + cur.getDate(), faded: cur.getMonth() !== tm });
+      cur.setDate(cur.getDate() + 7);
+    }
+  } else {
+    var cur = new Date(rmFlWeekOf + 'T00:00:00');
+    for (var i = 0; i < 5; i++) {
+      var iso = cur.toISOString().slice(0, 10);
+      var end = new Date(cur); end.setDate(end.getDate() + 4);
+      var lbl = _FL_MON[cur.getMonth()] + ' ' + cur.getDate() + '\u2013' + (cur.getMonth() !== end.getMonth() ? _FL_MON[end.getMonth()] + ' ' : '') + end.getDate();
+      cols.push({ key: iso, label: lbl, faded: false });
+      cur.setDate(cur.getDate() + 7);
+    }
+  }
+  return cols;
+}
+
+function renderRMFlGrid(entries, freelancers) {
+  var isDark = document.documentElement.classList.contains('dark');
+  var projCode = RM_FL.projCode;
+  var cols = rmFlGetColumns();
+
+  /* Build lookup: tmId|weekISO → [entries] */
+  var lookup = {};
+  for (var i = 0; i < entries.length; i++) {
+    var e = entries[i];
+    if (!flIsDateLabel(e.week_label || '')) continue;
+    var lk = e.team_member_id + '|' + e.week_label;
+    if (!lookup[lk]) lookup[lk] = [];
+    lookup[lk].push(e);
+  }
+
+  var h = '<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;min-width:500px;font-size:12px">';
+
+  /* Header */
+  h += '<thead><tr>';
+  h += '<th style="padding:6px 10px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mid-gray);min-width:160px;border-bottom:2px solid rgba(91,74,138,.15)">Freelancer</th>';
+  h += '<th style="padding:6px 8px;text-align:center;background:rgba(91,74,138,.08);color:#5B4A8A;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid rgba(91,74,138,.3);min-width:72px">Planned</th>';
+  h += '<th style="padding:6px 8px;text-align:center;background:rgba(255,183,77,.06);color:#F57F17;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid rgba(255,183,77,.3);min-width:72px">Adjusted</th>';
+  h += '<th style="padding:6px 8px;text-align:center;background:rgba(129,199,132,.06);color:#2E7D32;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid rgba(129,199,132,.3);min-width:72px">Actual</th>';
+  for (var ci = 0; ci < cols.length; ci++) {
+    var col = cols[ci];
+    h += '<th style="padding:5px 4px;text-align:center;font-size:10px;font-weight:600;color:' + (col.faded ? 'var(--mid-gray)' : 'var(--abyss)') + ';border-bottom:2px solid rgba(91,74,138,.15);white-space:nowrap;min-width:80px;opacity:' + (col.faded ? '.55' : '1') + '">' + col.label + '</th>';
+  }
+  h += '</tr></thead><tbody>';
+
+  var totPlanned = 0, totAdjusted = 0, totActual = 0;
+
+  for (var fi = 0; fi < freelancers.length; fi++) {
+    var fl = freelancers[fi];
+    var tiers = rmFlGetTiers(entries, fl.tmId);
+    totPlanned += tiers.planned; totAdjusted += tiers.adjusted; totActual += tiers.actual;
+    var planEntry = null;
+    for (var i = 0; i < entries.length; i++) { if (entries[i].team_member_id === fl.tmId && entries[i].week_label === '__budget__') { planEntry = entries[i]; break; } }
+    var adjOver = tiers.adjusted > tiers.planned && tiers.planned > 0;
+    var rowBg = fi % 2 === 0 ? 'transparent' : (isDark ? 'rgba(255,255,255,.018)' : 'rgba(0,0,0,.012)');
+
+    h += '<tr style="background:' + rowBg + '">';
+
+    /* Name */
+    h += '<td style="padding:8px 10px;border-bottom:1px solid rgba(91,74,138,.07)">';
+    h += '<div style="font-weight:600;font-size:12px">' + fl.name + '</div>';
+    h += '<div style="font-size:10px;color:var(--mid-gray)">' + sparkFmt(fl.rate) + '/hr</div>';
+    h += '<button onclick="event.stopPropagation();rmFlRemoveFreelancer(\'' + fl.tmId + '\')" style="background:none;border:none;font-size:10px;color:var(--mid-gray);cursor:pointer;padding:0;margin-top:2px;text-decoration:underline;line-height:1.6">remove</button>';
+    h += '</td>';
+
+    /* Planned */
+    h += '<td style="padding:6px 8px;text-align:center;background:rgba(91,74,138,.04);border-bottom:1px solid rgba(91,74,138,.07)">';
+    if (planEntry) {
+      h += '<input type="number" min="0" step="0.5" value="' + tiers.planned + '" onchange="rmFlPatch(\'' + planEntry.id + '\',\'hours\',parseFloat(this.value)||0);rmFlSyncPlanToSnapshot(\'' + fl.tmId + '\',parseFloat(this.value)||0)" style="width:52px;padding:2px 4px;border-radius:4px;border:1px solid rgba(91,74,138,.3);font-size:13px;font-weight:700;text-align:center;color:#5B4A8A;background:transparent">';
+    } else {
+      h += '<input type="number" min="0" step="0.5" value="" placeholder="0" onchange="rmFlCreatePlanEntry(\'' + fl.tmId + '\',parseFloat(this.value)||0)" style="width:52px;padding:2px 4px;border-radius:4px;border:1px dashed rgba(91,74,138,.3);font-size:13px;text-align:center;color:#5B4A8A;background:transparent" title="Set planned hours">';
+    }
+    h += '<div style="font-size:9px;color:var(--mid-gray);margin-top:2px">' + sparkFmt(tiers.planned * fl.rate) + '</div>';
+    h += '</td>';
+
+    /* Adjusted */
+    h += '<td style="padding:6px 8px;text-align:center;background:rgba(255,183,77,.04);border-bottom:1px solid rgba(91,74,138,.07)">';
+    h += '<div style="font-size:14px;font-weight:700;color:' + (adjOver ? 'var(--ember)' : (tiers.adjusted > 0 ? '#F57F17' : 'var(--mid-gray)')) + '">' + (tiers.adjusted > 0 ? tiers.adjusted.toFixed(1) : '\u2014') + '</div>';
+    if (tiers.adjusted > 0) h += '<div style="font-size:9px;color:var(--mid-gray)">' + sparkFmt(tiers.adjusted * fl.rate) + '</div>';
+    if (adjOver) h += '<div style="font-size:9px;color:var(--ember);font-weight:700;margin-top:2px">\u2191 OVER</div>';
+    h += '</td>';
+
+    /* Actual */
+    h += '<td style="padding:6px 8px;text-align:center;background:rgba(129,199,132,.04);border-bottom:1px solid rgba(91,74,138,.07)">';
+    h += '<div style="font-size:14px;font-weight:700;color:' + (tiers.actual > 0 ? '#2E7D32' : 'var(--mid-gray)') + '">' + (tiers.actual > 0 ? tiers.actual.toFixed(1) : '\u2014') + '</div>';
+    if (tiers.actual > 0) h += '<div style="font-size:9px;color:var(--mid-gray)">' + sparkFmt(tiers.actual * fl.rate) + '</div>';
+    h += '</td>';
+
+    /* Week cells */
+    for (var ci = 0; ci < cols.length; ci++) {
+      var col = cols[ci];
+      var lk = fl.tmId + '|' + col.key;
+      var cellEnts = lookup[lk] || [];
+      var cellHrs = 0, allPaid = true, anyPaid = false;
+      for (var ei = 0; ei < cellEnts.length; ei++) { cellHrs += cellEnts[ei].hours || 0; if (cellEnts[ei].paid) anyPaid = true; else allPaid = false; }
+      if (!cellEnts.length) allPaid = false;
+      var cBg = cellEnts.length ? (allPaid ? 'rgba(129,199,132,.18)' : 'rgba(91,74,138,.12)') : 'transparent';
+      var cClr = cellEnts.length ? (allPaid ? '#2E7D32' : '#5B4A8A') : 'rgba(91,74,138,.2)';
+      h += '<td style="padding:4px 3px;text-align:center;border-bottom:1px solid rgba(91,74,138,.07);border-left:1px solid rgba(91,74,138,.05);cursor:pointer;opacity:' + (col.faded ? '.55' : '1') + '" onclick="rmFlOpenCellModal(\'' + projCode + '\',\'' + fl.tmId + '\',\'' + col.key + '\')">';
+      if (cellEnts.length) {
+        h += '<div style="background:' + cBg + ';border-radius:4px;padding:4px 2px"><div style="font-size:12px;font-weight:700;color:' + cClr + '">' + cellHrs + 'h</div>';
+        h += '<div style="font-size:9px;color:' + (allPaid ? '#2E7D32' : '#9575CD') + ';font-weight:600">' + (allPaid ? '\u2713 Paid' : (anyPaid ? '\u00bd Partial' : 'Unpaid')) + '</div></div>';
+      } else {
+        h += '<div style="color:rgba(91,74,138,.25);font-size:18px;line-height:1.2">+</div>';
+      }
+      h += '</td>';
+    }
+    h += '</tr>';
+  }
+
+  /* Totals row */
+  var totOver = totAdjusted > totPlanned && totPlanned > 0;
+  h += '<tr style="background:rgba(91,74,138,.05);font-weight:700">';
+  h += '<td style="padding:7px 10px;font-size:11px;color:#5B4A8A;text-transform:uppercase;letter-spacing:.05em">Totals</td>';
+  h += '<td style="padding:7px 8px;text-align:center;background:rgba(91,74,138,.06);font-size:13px;color:#5B4A8A">' + totPlanned.toFixed(1) + 'h</td>';
+  h += '<td style="padding:7px 8px;text-align:center;background:rgba(255,183,77,.05);font-size:13px;color:' + (totOver ? 'var(--ember)' : '#F57F17') + '">' + totAdjusted.toFixed(1) + 'h</td>';
+  h += '<td style="padding:7px 8px;text-align:center;background:rgba(129,199,132,.05);font-size:13px;color:#2E7D32">' + totActual.toFixed(1) + 'h</td>';
+  for (var ci = 0; ci < cols.length; ci++) {
+    var col = cols[ci], colHrs = 0;
+    for (var fi = 0; fi < freelancers.length; fi++) { var ce = lookup[freelancers[fi].tmId + '|' + col.key] || []; for (var ei = 0; ei < ce.length; ei++) colHrs += ce[ei].hours || 0; }
+    h += '<td style="padding:7px 4px;text-align:center;font-size:11px;color:var(--mid-gray);border-left:1px solid rgba(91,74,138,.05)">' + (colHrs > 0 ? colHrs.toFixed(1) + 'h' : '') + '</td>';
+  }
+  h += '</tr>';
+
+  h += '</tbody></table>';
+
+  /* OOP cross-calendar: show scheduled OOP payments for this project */
+  if (projCode && OOP_SCHEDULE && OOP_SCHEDULE.entries && OOP_SCHEDULE.entries.length) {
+    var _colStart = cols[0].key;
+    var _colEndD = new Date(cols[cols.length - 1].key + 'T00:00:00'); _colEndD.setDate(_colEndD.getDate() + 6);
+    var _colEnd = _colEndD.toISOString().slice(0, 10);
+    var _oopVis = OOP_SCHEDULE.entries.filter(function(oe) {
+      return (oe.projectCode === projCode) && oe.date >= _colStart && oe.date <= _colEnd;
+    });
+    if (_oopVis.length) {
+      h += '<div style="margin-top:14px;padding:10px 12px;background:rgba(255,152,0,.05);border-radius:8px;border-left:3px solid rgba(255,152,0,.4)">';
+      h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#F57F17;margin-bottom:6px">OOP Payments in View</div>';
+      for (var oi = 0; oi < _oopVis.length; oi++) {
+        var oe = _oopVis[oi];
+        h += '<div style="display:flex;align-items:center;gap:8px;font-size:11px;padding:3px 0;border-bottom:1px solid rgba(255,152,0,.1)">';
+        h += '<span style="color:var(--mid-gray);white-space:nowrap">' + oe.date + '</span>';
+        h += '<span style="flex:1">' + (oe.lineItemName || oe.description || 'OOP item') + '</span>';
+        h += '<span style="font-weight:600;color:#F57F17">$' + Math.round(oe.amount || 0).toLocaleString() + '</span>';
+        if (oe.paid) h += '<span style="font-size:9px;color:#2E7D32;font-weight:700">\u2713 PAID</span>';
+        h += '</div>';
+      }
+      h += '</div>';
+    }
+  }
+
+  h += '</div>';
+  return h;
+}
+
+function rmFlOpenCellModal(projCode, tmId, weekISO) {
+  var entries = RM_FL.entries || [];
+  var name = '', rate = 0, cellEnts = [];
+  for (var i = 0; i < entries.length; i++) {
+    var e = entries[i];
+    if (e.team_member_id !== tmId) continue;
+    if (!name) name = e._name || (e.team_member && e.team_member.name) || '';
+    if (!rate) rate = e.rate || 0;
+    if (flIsDateLabel(e.week_label || '') && e.week_label === weekISO) cellEnts.push(e);
+  }
+  var d = new Date(weekISO + 'T00:00:00'), we = new Date(d); we.setDate(we.getDate() + 4);
+  var weekLbl = _FL_MON[d.getMonth()] + ' ' + d.getDate() + ' \u2013 ' + _FL_MON[we.getMonth()] + ' ' + we.getDate() + ', ' + we.getFullYear();
+  var editEntry = cellEnts.length === 1 ? cellEnts[0] : null;
+  var hrs = editEntry ? (editEntry.hours || 0) : 0;
+  var paid = editEntry ? !!editEntry.paid : false;
+  var paidDate = editEntry ? (editEntry.paid_date || '') : '';
+  var entryId = editEntry ? editEntry.id : '';
+
+  var overlay = document.createElement('div');
+  overlay.id = 'rmFlCellOverlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center';
+
+  var h = '<div style="background:var(--white);border-radius:12px;padding:0;min-width:300px;max-width:380px;box-shadow:0 10px 40px rgba(0,0,0,.3);overflow:hidden">';
+  h += '<div style="background:#5B4A8A;color:#fff;padding:14px 18px">';
+  h += '<div style="font-size:15px;font-weight:700">' + name + '</div>';
+  h += '<div style="font-size:11px;opacity:.75;margin-top:2px">Week of ' + weekLbl + ' \u00b7 ' + sparkFmt(rate) + '/hr</div>';
+  h += '</div>';
+  h += '<div style="padding:18px;display:flex;flex-direction:column;gap:12px">';
+  h += '<div><label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mid-gray);display:block;margin-bottom:4px">Hours</label>';
+  h += '<input id="rmFlCellHrs" type="number" min="0" step="0.5" value="' + hrs + '" oninput="var c=document.getElementById(\'rmFlCellCost\');if(c)c.textContent=\'$\'+Math.round((parseFloat(this.value)||0)*' + rate + ').toLocaleString()" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--canvas);font-size:16px;font-weight:700;color:#5B4A8A;outline:none;box-sizing:border-box">';
+  h += '<div id="rmFlCellCost" style="font-size:12px;color:var(--mid-gray);margin-top:4px">$' + Math.round(hrs * rate).toLocaleString() + '</div></div>';
+  h += '<div style="display:flex;align-items:center;gap:10px">';
+  h += '<input id="rmFlCellPaid" type="checkbox"' + (paid ? ' checked' : '') + ' style="width:16px;height:16px;accent-color:#81C784;cursor:pointer" onchange="document.getElementById(\'rmFlCellPaidRow\').style.display=this.checked?\'block\':\'none\'">';
+  h += '<label for="rmFlCellPaid" style="font-size:13px;font-weight:600;cursor:pointer;color:#2E7D32">Mark as Paid</label>';
+  h += '</div>';
+  h += '<div id="rmFlCellPaidRow" style="display:' + (paid ? 'block' : 'none') + '">';
+  h += '<label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mid-gray);display:block;margin-bottom:4px">Paid Date</label>';
+  h += '<input id="rmFlCellPaidDate" type="date" value="' + paidDate + '" style="width:100%;padding:7px 10px;border-radius:6px;border:1px solid var(--canvas);font-size:13px;outline:none;box-sizing:border-box">';
+  h += '</div>';
+  h += '<div style="display:flex;gap:8px;margin-top:4px">';
+  h += '<button onclick="rmFlSaveCellEntry(\'' + projCode + '\',\'' + tmId + '\',\'' + weekISO + '\',\'' + entryId + '\',' + rate + ')" style="flex:1;padding:10px 0;border-radius:6px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-size:13px;font-weight:600">Save</button>';
+  if (entryId) h += '<button onclick="rmFlDeleteCellEntry(\'' + entryId + '\')" style="padding:10px 14px;border-radius:6px;border:1px solid rgba(220,53,69,.3);background:transparent;color:var(--ember);cursor:pointer;font-size:13px">Delete</button>';
+  h += '<button onclick="document.getElementById(\'rmFlCellOverlay\').remove()" style="padding:10px 14px;border-radius:6px;border:1px solid var(--canvas);background:transparent;cursor:pointer;font-size:13px;color:var(--mid-gray)">Cancel</button>';
+  h += '</div></div></div>';
+
+  overlay.innerHTML = h;
+  overlay.onclick = function(ev) { if (ev.target === overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+}
+
+async function rmFlSaveCellEntry(projCode, tmId, weekISO, entryId, rate) {
+  var hrsEl = document.getElementById('rmFlCellHrs');
+  var paidEl = document.getElementById('rmFlCellPaid');
+  var pdEl   = document.getElementById('rmFlCellPaidDate');
+  if (!hrsEl) return;
+  var hours = parseFloat(hrsEl.value) || 0;
+  var paid = paidEl ? paidEl.checked : false;
+  var paidDate = (paid && pdEl && pdEl.value) ? pdEl.value : null;
+  sparkShowSaving();
+  if (entryId) {
+    await sparkFetch('freelancer_budget_entries?id=eq.' + entryId, '', 'PATCH', { hours: hours, paid: paid, paid_date: paidDate });
+    for (var i = 0; i < RM_FL.entries.length; i++) {
+      if (RM_FL.entries[i].id === entryId) { RM_FL.entries[i].hours = hours; RM_FL.entries[i].paid = paid; RM_FL.entries[i].paid_date = paidDate; break; }
+    }
+  } else {
+    if (hours <= 0) { sparkHideSaving(); document.getElementById('rmFlCellOverlay').remove(); return; }
+    var result = await sparkFetch('freelancer_budget_entries', '', 'POST', {
+      budget_id: RM_FL.budgetId, team_member_id: tmId, week_label: weekISO,
+      hours: hours, rate: rate, paid: paid, paid_date: paidDate, display_order: RM_FL.entries.length
+    });
+    if (result && result.length) {
+      result[0]._name = rmFlGetNameForTm(tmId);
+      result[0].team_member = { id: tmId, name: result[0]._name };
+      RM_FL.entries.push(result[0]);
+    }
+  }
+  if (SUPA_BUDGETS && SUPA_BUDGETS[projCode]) { SUPA_BUDGETS[projCode]._flEntries = RM_FL.entries.slice(); flRecomputeTotals(SUPA_BUDGETS[projCode]); }
+  sparkHideSaving();
+  document.getElementById('rmFlCellOverlay').remove();
+  renderRMFlUpdate();
+}
+
+async function rmFlDeleteCellEntry(entryId) {
+  sparkShowSaving();
+  await sparkFetch('freelancer_budget_entries?id=eq.' + entryId, '', 'DELETE', null);
+  RM_FL.entries = RM_FL.entries.filter(function(e) { return e.id !== entryId; });
+  sparkHideSaving();
+  document.getElementById('rmFlCellOverlay').remove();
+  renderRMFlUpdate();
+}
+
+function rmFlGetNameForTm(tmId) {
+  for (var i = 0; i < RM_FL.entries.length; i++) {
+    if (RM_FL.entries[i].team_member_id === tmId) return RM_FL.entries[i]._name || (RM_FL.entries[i].team_member && RM_FL.entries[i].team_member.name) || '';
+  }
+  if (typeof FURNACE_TEAM_MEMBERS !== 'undefined' && FURNACE_TEAM_MEMBERS) {
+    for (var i = 0; i < FURNACE_TEAM_MEMBERS.length; i++) { if (FURNACE_TEAM_MEMBERS[i].id === tmId) return FURNACE_TEAM_MEMBERS[i].name; }
+  }
+  return '';
+}
+
+async function rmFlCreatePlanEntry(tmId, hours) {
+  if (!RM_FL.budgetId || hours <= 0) return;
+  var rate = 0;
+  for (var i = 0; i < RM_FL.entries.length; i++) { if (RM_FL.entries[i].team_member_id === tmId) { rate = RM_FL.entries[i].rate || 0; break; } }
+  sparkShowSaving();
+  var result = await sparkFetch('freelancer_budget_entries', '', 'POST', {
+    budget_id: RM_FL.budgetId, team_member_id: tmId, week_label: '__budget__',
+    hours: hours, rate: rate, paid: false, display_order: -1
+  });
+  if (result && result.length) { result[0]._name = rmFlGetNameForTm(tmId); result[0].team_member = { id: tmId, name: result[0]._name }; RM_FL.entries.push(result[0]); }
+  sparkHideSaving();
+  renderRMFlUpdate();
+}
+
+function rmFlSyncPlanToSnapshot(tmId, hours) {
+  if (!SUPA_BUDGETS || !RM_FL.projCode) return;
+  var sb = SUPA_BUDGETS[RM_FL.projCode];
+  if (!sb || !sb._flEntries) return;
+  for (var i = 0; i < sb._flEntries.length; i++) {
+    if (sb._flEntries[i].team_member_id === tmId && sb._flEntries[i].week_label === '__budget__') { sb._flEntries[i].hours = hours; break; }
+  }
+  flRecomputeTotals(sb);
 }
 
 async function rmFlLoadProject(projCode) {
@@ -11223,6 +11429,45 @@ function renderOopGridWeek(el, lbl, projCode) {
   }
   h += '<div class="oop-grand-total">$' + Math.round(grandTotal).toLocaleString() + '</div>';
   h += '</div>';
+
+  /* FL cross-calendar: show freelancer calendar entries for this project in purple */
+  var _flSb = SUPA_BUDGETS && SUPA_BUDGETS[projCode];
+  if (_flSb && _flSb._flEntries && _flSb._flEntries.length) {
+    var _flCalEnts = _flSb._flEntries.filter(function(fe) {
+      return flIsDateLabel(fe.week_label || '') && fe.week_label >= days[0] && fe.week_label <= days[days.length-1];
+    });
+    if (_flCalEnts.length) {
+      /* Group by person */
+      var _flByPerson = {};
+      for (var _fi = 0; _fi < _flCalEnts.length; _fi++) {
+        var _fe = _flCalEnts[_fi];
+        var _fn = _fe._name || (_fe.team_member && _fe.team_member.name) || 'Freelancer';
+        if (!_flByPerson[_fn]) _flByPerson[_fn] = {};
+        _flByPerson[_fn][_fe.week_label] = (_flByPerson[_fn][_fe.week_label] || 0) + (_fe.hours || 0);
+        if (_fe.paid) { if (!_flByPerson[_fn]._paid) _flByPerson[_fn]._paid = {}; _flByPerson[_fn]._paid[_fe.week_label] = true; }
+      }
+      var _flNames = Object.keys(_flByPerson);
+      for (var _fni = 0; _fni < _flNames.length; _fni++) {
+        var _fln = _flNames[_fni], _flPData = _flByPerson[_fln];
+        h += '<div class="oop-row-hdr" style="font-size:10px;color:#9575CD;opacity:.8">' + _fln + '</div>';
+        var _flWeekTot = 0;
+        for (var c = 0; c < days.length; c++) {
+          var _flHrs = _flPData[days[c]] || 0;
+          var _flPaid = _flPData._paid && _flPData._paid[days[c]];
+          _flWeekTot += _flHrs;
+          if (_flHrs > 0) {
+            h += '<div class="oop-cell" style="background:' + (_flPaid ? 'rgba(91,74,138,.15)' : 'rgba(149,117,205,.12)') + ';border:1px solid rgba(149,117,205,.3);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:default">';
+            h += '<span style="font-size:11px;font-weight:700;color:#9575CD">' + _flHrs + 'h</span>';
+            h += '<span style="font-size:9px;color:' + (_flPaid ? '#2E7D32' : '#9575CD') + '">' + (_flPaid ? '\u2713 Paid' : 'Unpaid') + '</span>';
+            h += '</div>';
+          } else {
+            h += '<div class="oop-cell" style="background:rgba(149,117,205,.03)"></div>';
+          }
+        }
+        h += '<div class="oop-total-cell" style="color:#9575CD">' + (_flWeekTot > 0 ? _flWeekTot + 'h' : '') + '</div>';
+      }
+    }
+  }
 
   /* Entry list below */
   h += renderOopEntryList(projCode);
