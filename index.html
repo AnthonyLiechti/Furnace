@@ -364,6 +364,7 @@ body { font-family: Arial, 'TT Hoves Pro', sans-serif; background: var(--light-g
 .spark-summary-item .ss-label { font-size:9px; text-transform:uppercase; letter-spacing:.8px; opacity:.5; margin-bottom:4px; }
 .spark-summary-item .ss-value { font-size:20px; font-weight:700; }
 .spark-summary-item .ss-sub { font-size:10px; opacity:.45; margin-top:2px; }
+.spark-actuals-bar { background:linear-gradient(135deg,#192233 0%,#1b2d3e 100%); color:var(--white); border-radius:10px; padding:18px 24px; display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:16px; border-left:3px solid rgba(129,199,132,.5); }
 .spark-saving { display:inline-block; font-size:11px; color:var(--ocean); font-style:italic; margin-left:12px; opacity:0; transition:opacity .2s; }
 .spark-saving.visible { opacity:1; }
 .spark-overview-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px,1fr)); gap:12px; margin-top:12px; }
@@ -712,7 +713,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.104 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.106 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -774,6 +775,7 @@ var rmFlViewMode = 'week'; /* RM freelancer calendar view: 'week' | 'month' */
 var rmFlWeekOf   = null;   /* RM freelancer calendar anchor Monday ISO string */
 var flaggedCollapsedOop = new Set(); /* collapsed project IDs in OOP Unscheduled section */
 var flaggedCollapsedFl  = new Set(); /* collapsed project IDs in FL Unplanned section */
+var sparkShowActualsRow = false;
 let showInactiveClients = false;
 let sidebarSearch = '';
 
@@ -7172,7 +7174,63 @@ function sparkRenderSummary() {
   h += '<div class="spark-summary-item"><div class="ss-label">Client Price</div><div class="ss-value" style="color:var(--sand)">' + sparkFmt(clientPrice) + '</div>' + (discAmt > 0 ? '<div class="ss-sub">after ' + sparkFmt(discAmt) + ' disc.</div>' : '') + '</div>';
   h += '<div class="spark-summary-item"><div class="ss-label">Profit</div><div class="ss-value" style="color:' + (profit >= 0 ? '#81C784' : 'var(--ember)') + '">' + sparkFmt(profit) + '</div><div class="ss-sub">' + margin.toFixed(1) + '% margin</div></div>';
   el.innerHTML = h;
+
+  /* ── Actuals row ── */
+  var _projCodeA = (data.budget.projects && data.budget.projects.project_code)
+    ? data.budget.projects.project_code
+    : (PROJ_CODE_MAP && PROJ_CODE_MAP[data.budget.project_id]);
+  var _actLaborHrs = 0, _actLaborCost = 0;
+  if (_projCodeA && SUPA_ACTUALS_ALL) {
+    for (var _ai = 0; _ai < SUPA_ACTUALS_ALL.length; _ai++) {
+      var _ae = SUPA_ACTUALS_ALL[_ai];
+      if (_ae.project_code !== _projCodeA) continue;
+      _actLaborHrs += (_ae.hours || 0);
+      _actLaborCost += (_ae.hours || 0) * 200;
+    }
+  }
+  var _sbA = _projCodeA ? SUPA_BUDGETS[_projCodeA] : null;
+  /* FL actual: all scheduled calendar entries (ISO-date week_label), paid or not */
+  var _actFlCost = 0, _actFlPaid = 0;
+  if (_sbA && _sbA._flEntries) {
+    for (var _fi = 0; _fi < _sbA._flEntries.length; _fi++) {
+      var _fe = _sbA._flEntries[_fi];
+      if (!flIsDateLabel(_fe.week_label || '')) continue;
+      var _fc = (_fe.hours || 0) * (_fe.rate || 0);
+      _actFlCost += _fc;
+      if (_fe.paid) _actFlPaid += _fc;
+    }
+  }
+  var _actOopCost = _sbA ? (_sbA.oopSpent || 0) : 0;
+  var _actOopBudget = totalOopWithMarkup; /* planned OOP for comparison */
+  var _actProfit = clientPrice - _actLaborCost - _actFlCost - _actOopCost;
+  var _actMargin = clientPrice > 0 ? (_actProfit / clientPrice * 100) : 0;
+  /* Toggle row */
+  var _tglEl = document.getElementById('sparkActualsToggleRow');
+  if (_tglEl) {
+    _tglEl.innerHTML = '<button onclick="sparkToggleActualsRow()" style="font-size:11px;padding:3px 12px;border-radius:20px;border:1px solid rgba(0,0,0,.18);background:transparent;color:var(--mid-gray);cursor:pointer;font-family:inherit;letter-spacing:.02em">' + (sparkShowActualsRow ? '\u25b2 Hide Actuals' : '\u25bc Show Actuals') + '</button>';
+  }
+  /* Actuals bar */
+  var _actEl = document.getElementById('sparkActualsBar');
+  if (_actEl) {
+    _actEl.style.display = sparkShowActualsRow ? '' : 'none';
+    if (sparkShowActualsRow) {
+      var _ah = '';
+      _ah += '<div class="spark-summary-item"><div class="ss-label">Actual Labor</div><div class="ss-value">' + sparkFmt(_actLaborCost) + '</div><div class="ss-sub">' + _actLaborHrs.toFixed(1) + ' hrs tracked</div></div>';
+      _ah += '<div class="spark-summary-item"><div class="ss-label">Actual Freelancers</div><div class="ss-value" style="color:#CE93D8">' + sparkFmt(_actFlCost) + '</div><div class="ss-sub">paid: ' + sparkFmt(_actFlPaid) + '</div></div>';
+      _ah += '<div class="spark-summary-item"><div class="ss-label">Actual OOP</div><div class="ss-value">' + sparkFmt(_actOopCost) + '</div><div class="ss-sub">of ' + sparkFmt(_actOopBudget) + ' planned</div></div>';
+      _ah += '<div class="spark-summary-item"><div class="ss-label">Proj. Actual Profit</div><div class="ss-value" style="color:' + (_actProfit >= 0 ? '#81C784' : 'var(--ember)') + '">' + sparkFmt(_actProfit) + '</div></div>';
+      _ah += '<div class="spark-summary-item"><div class="ss-label">Proj. Actual Margin</div><div class="ss-value" style="color:' + (_actMargin >= 0 ? '#81C784' : 'var(--ember)') + '">' + _actMargin.toFixed(1) + '%</div></div>';
+      _actEl.className = 'spark-actuals-bar';
+      _actEl.innerHTML = _ah;
+    }
+  }
+
   syncProjFinancialsFromCurrent();
+}
+
+function sparkToggleActualsRow() {
+  sparkShowActualsRow = !sparkShowActualsRow;
+  sparkRenderSummary();
 }
 
 var sparkLaborSectionExpanded = { forge: true, freelancer: true };
@@ -8563,6 +8621,8 @@ function sparkRenderBudgetContent(embedded) {
 
   /* ── Summary Bar ── */
   h += '<div class="spark-summary" id="sparkSummaryBar"></div>';
+  h += '<div id="sparkActualsToggleRow" style="display:flex;justify-content:flex-end;margin-top:8px"></div>';
+  h += '<div id="sparkActualsBar" style="display:none"></div>';
 
   el.innerHTML = h;
 
