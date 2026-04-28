@@ -712,7 +712,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.96 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.97 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -770,6 +770,8 @@ let displayUnit = 'hours';
 let openClients = {};
 let showFinalized = false;
 let showFlaggedAll = false; /* Needs Attention: false=active only, true=all projects */
+var flaggedDismissedOop = new Set(JSON.parse(localStorage.getItem('flaggedDismissedOop') || '[]'));
+var flaggedDismissedFl  = new Set(JSON.parse(localStorage.getItem('flaggedDismissedFl')  || '[]'));
 let showInactiveClients = false;
 let sidebarSearch = '';
 
@@ -2739,6 +2741,18 @@ function renderProject(projectId) {
   }
 }
 
+/* ── NEEDS ATTENTION: dismiss helpers ── */
+function flagDismiss(type, projId) {
+  if (type === 'oop') { flaggedDismissedOop.add(projId); localStorage.setItem('flaggedDismissedOop', JSON.stringify([...flaggedDismissedOop])); }
+  else                { flaggedDismissedFl.add(projId);  localStorage.setItem('flaggedDismissedFl',  JSON.stringify([...flaggedDismissedFl]));  }
+  renderFlagged();
+}
+function flagRestore(type) {
+  if (type === 'oop') { flaggedDismissedOop.clear(); localStorage.setItem('flaggedDismissedOop', '[]'); }
+  else                { flaggedDismissedFl.clear();  localStorage.setItem('flaggedDismissedFl',  '[]'); }
+  renderFlagged();
+}
+
 /* ── RENDER: FLAGGED ── */
 function renderFlagged() {
   var h = '<h1 class="page-title">Needs Attention';
@@ -2823,17 +2837,19 @@ function renderFlagged() {
       var _ed = _it.adjusted_days != null ? _it.adjusted_days : (_it.days || 1);
       var _eh = _it.adjusted_head_count != null ? _it.adjusted_head_count : (_it.head_count || 1);
       var _et = _it.actual_amount != null ? _it.actual_amount : (_ec * _er * _ed * _eh);
-      if (_et > 0 && !_it.paid && !_scheduledIds[_it.id]) _oopUnschedCount++;
+      if (_et > 0 && !_scheduledIds[_it.id] && !_it.paid) _oopUnschedCount++;
     }
   }
 
-  /* Pre-compute unpaid freelancer count for summary card */
+  /* Pre-compute unplanned freelancer count for summary card */
   var _flUnpaidCount = 0;
   var _allForFl = all.filter(function(p) { return p._supabudget && !isProjectCompleted(p); });
   for (var i = 0; i < _allForFl.length; i++) {
     var _flItems = _allForFl[i]._supabudget._flEntries || [];
     for (var j = 0; j < _flItems.length; j++) {
-      if (!_flItems[j].paid && (_flItems[j].hours || 0) > 0) _flUnpaidCount++;
+      var _fe = _flItems[j];
+      if (_fe.week_label === '__budget__') continue;
+      if (!flIsDateLabel(_fe.week_label || '') && (_fe.hours || 0) > 0) _flUnpaidCount++;
     }
   }
 
@@ -2843,8 +2859,8 @@ function renderFlagged() {
   h += '<div class="oop-checklist-card" style="border-radius:8px;padding:14px;text-align:center;border-left:4px solid #E53935"><div style="font-size:28px;font-weight:700;color:#E53935">' + noBudget.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">No Budget</div></div>';
   h += '<div class="oop-checklist-card" style="border-radius:8px;padding:14px;text-align:center;border-left:4px solid var(--honey)"><div style="font-size:28px;font-weight:700;color:var(--honey)">' + budgetNoLabor.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Needs Labor</div></div>';
   h += '<div class="oop-checklist-card" style="border-radius:8px;padding:14px;text-align:center;border-left:4px solid #FF9800"><div style="font-size:28px;font-weight:700;color:#FF9800">' + needsOop.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Needs OOP</div></div>';
-  h += '<div class="oop-checklist-card" style="border-radius:8px;padding:14px;text-align:center;border-left:4px solid #CE93D8"><div style="font-size:28px;font-weight:700;color:#CE93D8">' + _oopUnschedCount + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">OOP Unpaid</div></div>';
-  h += '<div class="oop-checklist-card" style="border-radius:8px;padding:14px;text-align:center;border-left:4px solid #5B4A8A"><div style="font-size:28px;font-weight:700;color:#5B4A8A">' + _flUnpaidCount + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">FL Unpaid</div></div>';
+  h += '<div class="oop-checklist-card" style="border-radius:8px;padding:14px;text-align:center;border-left:4px solid #CE93D8"><div style="font-size:28px;font-weight:700;color:#CE93D8">' + _oopUnschedCount + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">OOP Unscheduled</div></div>';
+  h += '<div class="oop-checklist-card" style="border-radius:8px;padding:14px;text-align:center;border-left:4px solid #5B4A8A"><div style="font-size:28px;font-weight:700;color:#5B4A8A">' + _flUnpaidCount + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">FL Unplanned</div></div>';
   h += '<div class="oop-checklist-card" style="border-radius:8px;padding:14px;text-align:center;border-left:4px solid #1565C0"><div style="font-size:28px;font-weight:700;color:#1565C0">' + possiblyDone.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Possibly Done</div></div>';
   h += '<div class="oop-checklist-card" style="border-radius:8px;padding:14px;text-align:center;border-left:4px solid #81C784"><div style="font-size:28px;font-weight:700;color:#81C784">' + fullyLoaded.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);margin-top:4px">Fully Loaded</div></div>';
   h += '</div>';
@@ -2923,7 +2939,7 @@ function renderFlagged() {
       var effectiveDays = item.adjusted_days != null ? item.adjusted_days : (item.days || 1);
       var effectiveHead = item.adjusted_head_count != null ? item.adjusted_head_count : (item.head_count || 1);
       var effectiveTotal = item.actual_amount != null ? item.actual_amount : (effectiveCount * effectiveRate * effectiveDays * effectiveHead);
-      if (effectiveTotal > 0 && !item.paid && !scheduledItemIds[item.id]) {
+      if (effectiveTotal > 0 && !scheduledItemIds[item.id] && !item.paid) {
         unschedItems.push({ item: item, total: effectiveTotal });
         totalUnschedItems++;
         totalUnschedAmount += effectiveTotal;
@@ -2935,19 +2951,23 @@ function renderFlagged() {
   }
 
   if (unscheduledOop.length) {
-    h += '<div class="section-title" style="color:#CE93D8">OOP Finance Checklist (' + totalUnschedItems + ' items across ' + unscheduledOop.length + ' projects)</div>';
-    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">Line items with costs that haven\'t been paid or scheduled for payment. Total outstanding: <strong style="color:#CE93D8">$' + Math.round(totalUnschedAmount).toLocaleString() + '</strong>. Schedule payments in Manage Resources \u2192 Out-of-Pocket, or mark as paid on the project page.</p>';
+    var _oopVisible = unscheduledOop.filter(function(uo) { return !flaggedDismissedOop.has(uo.project.id); });
+    var _oopDismissedCt = unscheduledOop.length - _oopVisible.length;
+    h += '<div class="section-title" style="color:#CE93D8">OOP Unscheduled (' + totalUnschedItems + ' item' + (totalUnschedItems !== 1 ? 's' : '') + ' across ' + unscheduledOop.length + ' project' + (unscheduledOop.length !== 1 ? 's' : '') + ')</div>';
+    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">Line items with costs not yet added to the payment schedule. Total outstanding: <strong style="color:#CE93D8">$' + Math.round(totalUnschedAmount).toLocaleString() + '</strong>. Schedule payments in Manage Resources \u2192 Out-of-Pocket, or mark as paid on the project page.</p>';
 
-    for (var ui = 0; ui < unscheduledOop.length; ui++) {
-      var uo = unscheduledOop[ui];
+    for (var ui = 0; ui < _oopVisible.length; ui++) {
+      var uo = _oopVisible[ui];
       var projTotal = 0;
       for (var j = 0; j < uo.items.length; j++) projTotal += uo.items[j].total;
 
-      h += '<div class="oop-checklist-card" style="border-radius:8px;border-left:4px solid #CE93D8;padding:14px 16px;margin-bottom:12px;cursor:pointer" onclick="navigate(\'project:' + uo.project.id + '\')">';
+      h += '<div class="oop-checklist-card" style="border-radius:8px;border-left:4px solid #CE93D8;padding:14px 16px;margin-bottom:12px">';
       h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
-      h += '<div style="font-weight:600">' + uo.project.code + ' — ' + uo.project.name + '</div>';
+      h += '<div style="font-weight:600;cursor:pointer" onclick="navigate(\'project:' + uo.project.id + '\')">' + uo.project.code + ' — ' + uo.project.name + '</div>';
+      h += '<div style="display:flex;align-items:center;gap:10px">';
       h += '<div style="font-weight:700;color:#CE93D8">' + uo.items.length + ' item' + (uo.items.length > 1 ? 's' : '') + ' · $' + Math.round(projTotal).toLocaleString() + '</div>';
-      h += '</div>';
+      h += '<button onclick="event.stopPropagation();flagDismiss(\'oop\',\'' + uo.project.id + '\')" title="Dismiss this project" style="background:none;border:1px solid rgba(128,128,128,.3);border-radius:4px;padding:2px 7px;font-size:12px;color:var(--mid-gray);cursor:pointer;line-height:1.4">&times; Close</button>';
+      h += '</div></div>';
 
       /* Individual line items */
       h += '<div style="display:grid;grid-template-columns:1fr 100px 100px;gap:4px;font-size:12px;color:var(--mid-gray);padding:4px 0;border-bottom:1px solid rgba(128,128,128,.2)">';
@@ -2957,7 +2977,7 @@ function renderFlagged() {
       for (var j = 0; j < uo.items.length; j++) {
         var li = uo.items[j];
         var itemName = li.item.line_item_name || 'Unnamed';
-        h += '<div style="display:grid;grid-template-columns:1fr 100px 100px;gap:4px;font-size:12px;padding:4px 0;border-bottom:1px solid rgba(128,128,128,.1)">';
+        h += '<div style="display:grid;grid-template-columns:1fr 100px 100px;gap:4px;font-size:12px;padding:4px 0;border-bottom:1px solid rgba(128,128,128,.1);cursor:pointer" onclick="navigate(\'project:' + uo.project.id + '\')">';
         h += '<div>' + itemName + '</div>';
         h += '<div style="text-align:right;font-weight:600">$' + Math.round(li.total).toLocaleString() + '</div>';
         h += '<div style="text-align:right"><span style="background:rgba(245,127,23,.15);color:#FFB74D;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600">Unscheduled</span></div>';
@@ -2966,9 +2986,12 @@ function renderFlagged() {
 
       h += '</div>';
     }
+    if (_oopDismissedCt > 0) {
+      h += '<div style="font-size:12px;color:var(--mid-gray);padding:6px 4px">' + _oopDismissedCt + ' project' + (_oopDismissedCt !== 1 ? 's' : '') + ' closed &mdash; <a href="#" onclick="flagRestore(\'oop\');return false" style="color:#CE93D8">restore</a></div>';
+    }
   }
 
-  /* ── 3c. UNPAID FREELANCER WEEKS — Finance Officer Checklist ── */
+  /* ── 3c. UNPLANNED FREELANCER HOURS — no calendar week assigned ── */
   var unpaidFlProjects = [];
   var totalFlUnpaidItems = 0;
   var totalFlUnpaidCost = 0;
@@ -2979,7 +3002,9 @@ function renderFlagged() {
     var unpaidWeeks = [];
     for (var j = 0; j < flItems.length; j++) {
       var fe = flItems[j];
-      if (!fe.paid && (fe.hours || 0) > 0) {
+      if (fe.week_label === '__budget__') continue;
+      /* Unplanned = no calendar week assigned (week_label is not an ISO date) */
+      if (!flIsDateLabel(fe.week_label || '') && (fe.hours || 0) > 0) {
         var weekCost = (fe.hours || 0) * (fe.rate || 0);
         unpaidWeeks.push({ entry: fe, cost: weekCost });
         totalFlUnpaidItems++;
@@ -2992,11 +3017,13 @@ function renderFlagged() {
   }
 
   if (unpaidFlProjects.length) {
-    h += '<div class="section-title" style="color:#9575CD">Freelancer Finance Checklist (' + totalFlUnpaidItems + ' week' + (totalFlUnpaidItems !== 1 ? 's' : '') + ' across ' + unpaidFlProjects.length + ' project' + (unpaidFlProjects.length !== 1 ? 's' : '') + ')</div>';
-    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">Freelancer week line items with hours that haven\'t been marked as paid. Total outstanding: <strong style="color:#9575CD">$' + Math.round(totalFlUnpaidCost).toLocaleString() + '</strong>. Mark weeks as paid in the Budget Snapshot \u2192 Freelancers section.</p>';
+    var _flVisible = unpaidFlProjects.filter(function(ufp) { return !flaggedDismissedFl.has(ufp.project.id); });
+    var _flDismissedCt = unpaidFlProjects.length - _flVisible.length;
+    h += '<div class="section-title" style="color:#9575CD">Freelancers Unplanned (' + totalFlUnpaidItems + ' entr' + (totalFlUnpaidItems !== 1 ? 'ies' : 'y') + ' across ' + unpaidFlProjects.length + ' project' + (unpaidFlProjects.length !== 1 ? 's' : '') + ')</div>';
+    h += '<p style="font-size:12px;color:var(--mid-gray);margin-bottom:12px">Freelancer entries without a scheduled calendar week. Total unplanned: <strong style="color:#9575CD">$' + Math.round(totalFlUnpaidCost).toLocaleString() + '</strong>. Assign weeks in the Budget Snapshot \u2192 Freelancers planner.</p>';
 
-    for (var ui = 0; ui < unpaidFlProjects.length; ui++) {
-      var ufp = unpaidFlProjects[ui];
+    for (var ui = 0; ui < _flVisible.length; ui++) {
+      var ufp = _flVisible[ui];
       var projFlTotal = 0;
       for (var j = 0; j < ufp.weeks.length; j++) projFlTotal += ufp.weeks[j].cost;
 
@@ -3011,24 +3038,27 @@ function renderFlagged() {
         byFreelancer[tmName].cost += wk.cost;
       }
 
-      h += '<div class="oop-checklist-card" style="border-radius:8px;border-left:4px solid #9575CD;padding:14px 16px;margin-bottom:12px;cursor:pointer" onclick="navigate(\'project:' + ufp.project.id + '\')">';
+      h += '<div class="oop-checklist-card" style="border-radius:8px;border-left:4px solid #9575CD;padding:14px 16px;margin-bottom:12px">';
       h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
-      h += '<div style="font-weight:600">' + ufp.project.code + ' — ' + ufp.project.name + '</div>';
-      h += '<div style="font-weight:700;color:#9575CD">' + ufp.weeks.length + ' week' + (ufp.weeks.length > 1 ? 's' : '') + ' · $' + Math.round(projFlTotal).toLocaleString() + '</div>';
-      h += '</div>';
+      h += '<div style="font-weight:600;cursor:pointer" onclick="navigate(\'project:' + ufp.project.id + '\')">' + ufp.project.code + ' — ' + ufp.project.name + '</div>';
+      h += '<div style="display:flex;align-items:center;gap:10px">';
+      h += '<div style="font-weight:700;color:#9575CD">' + ufp.weeks.length + ' entr' + (ufp.weeks.length !== 1 ? 'ies' : 'y') + ' · $' + Math.round(projFlTotal).toLocaleString() + '</div>';
+      h += '<button onclick="event.stopPropagation();flagDismiss(\'fl\',\'' + ufp.project.id + '\')" title="Dismiss this project" style="background:none;border:1px solid rgba(128,128,128,.3);border-radius:4px;padding:2px 7px;font-size:12px;color:var(--mid-gray);cursor:pointer;line-height:1.4">&times; Close</button>';
+      h += '</div></div>';
 
       var flNames = Object.keys(byFreelancer);
       for (var fi = 0; fi < flNames.length; fi++) {
         var flName = flNames[fi];
         var flData = byFreelancer[flName];
-        h += '<div style="font-size:12px;font-weight:600;color:#9575CD;padding:6px 0 2px">' + flName + ' — $' + Math.round(flData.cost).toLocaleString() + ' unpaid</div>';
+        h += '<div style="font-size:12px;font-weight:600;color:#9575CD;padding:6px 0 2px;cursor:pointer" onclick="navigate(\'project:' + ufp.project.id + '\')">' + flName + ' — $' + Math.round(flData.cost).toLocaleString() + ' unplanned</div>';
         h += '<div style="display:grid;grid-template-columns:1fr 60px 80px 100px;gap:4px;font-size:11px;color:var(--mid-gray);padding:3px 0;border-bottom:1px solid rgba(128,128,128,.2)">';
-        h += '<div style="font-weight:600">Week</div><div style="text-align:right;font-weight:600">Hrs</div><div style="text-align:right;font-weight:600">Rate</div><div style="text-align:right;font-weight:600">Cost</div>';
+        h += '<div style="font-weight:600">Label</div><div style="text-align:right;font-weight:600">Hrs</div><div style="text-align:right;font-weight:600">Rate</div><div style="text-align:right;font-weight:600">Cost</div>';
         h += '</div>';
         for (var wi = 0; wi < flData.weeks.length; wi++) {
           var fw = flData.weeks[wi];
-          h += '<div style="display:grid;grid-template-columns:1fr 60px 80px 100px;gap:4px;font-size:11px;padding:3px 0;border-bottom:1px solid rgba(128,128,128,.1)">';
-          h += '<div>' + (fw.entry.week_label || 'Week') + '</div>';
+          var wlbl = fw.entry.week_label || '';
+          h += '<div style="display:grid;grid-template-columns:1fr 60px 80px 100px;gap:4px;font-size:11px;padding:3px 0;border-bottom:1px solid rgba(128,128,128,.1);cursor:pointer" onclick="navigate(\'project:' + ufp.project.id + '\')">';
+          h += '<div>' + (wlbl ? wlbl : '<em style="color:var(--mid-gray)">No label</em>') + '</div>';
           h += '<div style="text-align:right">' + (fw.entry.hours || 0) + 'h</div>';
           h += '<div style="text-align:right">$' + (fw.entry.rate || 0) + '/hr</div>';
           h += '<div style="text-align:right;font-weight:600">$' + Math.round(fw.cost).toLocaleString() + '</div>';
@@ -3036,6 +3066,9 @@ function renderFlagged() {
         }
       }
       h += '</div>';
+    }
+    if (_flDismissedCt > 0) {
+      h += '<div style="font-size:12px;color:var(--mid-gray);padding:6px 4px">' + _flDismissedCt + ' project' + (_flDismissedCt !== 1 ? 's' : '') + ' closed &mdash; <a href="#" onclick="flagRestore(\'fl\');return false" style="color:#9575CD">restore</a></div>';
     }
   }
 
