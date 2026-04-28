@@ -712,7 +712,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.98 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.99 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -3029,7 +3029,7 @@ function renderFlagged() {
       for (var j = 0; j < ufp.weeks.length; j++) {
         var wk = ufp.weeks[j];
         var tmId = wk.entry.team_member_id;
-        var tmName = (wk.entry.team_member && wk.entry.team_member.name) ? wk.entry.team_member.name : ('Freelancer ' + (tmId || '').slice(0, 6));
+        var tmName = wk.entry._name || (wk.entry.team_member && wk.entry.team_member.name) || ('Freelancer ' + (tmId || '').slice(0, 6));
         if (!byFreelancer[tmName]) byFreelancer[tmName] = { weeks: [], cost: 0 };
         byFreelancer[tmName].weeks.push(wk);
         byFreelancer[tmName].cost += wk.cost;
