@@ -713,7 +713,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.135 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.136 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -1064,8 +1064,18 @@ function findProjectName(projId) {
 function getAllocationsForProject(projId) {
   if (!ALLOCATIONS || !ALLOCATIONS.allocations || !ALLOCATIONS.allocations.length) return [];
   var proj = findProjectName(projId);
-  if (!proj) return [];
+  if (!proj) {
+    /* projId might already be a project code — try matching by code directly */
+    for (var _ci = 0; _ci < CLIENTS.length; _ci++) {
+      for (var _pi = 0; _pi < CLIENTS[_ci].projects.length; _pi++) {
+        if (CLIENTS[_ci].projects[_pi].code === projId) { proj = CLIENTS[_ci].projects[_pi]; break; }
+      }
+      if (proj) break;
+    }
+    if (!proj) return [];
+  }
   var projName = proj.name || '';
+  var projCode = proj.code || '';
   var forecastName = proj.forecastName || '';
   var supaName = (proj._supabudget && proj._supabudget.name) ? proj._supabudget.name : '';
   var allAllocs = ALLOCATIONS.allocations;
@@ -1074,11 +1084,12 @@ function getAllocationsForProject(projId) {
     var a = allAllocs[i];
     var ap = a.project || '';
     if (!ap) continue;
-    /* Exact match on project name, forecastName, or supabudget name */
-    if (ap === projName || (forecastName && ap === forecastName) || (supaName && ap === supaName)) {
+    /* Exact match on project name, code, forecastName, or supabudget name */
+    if (ap === projName || (projCode && ap === projCode) ||
+        (forecastName && ap === forecastName) || (supaName && ap === supaName)) {
       matched.push(a);
     } else if (projName && (ap.indexOf(projName) >= 0 || projName.indexOf(ap) >= 0)) {
-      /* Partial / contains match */
+      /* Partial / contains match (name only, not code — codes are too short and cause false positives) */
       matched.push(a);
     }
   }
