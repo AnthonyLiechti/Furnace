@@ -713,7 +713,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.127 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.128 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -777,6 +777,7 @@ var flaggedCollapsedOop = new Set(); /* collapsed project IDs in OOP Unscheduled
 var flaggedCollapsedFl  = new Set(); /* collapsed project IDs in FL Unplanned section */
 var sparkShowActualsRow = false;
 var projFinActualsOpen = {}; /* per-project code toggle state for actuals row */
+var masterActualsOpen  = false; /* toggle for master / client portfolio actuals row */
 let showInactiveClients = false;
 let sidebarSearch = '';
 
@@ -1477,7 +1478,7 @@ function renderHourTypeSection(ht, clientId) {
    Produces the same row layout as the individual Project Financials banner,
    aggregated across the supplied project list.
    Returns '' when no projects have Supabase budgets. */
-function buildPortfolioBannerHTML(projects, bannerTitle) {
+function buildPortfolioBannerHTML(projects, bannerTitle, opts) {
   var agencyRate = 200;
 
   /* ─ Aggregate supabase-backed projects ─ */
@@ -1533,6 +1534,34 @@ function buildPortfolioBannerHTML(projects, bannerTitle) {
   var effRateDisplay = effRate > 0 ? '$' + Math.round(effRate) + '/hr' : '\u2014';
   var effRateColor   = effRate > 0 && effRate <= 150 ? '#81C784' : effRate <= 175 ? 'var(--honey)' : effRate > 0 ? 'var(--ember)' : 'var(--white)';
 
+  /* ─ Actuals (for optional toggle row) ─ */
+  var _pActCodes = {};
+  for (var _paci = 0; _paci < projects.length; _paci++) { _pActCodes[projects[_paci].code] = true; }
+  var _pActRateMap = {};
+  if (typeof FURNACE_TEAM_MEMBERS !== 'undefined' && FURNACE_TEAM_MEMBERS) {
+    for (var _patmi = 0; _patmi < FURNACE_TEAM_MEMBERS.length; _patmi++) {
+      var _patm = FURNACE_TEAM_MEMBERS[_patmi];
+      if (_patm.name && _patm.fully_burdened_rate) _pActRateMap[_patm.name] = _patm.fully_burdened_rate;
+    }
+  }
+  var _pActLaborHrs = 0, _pActLaborCost = 0;
+  if (typeof SUPA_ACTUALS_ALL !== 'undefined' && SUPA_ACTUALS_ALL) {
+    for (var _paai = 0; _paai < SUPA_ACTUALS_ALL.length; _paai++) {
+      var _paae = SUPA_ACTUALS_ALL[_paai];
+      if (!_pActCodes[_paae.project_code]) continue;
+      var _paaeRate = (_paae.person_name && _pActRateMap[_paae.person_name]) ? _pActRateMap[_paae.person_name] : (_paae.billable_rate || 200);
+      _pActLaborHrs  += (_paae.hours || 0);
+      _pActLaborCost += (_paae.hours || 0) * _paaeRate;
+    }
+  }
+  var _pActFlInternal  = totalFlPaid * 0.5;
+  var _pActOopSpent    = totalOopSpent;
+  var _pActProfit      = totalClientPrice - _pActLaborCost - _pActFlInternal - _pActOopSpent;
+  var _pActMargin      = totalClientPrice > 0 ? (_pActProfit / totalClientPrice * 100) : 0;
+  var _pActSparkle     = _pActMargin > 25;
+  var _pActOpen        = !!(opts && opts.actualsOpen);
+  var _pActToggleFn    = (opts && opts.toggleFn) ? opts.toggleFn : '';
+
   /* ─ Progress bar: grouped Labor | FL | OOP | Profit ─ */
   var barTotal   = totalClientPrice > 0 ? totalClientPrice : 1;
   var profitBar$ = Math.max(0, totalClientPrice - totalLaborSpent$ - totalLaborRemaining$ - totalOopSpent - Math.max(0, totalOopRemaining) - totalFlBudget);
@@ -1573,28 +1602,44 @@ function buildPortfolioBannerHTML(projects, bannerTitle) {
   _h += '<div class="snap-fin-item"><div class="sf-label">Eff. Rate</div><div class="sf-value" style="color:' + effRateColor + '">' + effRateDisplay + '</div><div class="sf-sub">' + (totalHoursSpent > 0 ? 'vs $200 bill rate' : 'No hours tracked') + '</div></div>';
   _h += '</div>';
 
+  /* ── Actuals toggle button + row ── */
+  if (_pActToggleFn) {
+    _h += '<div style="display:flex;justify-content:flex-end;margin-top:6px">';
+    _h += '<button onclick="' + _pActToggleFn + '" style="font-size:11px;padding:3px 12px;border-radius:20px;border:1px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.45);cursor:pointer;font-family:inherit;letter-spacing:.02em">';
+    _h += (_pActOpen ? '\u25b2 Hide Actuals' : '\u25bc Show Actuals') + '</button></div>';
+  }
+  if (_pActOpen) {
+    _h += '<div class="snap-financials" style="margin-top:6px;padding-top:12px;border-top:1px solid rgba(129,199,132,.25)">';
+    _h += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.7)">Actual Labor</div><div class="sf-value">$' + Math.round(_pActLaborCost).toLocaleString() + '</div><div class="sf-sub">' + _pActLaborHrs.toFixed(1) + ' hrs at cost rate</div></div>';
+    _h += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.7)">Actual FL</div><div class="sf-value" style="color:#CE93D8">$' + Math.round(_pActFlInternal).toLocaleString() + '</div><div class="sf-sub">paid: $' + Math.round(totalFlPaid).toLocaleString() + '</div></div>';
+    _h += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.7)">Actual OOP</div><div class="sf-value">$' + Math.round(_pActOopSpent).toLocaleString() + '</div><div class="sf-sub">w/ markup: $' + Math.round(totalOopProjected).toLocaleString() + '</div></div>';
+    _h += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.7)">Proj. Actual Profit</div><div class="sf-value" style="color:' + (_pActProfit >= 0 ? '#81C784' : 'var(--ember)') + '">$' + Math.round(_pActProfit).toLocaleString() + '</div></div>';
+    _h += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.7)">Proj. Actual Margin</div><div class="sf-value' + (_pActSparkle ? ' margin-sparkle' : '') + '" style="' + (_pActSparkle ? '' : 'color:' + (_pActMargin >= 0 ? '#81C784' : 'var(--ember)')) + '">' + _pActMargin.toFixed(1) + '%</div></div>';
+    _h += '</div>';
+  }
+
   /* ── Progress bar ── */
   _h += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1)">';
   _h += '<div class="lob-bar">';
-  if (pLaborBudg  > 0.1) _h += '<div class="lob-seg" style="width:' + pLaborBudg.toFixed(1)  + '%;background:var(--ember)">' + (pLaborBudg  >= 8 ? '$' + Math.round(totalProjLaborPrice).toLocaleString()  : '') + '</div>';
+  if (pLaborBudg  > 0.1) _h += '<div class="lob-seg" style="width:' + pLaborBudg.toFixed(1)  + '%;background:var(--ocean)">' + (pLaborBudg  >= 8 ? '$' + Math.round(totalProjLaborPrice).toLocaleString()  : '') + '</div>';
   if (pLaborSpent > 0.1) _h += '<div class="lob-seg" style="width:' + pLaborSpent.toFixed(1) + '%;background:var(--ember)">' + (pLaborSpent >= 8 ? '$' + Math.round(totalLaborSpent$).toLocaleString()    : '') + '</div>';
   if (pLaborRem   > 0.5) _h += '<div class="lob-seg" style="width:' + pLaborRem.toFixed(1)   + '%;background:var(--ocean)">' + (pLaborRem   >= 8 ? '$' + Math.round(totalLaborRemaining$).toLocaleString() : '') + '</div>';
-  if (pFlBudg     > 0.5) _h += '<div class="lob-seg" style="width:' + pFlBudg.toFixed(1)     + '%;background:#7B1FA2">'      + (pFlBudg     >= 8 ? '$' + Math.round(totalFlBudget).toLocaleString()        : '') + '</div>';
+  if (pFlBudg     > 0.5) _h += '<div class="lob-seg" style="width:' + pFlBudg.toFixed(1)     + '%;background:#CE93D8;color:var(--abyss)">' + (pFlBudg >= 8 ? '$' + Math.round(totalFlBudget).toLocaleString() : '') + '</div>';
   if (pFlSpent    > 0.1) _h += '<div class="lob-seg" style="width:' + pFlSpent.toFixed(1)    + '%;background:#7B1FA2">'      + (pFlSpent    >= 8 ? '$' + Math.round(totalFlPaid).toLocaleString()          : '') + '</div>';
   if (pFlRem      > 0.5) _h += '<div class="lob-seg" style="width:' + pFlRem.toFixed(1)      + '%;background:#CE93D8;color:var(--abyss)">' + (pFlRem >= 8 ? '$' + Math.round(Math.max(0, totalFlBudget - totalFlPaid)).toLocaleString() : '') + '</div>';
-  if (pOopBudg    > 0.5) _h += '<div class="lob-seg" style="width:' + pOopBudg.toFixed(1)    + '%;background:#F57F17">'      + (pOopBudg    >= 8 ? '$' + Math.round(totalOopProjected).toLocaleString()   : '') + '</div>';
+  if (pOopBudg    > 0.5) _h += '<div class="lob-seg" style="width:' + pOopBudg.toFixed(1)    + '%;background:#FFE0B2;color:var(--abyss)">' + (pOopBudg >= 8 ? '$' + Math.round(totalOopProjected).toLocaleString() : '') + '</div>';
   if (pOopSpent   > 0.1) _h += '<div class="lob-seg" style="width:' + pOopSpent.toFixed(1)   + '%;background:#F57F17">'      + (pOopSpent   >= 8 ? '$' + Math.round(totalOopSpent).toLocaleString()       : '') + '</div>';
   if (pOopRem     > 0.5) _h += '<div class="lob-seg" style="width:' + pOopRem.toFixed(1)     + '%;background:#FFE0B2;color:var(--abyss)">' + (pOopRem >= 8 ? '$' + Math.round(Math.max(0, totalOopRemaining)).toLocaleString() : '') + '</div>';
   if (pProfit     > 0.5) _h += '<div class="lob-seg" style="width:' + pProfit.toFixed(1)     + '%;background:#81C784">'      + (pProfit     >= 8 ? '$' + Math.round(profitBar$).toLocaleString()          : '') + '</div>';
   _h += '</div>';
   _h += '<div class="lob-legend">';
-  if (pLaborBudg  > 0.1) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ember)"></div>Labor Budgeted</div>';
+  if (pLaborBudg  > 0.1) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ocean)"></div>Labor Budgeted</div>';
   if (pLaborSpent > 0.1) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ember)"></div>Labor Spent</div>';
   if (pLaborRem   > 0.5) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ocean)"></div>Labor Remaining</div>';
-  if (pFlBudg     > 0.5) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#7B1FA2"></div>FL Budgeted</div>';
+  if (pFlBudg     > 0.5) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#CE93D8"></div>FL Budgeted</div>';
   if (pFlSpent    > 0.1) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#7B1FA2"></div>FL Spent</div>';
   if (pFlRem      > 0.5) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#CE93D8"></div>FL Remaining</div>';
-  if (pOopBudg    > 0.5) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#F57F17"></div>OOP Budgeted</div>';
+  if (pOopBudg    > 0.5) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#FFE0B2"></div>OOP Budgeted</div>';
   if (pOopSpent   > 0.1) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#F57F17"></div>OOP Spent</div>';
   if (pOopRem     > 0.5) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#FFE0B2"></div>OOP Remaining</div>';
   _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Profit</div>';
@@ -1731,7 +1776,7 @@ function renderMaster() {
   }
 
   /* ── PORTFOLIO FINANCIALS BANNER ── */
-  h += buildPortfolioBannerHTML(all, 'Portfolio Financials');
+  h += buildPortfolioBannerHTML(all, 'Portfolio Financials', {actualsOpen: masterActualsOpen, toggleFn: 'toggleMasterActuals()'});
 
   /* ── FINANCE TABLE — date-filtered hours + OOP spent per project ── */
   /* Compute per-project hours and revenue for the selected date range */
@@ -2302,25 +2347,25 @@ function renderProjFinancials(p) {
   var pProfit   = Math.max(0, 100 - _bu5 - pOopRem);
   h += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1)">';
   h += '<div class="lob-bar">';
-  if (pLaborBudg  > 0.1) h += '<div class="lob-seg" style="width:' + pLaborBudg.toFixed(1)  + '%;background:var(--ember)">' + (pLaborBudg  >= 8 ? '$' + Math.round(projLaborPrice).toLocaleString()  : '') + '</div>';
+  if (pLaborBudg  > 0.1) h += '<div class="lob-seg" style="width:' + pLaborBudg.toFixed(1)  + '%;background:var(--ocean)">' + (pLaborBudg  >= 8 ? '$' + Math.round(projLaborPrice).toLocaleString()  : '') + '</div>';
   if (pLaborSpent > 0.1) h += '<div class="lob-seg" style="width:' + pLaborSpent.toFixed(1) + '%;background:var(--ember)">' + (pLaborSpent >= 8 ? '$' + Math.round(laborSpent$).toLocaleString()    : '') + '</div>';
   if (pLaborRem   > 0.5) h += '<div class="lob-seg" style="width:' + pLaborRem.toFixed(1)   + '%;background:var(--ocean)">' + (pLaborRem   >= 8 ? '$' + Math.round(laborRemaining$).toLocaleString() : '') + '</div>';
-  if (pFlBudg     > 0.5) h += '<div class="lob-seg" style="width:' + pFlBudg.toFixed(1)     + '%;background:#7B1FA2">'      + (pFlBudg     >= 8 ? '$' + Math.round(flBudget).toLocaleString()        : '') + '</div>';
+  if (pFlBudg     > 0.5) h += '<div class="lob-seg" style="width:' + pFlBudg.toFixed(1)     + '%;background:#CE93D8;color:var(--abyss)">' + (pFlBudg >= 8 ? '$' + Math.round(flBudget).toLocaleString() : '') + '</div>';
   if (pFlSpent    > 0.1) h += '<div class="lob-seg" style="width:' + pFlSpent.toFixed(1)    + '%;background:#7B1FA2">'      + (pFlSpent    >= 8 ? '$' + Math.round(flSpent).toLocaleString()         : '') + '</div>';
   if (pFlRem      > 0.5) h += '<div class="lob-seg" style="width:' + pFlRem.toFixed(1)      + '%;background:#CE93D8;color:var(--abyss)">' + (pFlRem >= 8 ? '$' + Math.round(Math.max(0, flBudget - flSpent)).toLocaleString() : '') + '</div>';
-  if (pOopBudg    > 0.5) h += '<div class="lob-seg" style="width:' + pOopBudg.toFixed(1)    + '%;background:#F57F17">'      + (pOopBudg    >= 8 ? '$' + Math.round(oopBudget).toLocaleString()       : '') + '</div>';
+  if (pOopBudg    > 0.5) h += '<div class="lob-seg" style="width:' + pOopBudg.toFixed(1)    + '%;background:#FFE0B2;color:var(--abyss)">' + (pOopBudg >= 8 ? '$' + Math.round(oopBudget).toLocaleString() : '') + '</div>';
   if (pOopSpent   > 0.1) h += '<div class="lob-seg" style="width:' + pOopSpent.toFixed(1)   + '%;background:#F57F17">'      + (pOopSpent   >= 8 ? '$' + Math.round(oopSpent).toLocaleString()        : '') + '</div>';
   if (pOopRem     > 0.5) h += '<div class="lob-seg" style="width:' + pOopRem.toFixed(1)     + '%;background:#FFE0B2;color:var(--abyss)">' + (pOopRem >= 8 ? '$' + Math.round(Math.max(0, oopRemaining)).toLocaleString() : '') + '</div>';
   if (pProfit     > 0.5) h += '<div class="lob-seg" style="width:' + pProfit.toFixed(1)     + '%;background:#81C784">'      + (pProfit     >= 8 ? '$' + Math.round(profitBar$).toLocaleString()      : '') + '</div>';
   h += '</div>';
   h += '<div class="lob-legend">';
-  if (pLaborBudg  > 0.1)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ember)"></div>Labor Budgeted</div>';
+  if (pLaborBudg  > 0.1)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ocean)"></div>Labor Budgeted</div>';
   if (pLaborSpent > 0.1)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ember)"></div>Labor Spent</div>';
   if (!isFinished && pLaborRem > 0.5) h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ocean)"></div>Labor Remaining</div>';
-  if (pFlBudg     > 0.5)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#7B1FA2"></div>FL Budgeted</div>';
+  if (pFlBudg     > 0.5)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#CE93D8"></div>FL Budgeted</div>';
   if (pFlSpent    > 0.1)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#7B1FA2"></div>FL Spent</div>';
   if (pFlRem      > 0.5)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#CE93D8"></div>FL Remaining</div>';
-  if (pOopBudg    > 0.5)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#F57F17"></div>OOP Budgeted</div>';
+  if (pOopBudg    > 0.5)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#FFE0B2"></div>OOP Budgeted</div>';
   if (pOopSpent   > 0.1)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#F57F17"></div>OOP Spent</div>';
   if (pOopRem     > 0.5)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#FFE0B2"></div>OOP Remaining</div>';
   h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Profit</div>';
@@ -7409,6 +7454,11 @@ function sparkRenderSummary() {
 function sparkToggleActualsRow() {
   sparkShowActualsRow = !sparkShowActualsRow;
   sparkRenderSummary();
+}
+
+function toggleMasterActuals() {
+  masterActualsOpen = !masterActualsOpen;
+  navigate(currentView);
 }
 
 function projFinToggleActuals(code) {
