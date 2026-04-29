@@ -718,7 +718,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.153 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.154 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
   </div>
@@ -1871,14 +1871,6 @@ function renderMaster() {
     h += '<span style="font-size:12px;color:var(--ocean);font-weight:600">Filtered View</span>';
     h += '<span style="font-size:12px;color:var(--abyss)">' + _lbl + '</span>';
     h += '<span style="font-size:11px;color:var(--mid-gray)">Hours shown reflect tracked time in this period only. Budgets remain cumulative.</span>';
-    h += '</div>';
-  }
-
-  /* Needs Attention alert */
-  if (needsReviewCount > 0) {
-    h += '<div style="background:#FFF8E1;border-left:4px solid var(--honey);border-radius:8px;padding:14px 16px;margin-bottom:20px">';
-    h += '<div style="font-weight:600;color:#F57F17;margin-bottom:6px">&#9888; Needs Review: ' + needsReviewCount + ' project' + (needsReviewCount !== 1 ? 's' : '') + ' missing budget data</div>';
-    h += '<div style="font-size:12px;color:#F57F17">Projects need a Supabase budget or snapshot for accurate financials. <a href="#" onclick="navigate(\'flagged\');return false" style="color:#F57F17;text-decoration:underline;font-weight:600;cursor:pointer">View flagged projects &rarr;</a></div>';
     h += '</div>';
   }
 
