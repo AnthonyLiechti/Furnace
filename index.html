@@ -718,7 +718,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.147 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.149 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
   </div>
@@ -7655,12 +7655,10 @@ function sparkRenderSummary() {
   var _actFlInternal = _actFlPaid * 0.5;                 /* FL Internal Cost = 50% of paid */
   var _actProfit = clientPrice - _actLaborCost - _actFlInternal - _actOopSpent;
   var _actMargin = clientPrice > 0 ? (_actProfit / clientPrice * 100) : 0;
-  /* Toggle row — only visible to authorized users */
+  /* Toggle row — visible to all users in the budget editor snapshot view */
   var _tglEl = document.getElementById('sparkActualsToggleRow');
   if (_tglEl) {
-    _tglEl.innerHTML = canViewActuals()
-      ? '<button onclick="sparkToggleActualsRow()" style="font-size:11px;padding:3px 12px;border-radius:20px;border:1px solid rgba(0,0,0,.18);background:transparent;color:var(--mid-gray);cursor:pointer;font-family:inherit;letter-spacing:.02em">' + (sparkShowActualsRow ? '\u25b2 Hide Actuals' : '\u25bc Show Actuals') + '</button>'
-      : '';
+    _tglEl.innerHTML = '<button onclick="sparkToggleActualsRow()" style="font-size:11px;padding:3px 12px;border-radius:20px;border:1px solid rgba(0,0,0,.18);background:transparent;color:var(--mid-gray);cursor:pointer;font-family:inherit;letter-spacing:.02em">' + (sparkShowActualsRow ? '\u25b2 Hide Actuals' : '\u25bc Show Actuals') + '</button>';
   }
   /* Actuals bar */
   var _actEl = document.getElementById('sparkActualsBar');
