@@ -713,7 +713,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.122 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.123 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -11487,9 +11487,9 @@ function renderOopPlanner() {
     h += '<button onclick="oopDayOffset=0;renderOopGrid()" style="font-size:11px">Today</button>';
   } else {
     if (oopViewMode === 'month') {
-      h += '<button onclick="allocWeekOf=shiftOopMonth(allocWeekOf,-1);renderOopGrid()">&#9664;</button>';
+      h += '<button style="font-size:16px;padding:7px 18px;min-width:46px;position:relative;z-index:1" onclick="allocWeekOf=shiftOopMonth(allocWeekOf,-1);renderOopGrid()">&#9664;</button>';
       h += '<div class="at-label" id="oopWeekLabel"></div>';
-      h += '<button onclick="allocWeekOf=shiftOopMonth(allocWeekOf,1);renderOopGrid()">&#9654;</button>';
+      h += '<button style="font-size:16px;padding:7px 18px;min-width:46px;position:relative;z-index:1" onclick="allocWeekOf=shiftOopMonth(allocWeekOf,1);renderOopGrid()">&#9654;</button>';
     } else {
       h += '<button onclick="allocWeekOf=shiftWeek(allocWeekOf,-1);renderOopGrid()">&#9664;</button>';
       h += '<div class="at-label" id="oopWeekLabel"></div>';
@@ -11975,6 +11975,14 @@ function renderOopGridDay(el, lbl, projCode) {
   el.innerHTML = h;
 }
 
+function oopNavToMonth(dayISO) {
+  var d = new Date(dayISO + 'T00:00:00');
+  var first = new Date(d.getFullYear(), d.getMonth(), 1);
+  var dow = first.getDay();
+  first.setDate(first.getDate() + (dow === 1 ? 0 : dow === 0 ? 1 : 8 - dow));
+  allocWeekOf = first.toISOString().slice(0, 10);
+  renderOopGrid();
+}
 function renderOopGridMonth(el, lbl, projCode) {
   var _isDark   = document.documentElement.classList.contains('dark');
   var _dmText   = _isDark ? 'var(--dm-text)'       : 'var(--abyss)';
@@ -12037,8 +12045,11 @@ function renderOopGridMonth(el, lbl, projCode) {
 
       var bg = isToday ? 'rgba(48,109,124,.06)' : _dmSurf;
       var opacity = isThisMonth ? '1' : '0.4';
+      var cellClick = isThisMonth
+        ? 'oopShowModal(\'' + oopSelectedProject.replace(/'/g, "\\'") + '\',\'' + projCode + '\',\'' + day + '\',null)'
+        : 'oopNavToMonth(\'' + day + '\')';
 
-      h += '<div style="background:' + bg + ';padding:6px 8px;min-height:70px;opacity:' + opacity + ';cursor:pointer;position:relative" onclick="oopShowModal(\'' + oopSelectedProject.replace(/'/g, "\\'") + '\',\'' + projCode + '\',\'' + day + '\',null)">';
+      h += '<div style="background:' + bg + ';padding:6px 8px;min-height:70px;opacity:' + opacity + ';cursor:pointer;position:relative" onclick="' + cellClick + '">';
       h += '<div style="font-size:11px;font-weight:600;color:' + (isToday ? 'var(--ocean)' : _dmText) + ';margin-bottom:4px">' + dayDate.getDate() + '</div>';
 
       for (var e = 0; e < dayEntries.length; e++) {
