@@ -713,7 +713,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.128 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.129 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -1627,9 +1627,9 @@ function buildPortfolioBannerHTML(projects, bannerTitle, opts) {
   if (pFlBudg     > 0.5) _h += '<div class="lob-seg" style="width:' + pFlBudg.toFixed(1)     + '%;background:#CE93D8;color:var(--abyss)">' + (pFlBudg >= 8 ? '$' + Math.round(totalFlBudget).toLocaleString() : '') + '</div>';
   if (pFlSpent    > 0.1) _h += '<div class="lob-seg" style="width:' + pFlSpent.toFixed(1)    + '%;background:#7B1FA2">'      + (pFlSpent    >= 8 ? '$' + Math.round(totalFlPaid).toLocaleString()          : '') + '</div>';
   if (pFlRem      > 0.5) _h += '<div class="lob-seg" style="width:' + pFlRem.toFixed(1)      + '%;background:#CE93D8;color:var(--abyss)">' + (pFlRem >= 8 ? '$' + Math.round(Math.max(0, totalFlBudget - totalFlPaid)).toLocaleString() : '') + '</div>';
-  if (pOopBudg    > 0.5) _h += '<div class="lob-seg" style="width:' + pOopBudg.toFixed(1)    + '%;background:#FFE0B2;color:var(--abyss)">' + (pOopBudg >= 8 ? '$' + Math.round(totalOopProjected).toLocaleString() : '') + '</div>';
-  if (pOopSpent   > 0.1) _h += '<div class="lob-seg" style="width:' + pOopSpent.toFixed(1)   + '%;background:#F57F17">'      + (pOopSpent   >= 8 ? '$' + Math.round(totalOopSpent).toLocaleString()       : '') + '</div>';
-  if (pOopRem     > 0.5) _h += '<div class="lob-seg" style="width:' + pOopRem.toFixed(1)     + '%;background:#FFE0B2;color:var(--abyss)">' + (pOopRem >= 8 ? '$' + Math.round(Math.max(0, totalOopRemaining)).toLocaleString() : '') + '</div>';
+  if (pOopBudg    > 0.5) _h += '<div class="lob-seg" style="width:' + pOopBudg.toFixed(1)    + '%;background:#B2DFDB;color:var(--abyss)">' + (pOopBudg >= 8 ? '$' + Math.round(totalOopProjected).toLocaleString() : '') + '</div>';
+  if (pOopSpent   > 0.1) _h += '<div class="lob-seg" style="width:' + pOopSpent.toFixed(1)   + '%;background:#00897B">'      + (pOopSpent   >= 8 ? '$' + Math.round(totalOopSpent).toLocaleString()       : '') + '</div>';
+  if (pOopRem     > 0.5) _h += '<div class="lob-seg" style="width:' + pOopRem.toFixed(1)     + '%;background:#B2DFDB;color:var(--abyss)">' + (pOopRem >= 8 ? '$' + Math.round(Math.max(0, totalOopRemaining)).toLocaleString() : '') + '</div>';
   if (pProfit     > 0.5) _h += '<div class="lob-seg" style="width:' + pProfit.toFixed(1)     + '%;background:#81C784">'      + (pProfit     >= 8 ? '$' + Math.round(profitBar$).toLocaleString()          : '') + '</div>';
   _h += '</div>';
   _h += '<div class="lob-legend">';
@@ -1639,9 +1639,9 @@ function buildPortfolioBannerHTML(projects, bannerTitle, opts) {
   if (pFlBudg     > 0.5) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#CE93D8"></div>FL Budgeted</div>';
   if (pFlSpent    > 0.1) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#7B1FA2"></div>FL Spent</div>';
   if (pFlRem      > 0.5) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#CE93D8"></div>FL Remaining</div>';
-  if (pOopBudg    > 0.5) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#FFE0B2"></div>OOP Budgeted</div>';
-  if (pOopSpent   > 0.1) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#F57F17"></div>OOP Spent</div>';
-  if (pOopRem     > 0.5) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#FFE0B2"></div>OOP Remaining</div>';
+  if (pOopBudg    > 0.5) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#B2DFDB"></div>OOP Budgeted</div>';
+  if (pOopSpent   > 0.1) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#00897B"></div>OOP Spent</div>';
+  if (pOopRem     > 0.5) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#B2DFDB"></div>OOP Remaining</div>';
   _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Profit</div>';
   _h += '</div></div>';
 
@@ -2353,9 +2353,9 @@ function renderProjFinancials(p) {
   if (pFlBudg     > 0.5) h += '<div class="lob-seg" style="width:' + pFlBudg.toFixed(1)     + '%;background:#CE93D8;color:var(--abyss)">' + (pFlBudg >= 8 ? '$' + Math.round(flBudget).toLocaleString() : '') + '</div>';
   if (pFlSpent    > 0.1) h += '<div class="lob-seg" style="width:' + pFlSpent.toFixed(1)    + '%;background:#7B1FA2">'      + (pFlSpent    >= 8 ? '$' + Math.round(flSpent).toLocaleString()         : '') + '</div>';
   if (pFlRem      > 0.5) h += '<div class="lob-seg" style="width:' + pFlRem.toFixed(1)      + '%;background:#CE93D8;color:var(--abyss)">' + (pFlRem >= 8 ? '$' + Math.round(Math.max(0, flBudget - flSpent)).toLocaleString() : '') + '</div>';
-  if (pOopBudg    > 0.5) h += '<div class="lob-seg" style="width:' + pOopBudg.toFixed(1)    + '%;background:#FFE0B2;color:var(--abyss)">' + (pOopBudg >= 8 ? '$' + Math.round(oopBudget).toLocaleString() : '') + '</div>';
-  if (pOopSpent   > 0.1) h += '<div class="lob-seg" style="width:' + pOopSpent.toFixed(1)   + '%;background:#F57F17">'      + (pOopSpent   >= 8 ? '$' + Math.round(oopSpent).toLocaleString()        : '') + '</div>';
-  if (pOopRem     > 0.5) h += '<div class="lob-seg" style="width:' + pOopRem.toFixed(1)     + '%;background:#FFE0B2;color:var(--abyss)">' + (pOopRem >= 8 ? '$' + Math.round(Math.max(0, oopRemaining)).toLocaleString() : '') + '</div>';
+  if (pOopBudg    > 0.5) h += '<div class="lob-seg" style="width:' + pOopBudg.toFixed(1)    + '%;background:#B2DFDB;color:var(--abyss)">' + (pOopBudg >= 8 ? '$' + Math.round(oopBudget).toLocaleString() : '') + '</div>';
+  if (pOopSpent   > 0.1) h += '<div class="lob-seg" style="width:' + pOopSpent.toFixed(1)   + '%;background:#00897B">'      + (pOopSpent   >= 8 ? '$' + Math.round(oopSpent).toLocaleString()        : '') + '</div>';
+  if (pOopRem     > 0.5) h += '<div class="lob-seg" style="width:' + pOopRem.toFixed(1)     + '%;background:#B2DFDB;color:var(--abyss)">' + (pOopRem >= 8 ? '$' + Math.round(Math.max(0, oopRemaining)).toLocaleString() : '') + '</div>';
   if (pProfit     > 0.5) h += '<div class="lob-seg" style="width:' + pProfit.toFixed(1)     + '%;background:#81C784">'      + (pProfit     >= 8 ? '$' + Math.round(profitBar$).toLocaleString()      : '') + '</div>';
   h += '</div>';
   h += '<div class="lob-legend">';
@@ -2365,9 +2365,9 @@ function renderProjFinancials(p) {
   if (pFlBudg     > 0.5)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#CE93D8"></div>FL Budgeted</div>';
   if (pFlSpent    > 0.1)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#7B1FA2"></div>FL Spent</div>';
   if (pFlRem      > 0.5)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#CE93D8"></div>FL Remaining</div>';
-  if (pOopBudg    > 0.5)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#FFE0B2"></div>OOP Budgeted</div>';
-  if (pOopSpent   > 0.1)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#F57F17"></div>OOP Spent</div>';
-  if (pOopRem     > 0.5)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#FFE0B2"></div>OOP Remaining</div>';
+  if (pOopBudg    > 0.5)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#B2DFDB"></div>OOP Budgeted</div>';
+  if (pOopSpent   > 0.1)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#00897B"></div>OOP Spent</div>';
+  if (pOopRem     > 0.5)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#B2DFDB"></div>OOP Remaining</div>';
   h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Profit</div>';
   h += '</div></div>';
 
