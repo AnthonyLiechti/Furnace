@@ -713,7 +713,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.131 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.132 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -778,6 +778,7 @@ var flaggedCollapsedFl  = new Set(); /* collapsed project IDs in FL Unplanned se
 var sparkShowActualsRow = false;
 var projFinActualsOpen = {}; /* per-project code toggle state for actuals row */
 var masterActualsOpen  = false; /* toggle for master / client portfolio actuals row */
+var clientActualsOpen  = {}; /* per-client-id toggle state for client overview actuals */
 let showInactiveClients = false;
 let sidebarSearch = '';
 
@@ -2025,7 +2026,7 @@ function renderClient(clientId) {
   h += '<p class="page-subtitle">' + label + ' &middot; Rate: ' + (rate > 0 ? '$' + rate + '/hr' : 'Not set') + '</p>';
 
   /* ── CLIENT FINANCIALS BANNER ── */
-  var _clientBanner = buildPortfolioBannerHTML(visibleList, 'Client Financials');
+  var _clientBanner = buildPortfolioBannerHTML(visibleList, 'Client Financials', {actualsOpen: !!clientActualsOpen[clientId], toggleFn: 'toggleClientActuals(\'' + clientId + '\')'});
   if (_clientBanner) {
     h += _clientBanner;
   } else {
@@ -7610,6 +7611,11 @@ function sparkToggleActualsRow() {
 
 function toggleMasterActuals() {
   masterActualsOpen = !masterActualsOpen;
+  navigate(currentView);
+}
+
+function toggleClientActuals(clientId) {
+  clientActualsOpen[clientId] = !clientActualsOpen[clientId];
   navigate(currentView);
 }
 
