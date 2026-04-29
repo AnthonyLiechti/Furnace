@@ -27,7 +27,7 @@ module.exports = async function handler(req, res) {
     text = `📋 *New Project Created*\n*${projCode}* — ${projName}`;
   }
 
-  const targets = ['U0997RW6PAT', 'U01TVP5C94N']; /* Evan Figueroa, Richelle Butcher */
+  const targets = ['U01TVP5C94N']; /* Richelle Butcher */
 
   let lastError = null;
   for (const channel of targets) {
