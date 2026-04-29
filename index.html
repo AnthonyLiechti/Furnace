@@ -19,6 +19,11 @@ body { font-family: Arial, 'TT Hoves Pro', sans-serif; background: var(--light-g
 /* Sidebar */
 .sidebar { width: var(--sidebar-w); background: var(--abyss); color: var(--white); position:fixed; top:0; left:0; bottom:0; overflow-y:auto; z-index:10; display:flex; flex-direction:column; }
 .sidebar-header { padding:20px 16px 12px; border-bottom:1px solid rgba(255,255,255,.15); }
+#dataStatusBadge { display:inline-flex; align-items:center; gap:5px; margin-top:5px; font-size:9px; font-weight:700; letter-spacing:.4px; padding:2px 8px; border-radius:10px; opacity:0; transition:opacity .4s; pointer-events:none; }
+#dataStatusBadge.ds-syncing { opacity:1; background:rgba(245,127,23,.18); color:#FFB74D; border:1px solid rgba(245,127,23,.3); animation:dsPulse 1.4s ease-in-out infinite; }
+#dataStatusBadge.ds-live    { opacity:1; background:rgba(129,199,132,.18); color:#81C784; border:1px solid rgba(129,199,132,.3); }
+#dataStatusBadge.ds-cached  { opacity:1; background:rgba(255,183,77,.12);  color:#FFB74D; border:1px solid rgba(255,183,77,.25); }
+@keyframes dsPulse { 0%,100%{opacity:.7} 50%{opacity:1} }
 .sidebar-header h2 { font-size:16px; letter-spacing:1px; text-transform:uppercase; color:var(--sand); }
 .sidebar-header p { font-size:11px; color:rgba(255,255,255,.5); margin-top:4px; }
 .sidebar-nav { flex:1; padding:8px 0; }
@@ -713,8 +718,9 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.143 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.144 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
+    <div id="dataStatusBadge"></div>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
   <div class="dark-toggle" onclick="toggleDarkMode()">
@@ -13771,6 +13777,31 @@ async function sparkFetchAll(table, query) {
    On load: serve cached data instantly, then fetch fresh in background.
    Cache keyed by version so schema changes auto-bust it.
    ══════════════════════════════════════════════════════════════ */
+/* ── DATA STATUS BADGE ── */
+var _dsLiveTimer = null;
+function setDataStatus(state) {
+  var el = document.getElementById('dataStatusBadge');
+  if (!el) return;
+  if (_dsLiveTimer) { clearTimeout(_dsLiveTimer); _dsLiveTimer = null; }
+  el.className = '';
+  if (state === 'syncing') {
+    el.className = 'ds-syncing';
+    el.textContent = '⟳ Syncing…';
+  } else if (state === 'live') {
+    el.className = 'ds-live';
+    el.textContent = '✓ Live';
+    _dsLiveTimer = setTimeout(function() {
+      el.style.opacity = '0';
+      setTimeout(function() { el.className = ''; el.textContent = ''; el.style.opacity = ''; }, 500);
+    }, 3000);
+  } else if (state === 'cached') {
+    el.className = 'ds-cached';
+    el.textContent = '⏱ Cached';
+  } else {
+    el.textContent = '';
+  }
+}
+
 var FURNACE_CACHE_KEY = 'furnace_supa_v5';
 var FURNACE_CACHE_TTL = 45 * 60 * 1000; /* 45 min — real-time handles live updates */
 
@@ -13947,8 +13978,10 @@ async function loadSupabaseData() {
     if (cached) {
       furnaceApplyCachePayload(cached.d);
       furnaceSubscribeGlobalRealtime();
-      if (!isStale) return; /* cache is fresh — skip re-fetch, render will happen in loadData */
+      if (!isStale) { setDataStatus('live'); return; } /* cache is fresh */
+      setDataStatus('cached'); /* stale cache applied — fresh fetch starting */
     }
+    setDataStatus('syncing');
     /* 0+1+1b. Fetch team members, budgets, and project ID map in parallel */
     var _phase1 = await Promise.all([
       sparkFetchAll('team_members', 'select=id,name,department,employment_type,fully_burdened_rate,billable_rate,is_active&is_active=eq.true&order=department.asc,name.asc'),
@@ -14174,6 +14207,7 @@ async function loadSupabaseData() {
     }
 
     SUPA_LOADED = true;
+    setDataStatus('live');
     console.log('Supabase data loaded:', Object.keys(SUPA_BUDGETS).length, 'budgets,', SUPA_ACTUALS_ALL.length, 'actuals');
 
     /* Load Slack bot token + hours_last_updated from agency_settings */
