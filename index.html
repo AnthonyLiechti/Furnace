@@ -713,7 +713,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.118 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 28, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.119 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -12211,6 +12211,38 @@ function renderFlProjList() {
       if (calCnt > 0) h += '<span style="margin-left:auto;background:#5B4A8A;color:white;font-size:9px;padding:1px 5px;border-radius:8px;font-weight:600">' + calCnt + '</span>';
       else if (unpaidCnt > 0) h += '<span style="margin-left:auto;color:#CE93D8;font-size:9px;font-weight:700">unpaid</span>';
       h += '</div>';
+      /* Expanded freelancer breakdown when project is selected */
+      if (isActive) {
+        var _fls = flGetFreelancers(sb);
+        for (var _fli = 0; _fli < _fls.length; _fli++) {
+          var _fl = _fls[_fli];
+          var _budgHrs = 0, _allocHrs = 0, _paidHrs = 0;
+          for (var _fei = 0; _fei < sb._flEntries.length; _fei++) {
+            var _fe = sb._flEntries[_fei];
+            if (_fe.team_member_id !== _fl.tmId) continue;
+            if (_fe.week_label === '__budget__') { _budgHrs += _fe.hours || 0; }
+            else if (flIsDateLabel(_fe.week_label || '')) { _allocHrs += _fe.hours || 0; if (_fe.paid) _paidHrs += _fe.hours || 0; }
+          }
+          var _budg$ = _budgHrs * _fl.rate, _alloc$ = _allocHrs * _fl.rate, _paid$ = _paidHrs * _fl.rate;
+          var _over = _budgHrs > 0 && _allocHrs > _budgHrs;
+          h += '<div style="padding:8px 10px 8px 22px;border-bottom:1px solid rgba(91,74,138,.08);background:rgba(91,74,138,.04)">';
+          h += '<div style="font-size:11px;font-weight:700;color:#CE93D8;margin-bottom:5px">' + _fl.name + '</div>';
+          h += '<div style="font-size:10px;color:var(--mid-gray);margin-bottom:2px">$' + Math.round(_fl.rate).toLocaleString() + '/hr</div>';
+          if (_budgHrs > 0) {
+            h += '<div style="display:flex;justify-content:space-between;font-size:10px;margin-top:4px"><span style="color:var(--mid-gray)">Budget</span><span style="font-weight:600">$' + Math.round(_budg$).toLocaleString() + ' &middot; ' + _budgHrs + 'h</span></div>';
+          }
+          h += '<div style="display:flex;justify-content:space-between;font-size:10px;margin-top:2px"><span style="color:var(--mid-gray)">Allocated</span><span style="font-weight:600;color:' + (_over ? 'var(--ember)' : 'var(--abyss)') + '">$' + Math.round(_alloc$).toLocaleString() + ' &middot; ' + _allocHrs.toFixed(1) + 'h</span></div>';
+          if (_paidHrs > 0) {
+            h += '<div style="display:flex;justify-content:space-between;font-size:10px;margin-top:2px"><span style="color:#2E7D32">&#10003; Paid</span><span style="font-weight:600;color:#2E7D32">$' + Math.round(_paid$).toLocaleString() + ' &middot; ' + _paidHrs.toFixed(1) + 'h</span></div>';
+          }
+          if (_budgHrs > 0) {
+            var _rem = _budgHrs - _allocHrs;
+            var _remClr = _rem < 0 ? 'var(--ember)' : 'var(--mid-gray)';
+            h += '<div style="display:flex;justify-content:space-between;font-size:10px;margin-top:2px"><span style="color:' + _remClr + '">Remaining</span><span style="font-weight:600;color:' + _remClr + '">$' + Math.round(Math.abs(_rem * _fl.rate)).toLocaleString() + ' &middot; ' + Math.abs(_rem).toFixed(1) + 'h' + (_rem < 0 ? ' over' : '') + '</span></div>';
+          }
+          h += '</div>';
+        }
+      }
       shown++;
     }
   }
