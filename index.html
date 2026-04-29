@@ -718,7 +718,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.144 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.147 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
   </div>
@@ -1009,6 +1009,8 @@ var SUPA_ACTUALS_ALL = []; // raw labor_actuals array
 var SUPA_LOADED = false;
 var FURNACE_TEAM_MEMBERS = [];
 var SLACK_BOT_TOKEN = ''; /* loaded from agency_settings on init */
+var FURNACE_CURRENT_USER_EMAIL = ''; /* set on login from Google OAuth user.email */
+var ACTUALS_ALLOWED_EMAILS = ['anthony@createdbyforge.com','richelle@createdbyforge.com']; /* Show Actuals access list */
 var SUPA_POS = [];        /* purchase orders sent to clients, loaded from pos table */
 var HOURS_LAST_UPDATED = ''; /* human-readable date string, stored in agency_settings */
 var OPP_PHASES = [
@@ -1623,7 +1625,7 @@ function buildPortfolioBannerHTML(projects, bannerTitle, opts) {
   var _pActOopSpent    = totalOopSpent;
   var _pActProfit      = totalClientPrice - _pActLaborCost - _pActFlInternal - _pActOopSpent;
   var _pActMargin      = totalClientPrice > 0 ? (_pActProfit / totalClientPrice * 100) : 0;
-  var _pActSparkle     = _pActMargin > 25;
+  var _pActSparkle     = _pActMargin > 45;
   var _pActOpen        = !!(opts && opts.actualsOpen);
   var _pActToggleFn    = (opts && opts.toggleFn) ? opts.toggleFn : '';
 
@@ -1683,7 +1685,7 @@ function buildPortfolioBannerHTML(projects, bannerTitle, opts) {
   _h += '</div>';
 
   /* ── Actuals toggle button + row ── */
-  if (_pActToggleFn) {
+  if (_pActToggleFn && canViewActuals()) {
     _h += '<div style="display:flex;justify-content:flex-end;margin-top:6px">';
     _h += '<button onclick="' + _pActToggleFn + '" style="font-size:11px;padding:3px 12px;border-radius:20px;border:1px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.45);cursor:pointer;font-family:inherit;letter-spacing:.02em">';
     _h += (_pActOpen ? '\u25b2 Hide Actuals' : '\u25bc Show Actuals') + '</button></div>';
@@ -2468,12 +2470,14 @@ function renderProjFinancials(p) {
   var _pfActFlInternal = _pfActFlPaid * 0.5;            /* FL Internal Cost = 50% of paid */
   var _pfActProfit = tcvPrice - _pfActLaborCost - _pfActFlInternal - _pfActOopSpent;
   var _pfActMargin = tcvPrice > 0 ? (_pfActProfit / tcvPrice * 100) : 0;
-  h += '<div style="display:flex;justify-content:flex-end;margin-top:6px">';
-  h += '<button onclick="projFinToggleActuals(\'' + p.code + '\')" style="font-size:11px;padding:3px 12px;border-radius:20px;border:1px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.45);cursor:pointer;font-family:inherit;letter-spacing:.02em">';
-  h += (_pfActOpen ? '\u25b2 Hide Actuals' : '\u25bc Show Actuals') + '</button></div>';
+  if (canViewActuals()) {
+    h += '<div style="display:flex;justify-content:flex-end;margin-top:6px">';
+    h += '<button onclick="projFinToggleActuals(\'' + p.code + '\')" style="font-size:11px;padding:3px 12px;border-radius:20px;border:1px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.45);cursor:pointer;font-family:inherit;letter-spacing:.02em">';
+    h += (_pfActOpen ? '\u25b2 Hide Actuals' : '\u25bc Show Actuals') + '</button></div>';
+  }
   if (_pfActOpen) {
     h += '<div class="snap-financials" style="margin-top:6px;padding-top:12px;border-top:1px solid rgba(129,199,132,.25)">';
-    var _pfActSparkle = _pfActMargin > 25;
+    var _pfActSparkle = _pfActMargin > 45;
     h += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.7)">Actual Labor</div><div class="sf-value">$' + Math.round(_pfActLaborCost).toLocaleString() + '</div><div class="sf-sub">' + _pfActLaborHrs.toFixed(1) + ' hrs at cost rate</div></div>';
     h += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.7)">Actual FL</div><div class="sf-value" style="color:#CE93D8">$' + Math.round(_pfActFlInternal).toLocaleString() + '</div><div class="sf-sub">paid: $' + Math.round(_pfActFlPaid).toLocaleString() + '</div></div>';
     var _pfOopSub = _pfActOopSpent > _pfActOopPaid ? 'paid: $' + Math.round(_pfActOopPaid).toLocaleString() + ' · w/ markup: $' + Math.round(_pfActOopScheduled).toLocaleString() : 'w/ markup: $' + Math.round(_pfActOopScheduled).toLocaleString();
@@ -4780,6 +4784,15 @@ function sparkBrowserEmail() {
   var stored = localStorage.getItem('furnace_auth');
   if (!stored) return '';
   try { return JSON.parse(stored).user_email || ''; } catch(e) { return ''; }
+}
+
+function canViewActuals() {
+  var email = (FURNACE_CURRENT_USER_EMAIL || '').toLowerCase();
+  if (!email) return false;
+  for (var i = 0; i < ACTUALS_ALLOWED_EMAILS.length; i++) {
+    if (email === ACTUALS_ALLOWED_EMAILS[i].toLowerCase()) return true;
+  }
+  return false;
 }
 
 async function sparkFetch(table, query, method, body) {
@@ -7642,10 +7655,12 @@ function sparkRenderSummary() {
   var _actFlInternal = _actFlPaid * 0.5;                 /* FL Internal Cost = 50% of paid */
   var _actProfit = clientPrice - _actLaborCost - _actFlInternal - _actOopSpent;
   var _actMargin = clientPrice > 0 ? (_actProfit / clientPrice * 100) : 0;
-  /* Toggle row */
+  /* Toggle row — only visible to authorized users */
   var _tglEl = document.getElementById('sparkActualsToggleRow');
   if (_tglEl) {
-    _tglEl.innerHTML = '<button onclick="sparkToggleActualsRow()" style="font-size:11px;padding:3px 12px;border-radius:20px;border:1px solid rgba(0,0,0,.18);background:transparent;color:var(--mid-gray);cursor:pointer;font-family:inherit;letter-spacing:.02em">' + (sparkShowActualsRow ? '\u25b2 Hide Actuals' : '\u25bc Show Actuals') + '</button>';
+    _tglEl.innerHTML = canViewActuals()
+      ? '<button onclick="sparkToggleActualsRow()" style="font-size:11px;padding:3px 12px;border-radius:20px;border:1px solid rgba(0,0,0,.18);background:transparent;color:var(--mid-gray);cursor:pointer;font-family:inherit;letter-spacing:.02em">' + (sparkShowActualsRow ? '\u25b2 Hide Actuals' : '\u25bc Show Actuals') + '</button>'
+      : '';
   }
   /* Actuals bar */
   var _actEl = document.getElementById('sparkActualsBar');
@@ -14523,6 +14538,8 @@ function furnaceShowApp(user) {
   if (overlay) overlay.remove();
   document.querySelector('.sidebar').style.display = '';
   document.getElementById('mainContent').style.display = '';
+  /* Store current user email for permission checks (e.g. canViewActuals) */
+  FURNACE_CURRENT_USER_EMAIL = (user && user.email) ? user.email.toLowerCase() : '';
   /* Show name in sidebar */
   var nameEl = document.getElementById('furnaceSidebarUserName');
   if (nameEl && user) {
