@@ -713,7 +713,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.130 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.131 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -1484,7 +1484,16 @@ function buildPortfolioBannerHTML(projects, bannerTitle, opts) {
   /* ─ Aggregate supabase-backed projects ─ */
   var totalClientPrice = 0, totalProjLaborPrice = 0, totalFlBudget = 0, totalOopProjected = 0;
   var totalHoursBudget = 0, totalFlPaid = 0, totalOopSpent = 0, totalInternalLaborCost = 0;
+  var totalFlProjected = 0, totalOopProjSched = 0;
   var snapshotCount = 0;
+
+  /* Build OOP scheduled-IDs lookup once */
+  var _portOopSchedIds = {};
+  var _portOopSched = (OOP_SCHEDULE && OOP_SCHEDULE.entries) ? OOP_SCHEDULE.entries : [];
+  for (var _posi = 0; _posi < _portOopSched.length; _posi++) {
+    if (_portOopSched[_posi].oopEntryId) _portOopSchedIds[_portOopSched[_posi].oopEntryId] = true;
+  }
+  var _portToday = new Date().toISOString().slice(0,10);
 
   for (var _i = 0; _i < projects.length; _i++) {
     var _p = projects[_i], _sb = _p._supabudget;
@@ -1503,8 +1512,43 @@ function buildPortfolioBannerHTML(projects, bannerTitle, opts) {
     totalFlPaid            += _noFl ? 0 : (_sb.flSpent || 0);
     totalOopSpent          += _noOop ? 0 : (_sb.oopSpent || 0);
     totalInternalLaborCost += _sb.laborCostInternal || _sb.laborTotal || 0;
+    /* FL projected: future unpaid scheduled calendar entries */
+    if (!_noFl && _sb._flEntries) {
+      for (var _pfi = 0; _pfi < _sb._flEntries.length; _pfi++) {
+        var _pfe = _sb._flEntries[_pfi];
+        if (_pfe.week_label === '__budget__') continue;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(_pfe.week_label||'') && _pfe.week_label > _portToday && !_pfe.paid) {
+          totalFlProjected += (_pfe.hours || 0) * (_pfe.rate || 0);
+        }
+      }
+    }
+    /* OOP projected: scheduled but not paid items */
+    if (!_noOop && _sb._oopEntries) {
+      for (var _poi = 0; _poi < _sb._oopEntries.length; _poi++) {
+        var _pOopi = _sb._oopEntries[_poi];
+        if (_pOopi.is_active === false || _pOopi.paid) continue;
+        if (_portOopSchedIds[_pOopi.id]) {
+          var _pC = _pOopi.adjusted_count      != null ? _pOopi.adjusted_count      : (_pOopi.count      || 0);
+          var _pR = _pOopi.adjusted_rate       != null ? _pOopi.adjusted_rate       : (_pOopi.rate       || 0);
+          var _pD = _pOopi.adjusted_days       != null ? _pOopi.adjusted_days       : (_pOopi.days       || 1);
+          var _pH = _pOopi.adjusted_head_count != null ? _pOopi.adjusted_head_count : (_pOopi.head_count || 1);
+          totalOopProjSched += _pOopi.actual_amount != null ? _pOopi.actual_amount : (_pC * _pR * _pD * _pH);
+        }
+      }
+    }
   }
   if (snapshotCount === 0) return '';
+
+  /* Labor projected: future RM allocations × $200 */
+  var totalLaborProjected$ = 0;
+  for (var _pli = 0; _pli < projects.length; _pli++) {
+    if (!projects[_pli]._supabudget) continue;
+    var _plAllocs = getAllocationsForProject(projects[_pli].id);
+    for (var _plai = 0; _plai < _plAllocs.length; _plai++) {
+      var _pla = _plAllocs[_plai];
+      if (_pla.date && _pla.date > _portToday) totalLaborProjected$ += (_pla.hoursPerDay || 0) * agencyRate;
+    }
+  }
 
   /* ─ Hours & labor $ ─ */
   var totalHoursSpent = 0, totalLaborSpent$ = 0;
@@ -1562,30 +1606,39 @@ function buildPortfolioBannerHTML(projects, bannerTitle, opts) {
   var _pActOpen        = !!(opts && opts.actualsOpen);
   var _pActToggleFn    = (opts && opts.toggleFn) ? opts.toggleFn : '';
 
-  /* ─ Progress bar: grouped Labor | FL | OOP | Profit ─ */
+  /* ─ Progress bar: Labor | FL | OOP | Profit — each with Spent / Projected / Remaining ─ */
   var barTotal   = totalClientPrice > 0 ? totalClientPrice : 1;
-  var profitBar$ = Math.max(0, totalClientPrice - totalLaborSpent$ - totalLaborRemaining$ - totalOopSpent - Math.max(0, totalOopRemaining) - totalFlBudget);
-  var _pHasLaborSpend = totalLaborSpent$ > 0;
-  var _pHasFlSpend    = totalFlPaid > 0;
-  var _pHasOopSpend   = totalOopSpent > 0;
+  var profitBar$ = Math.max(0, totalClientPrice - totalProjLaborPrice - totalFlBudget - totalOopProjected);
+  var _pHasLaborSpend  = totalLaborSpent$ > 0;
+  var _pHasProjLabor   = totalLaborProjected$ > 0;
+  var _pHasFlSpend     = totalFlPaid > 0;
+  var _pHasProjFl      = totalFlProjected > 0;
+  var _pHasOopSpend    = totalOopSpent > 0;
+  var _pHasProjOop     = totalOopProjSched > 0;
   /* Labor */
-  var pLaborBudg  = !_pHasLaborSpend ? Math.min(100, totalProjLaborPrice / barTotal * 100) : 0;
+  var pLaborBudg  = (!_pHasLaborSpend && !_pHasProjLabor) ? Math.min(100, totalProjLaborPrice / barTotal * 100) : 0;
   var pLaborSpent = _pHasLaborSpend ? Math.min(100, totalLaborSpent$ / barTotal * 100) : 0;
   var _pu1 = pLaborBudg + pLaborSpent;
-  var pLaborRem   = _pHasLaborSpend ? Math.min(100 - _pu1, totalLaborRemaining$ / barTotal * 100) : 0;
-  var _pu2 = _pu1 + pLaborRem;
+  var pLaborProj  = _pHasProjLabor ? Math.min(100 - _pu1, totalLaborProjected$ / barTotal * 100) : 0;
+  var _pu1p = _pu1 + pLaborProj;
+  var pLaborRem   = (_pHasLaborSpend || _pHasProjLabor) ? Math.min(100 - _pu1p, Math.max(0, totalProjLaborPrice - totalLaborSpent$ - totalLaborProjected$) / barTotal * 100) : 0;
+  var _pu2 = _pu1p + pLaborRem;
   /* FL */
-  var pFlBudg  = (!_pHasFlSpend && totalFlBudget > 0) ? Math.min(100 - _pu2, totalFlBudget / barTotal * 100) : 0;
+  var pFlBudg  = (!_pHasFlSpend && !_pHasProjFl && totalFlBudget > 0) ? Math.min(100 - _pu2, totalFlBudget / barTotal * 100) : 0;
   var pFlSpent = _pHasFlSpend ? Math.min(100 - _pu2, totalFlPaid / barTotal * 100) : 0;
   var _pu3 = _pu2 + pFlBudg + pFlSpent;
-  var pFlRem   = _pHasFlSpend ? Math.min(100 - _pu3, Math.max(0, totalFlBudget - totalFlPaid) / barTotal * 100) : 0;
-  var _pu4 = _pu3 + pFlRem;
+  var pFlProj  = _pHasProjFl ? Math.min(100 - _pu3, totalFlProjected / barTotal * 100) : 0;
+  var _pu3p = _pu3 + pFlProj;
+  var pFlRem   = (_pHasFlSpend || _pHasProjFl) ? Math.min(100 - _pu3p, Math.max(0, totalFlBudget - totalFlPaid - totalFlProjected) / barTotal * 100) : 0;
+  var _pu4 = _pu3p + pFlRem;
   /* OOP */
-  var pOopBudg  = (!_pHasOopSpend && totalOopProjected > 0) ? Math.min(100 - _pu4, totalOopProjected / barTotal * 100) : 0;
+  var pOopBudg  = (!_pHasOopSpend && !_pHasProjOop && totalOopProjected > 0) ? Math.min(100 - _pu4, totalOopProjected / barTotal * 100) : 0;
   var pOopSpent = _pHasOopSpend ? Math.min(100 - _pu4, totalOopSpent / barTotal * 100) : 0;
   var _pu5 = _pu4 + pOopBudg + pOopSpent;
-  var pOopRem   = _pHasOopSpend ? Math.min(100 - _pu5, Math.max(0, totalOopRemaining) / barTotal * 100) : 0;
-  var pProfit   = Math.max(0, 100 - _pu5 - pOopRem);
+  var pOopProj  = _pHasProjOop ? Math.min(100 - _pu5, totalOopProjSched / barTotal * 100) : 0;
+  var _pu5p = _pu5 + pOopProj;
+  var pOopRem   = (_pHasOopSpend || _pHasProjOop) ? Math.min(100 - _pu5p, Math.max(0, totalOopRemaining - totalOopProjSched) / barTotal * 100) : 0;
+  var pProfit   = Math.max(0, 100 - _pu5p - pOopRem);
 
   var _h = '';
   _h += '<div class="snapshot-banner" style="margin-bottom:16px">';
@@ -1616,31 +1669,56 @@ function buildPortfolioBannerHTML(projects, bannerTitle, opts) {
     _h += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.7)">Proj. Actual Profit</div><div class="sf-value" style="color:' + (_pActProfit >= 0 ? '#81C784' : 'var(--ember)') + '">$' + Math.round(_pActProfit).toLocaleString() + '</div></div>';
     _h += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.7)">Proj. Actual Margin</div><div class="sf-value' + (_pActSparkle ? ' margin-sparkle' : '') + '" style="' + (_pActSparkle ? '' : 'color:' + (_pActMargin >= 0 ? '#81C784' : 'var(--ember)')) + '">' + _pActMargin.toFixed(1) + '%</div></div>';
     _h += '</div>';
+    /* ── Actuals bar ── */
+    var _pActBarTot = totalClientPrice > 0 ? totalClientPrice : 1;
+    var _ppActL = Math.max(0, Math.min(100,               _pActLaborCost  / _pActBarTot * 100));
+    var _ppActFl = Math.max(0, Math.min(100 - _ppActL,   _pActFlInternal / _pActBarTot * 100));
+    var _ppActOop = Math.max(0, Math.min(100 - _ppActL - _ppActFl, _pActOopSpent / _pActBarTot * 100));
+    var _ppActProfit = Math.max(0, 100 - _ppActL - _ppActFl - _ppActOop);
+    _h += '<div style="margin-top:12px">';
+    _h += '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.8px;opacity:.4;margin-bottom:5px;font-weight:600">Actuals vs. Client Price</div>';
+    _h += '<div class="lob-bar">';
+    if (_ppActL      > 0.1) _h += '<div class="lob-seg" style="width:' + _ppActL.toFixed(1)      + '%;background:#1565C0">'      + (_ppActL      >= 8 ? '$' + Math.round(_pActLaborCost).toLocaleString()  : '') + '</div>';
+    if (_ppActFl     > 0.1) _h += '<div class="lob-seg" style="width:' + _ppActFl.toFixed(1)     + '%;background:#7B1FA2">'      + (_ppActFl     >= 8 ? '$' + Math.round(_pActFlInternal).toLocaleString() : '') + '</div>';
+    if (_ppActOop    > 0.1) _h += '<div class="lob-seg" style="width:' + _ppActOop.toFixed(1)    + '%;background:var(--ember)">' + (_ppActOop    >= 8 ? '$' + Math.round(_pActOopSpent).toLocaleString()   : '') + '</div>';
+    if (_ppActProfit > 0.5) _h += '<div class="lob-seg" style="width:' + _ppActProfit.toFixed(1) + '%;background:#81C784">'      + (_ppActProfit >= 8 ? '$' + Math.round(_pActProfit).toLocaleString()     : '') + '</div>';
+    _h += '</div>';
+    _h += '<div class="lob-legend">';
+    if (_ppActL      > 0.1) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#1565C0"></div>Actual Labor</div>';
+    if (_ppActFl     > 0.1) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#7B1FA2"></div>Actual FL</div>';
+    if (_ppActOop    > 0.1) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ember)"></div>Actual OOP</div>';
+    if (_ppActProfit > 0.5) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Actual Profit</div>';
+    _h += '</div></div>';
   }
 
-  /* ── Progress bar ── */
   _h += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1)">';
   _h += '<div class="lob-bar">';
-  if (pLaborBudg  > 0.1) _h += '<div class="lob-seg" style="width:' + pLaborBudg.toFixed(1)  + '%;background:#80CBC4;color:var(--abyss)">' + (pLaborBudg  >= 8 ? '$' + Math.round(totalProjLaborPrice).toLocaleString()  : '') + '</div>';
-  if (pLaborSpent > 0.1) _h += '<div class="lob-seg" style="width:' + pLaborSpent.toFixed(1) + '%;background:#1565C0">' + (pLaborSpent >= 8 ? '$' + Math.round(totalLaborSpent$).toLocaleString()    : '') + '</div>';
-  if (pLaborRem   > 0.5) _h += '<div class="lob-seg" style="width:' + pLaborRem.toFixed(1)   + '%;background:#80CBC4;color:var(--abyss)">' + (pLaborRem   >= 8 ? '$' + Math.round(totalLaborRemaining$).toLocaleString() : '') + '</div>';
-  if (pFlBudg     > 0.5) _h += '<div class="lob-seg" style="width:' + pFlBudg.toFixed(1)     + '%;background:#CE93D8;color:var(--abyss)">' + (pFlBudg >= 8 ? '$' + Math.round(totalFlBudget).toLocaleString() : '') + '</div>';
-  if (pFlSpent    > 0.1) _h += '<div class="lob-seg" style="width:' + pFlSpent.toFixed(1)    + '%;background:#7B1FA2">'      + (pFlSpent    >= 8 ? '$' + Math.round(totalFlPaid).toLocaleString()          : '') + '</div>';
-  if (pFlRem      > 0.5) _h += '<div class="lob-seg" style="width:' + pFlRem.toFixed(1)      + '%;background:#CE93D8;color:var(--abyss)">' + (pFlRem >= 8 ? '$' + Math.round(Math.max(0, totalFlBudget - totalFlPaid)).toLocaleString() : '') + '</div>';
-  if (pOopBudg    > 0.5) _h += '<div class="lob-seg" style="width:' + pOopBudg.toFixed(1)    + '%;background:#FFCC80;color:var(--abyss)">' + (pOopBudg >= 8 ? '$' + Math.round(totalOopProjected).toLocaleString() : '') + '</div>';
-  if (pOopSpent   > 0.1) _h += '<div class="lob-seg" style="width:' + pOopSpent.toFixed(1)   + '%;background:var(--ember)">'      + (pOopSpent   >= 8 ? '$' + Math.round(totalOopSpent).toLocaleString()       : '') + '</div>';
-  if (pOopRem     > 0.5) _h += '<div class="lob-seg" style="width:' + pOopRem.toFixed(1)     + '%;background:#FFCC80;color:var(--abyss)">' + (pOopRem >= 8 ? '$' + Math.round(Math.max(0, totalOopRemaining)).toLocaleString() : '') + '</div>';
-  if (pProfit     > 0.5) _h += '<div class="lob-seg" style="width:' + pProfit.toFixed(1)     + '%;background:#81C784">'      + (pProfit     >= 8 ? '$' + Math.round(profitBar$).toLocaleString()          : '') + '</div>';
+  if (pLaborBudg  > 0.1) _h += '<div class="lob-seg" style="width:' + pLaborBudg.toFixed(1)  + '%;background:#80CBC4;color:var(--abyss)">' + (pLaborBudg  >= 8 ? '$' + Math.round(totalProjLaborPrice).toLocaleString()   : '') + '</div>';
+  if (pLaborSpent > 0.1) _h += '<div class="lob-seg" style="width:' + pLaborSpent.toFixed(1) + '%;background:#1565C0">'                    + (pLaborSpent >= 8 ? '$' + Math.round(totalLaborSpent$).toLocaleString()     : '') + '</div>';
+  if (pLaborProj  > 0.5) _h += '<div class="lob-seg" style="width:' + pLaborProj.toFixed(1)  + '%;background:#42A5F5">'                    + (pLaborProj  >= 8 ? '$' + Math.round(totalLaborProjected$).toLocaleString() : '') + '</div>';
+  if (pLaborRem   > 0.5) _h += '<div class="lob-seg" style="width:' + pLaborRem.toFixed(1)   + '%;background:#80CBC4;color:var(--abyss)">' + (pLaborRem   >= 8 ? '$' + Math.round(Math.max(0, totalProjLaborPrice - totalLaborSpent$ - totalLaborProjected$)).toLocaleString() : '') + '</div>';
+  if (pFlBudg     > 0.5) _h += '<div class="lob-seg" style="width:' + pFlBudg.toFixed(1)     + '%;background:#CE93D8;color:var(--abyss)">' + (pFlBudg     >= 8 ? '$' + Math.round(totalFlBudget).toLocaleString()        : '') + '</div>';
+  if (pFlSpent    > 0.1) _h += '<div class="lob-seg" style="width:' + pFlSpent.toFixed(1)    + '%;background:#7B1FA2">'                    + (pFlSpent    >= 8 ? '$' + Math.round(totalFlPaid).toLocaleString()           : '') + '</div>';
+  if (pFlProj     > 0.5) _h += '<div class="lob-seg" style="width:' + pFlProj.toFixed(1)     + '%;background:#AB47BC">'                    + (pFlProj     >= 8 ? '$' + Math.round(totalFlProjected).toLocaleString()      : '') + '</div>';
+  if (pFlRem      > 0.5) _h += '<div class="lob-seg" style="width:' + pFlRem.toFixed(1)      + '%;background:#CE93D8;color:var(--abyss)">' + (pFlRem      >= 8 ? '$' + Math.round(Math.max(0, totalFlBudget - totalFlPaid - totalFlProjected)).toLocaleString() : '') + '</div>';
+  if (pOopBudg    > 0.5) _h += '<div class="lob-seg" style="width:' + pOopBudg.toFixed(1)    + '%;background:#FFCC80;color:var(--abyss)">' + (pOopBudg    >= 8 ? '$' + Math.round(totalOopProjected).toLocaleString()    : '') + '</div>';
+  if (pOopSpent   > 0.1) _h += '<div class="lob-seg" style="width:' + pOopSpent.toFixed(1)   + '%;background:var(--ember)">'               + (pOopSpent   >= 8 ? '$' + Math.round(totalOopSpent).toLocaleString()        : '') + '</div>';
+  if (pOopProj    > 0.5) _h += '<div class="lob-seg" style="width:' + pOopProj.toFixed(1)    + '%;background:#FFA726;color:var(--abyss)">' + (pOopProj    >= 8 ? '$' + Math.round(totalOopProjSched).toLocaleString()    : '') + '</div>';
+  if (pOopRem     > 0.5) _h += '<div class="lob-seg" style="width:' + pOopRem.toFixed(1)     + '%;background:#FFCC80;color:var(--abyss)">' + (pOopRem     >= 8 ? '$' + Math.round(Math.max(0, totalOopRemaining - totalOopProjSched)).toLocaleString() : '') + '</div>';
+  if (pProfit     > 0.5) _h += '<div class="lob-seg" style="width:' + pProfit.toFixed(1)     + '%;background:#81C784">'                    + (pProfit     >= 8 ? '$' + Math.round(profitBar$).toLocaleString()           : '') + '</div>';
   _h += '</div>';
   _h += '<div class="lob-legend">';
   if (pLaborBudg  > 0.1) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#80CBC4"></div>Labor Budgeted</div>';
   if (pLaborSpent > 0.1) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#1565C0"></div>Labor Spent</div>';
+  if (pLaborProj  > 0.5) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#42A5F5"></div>Labor Projected</div>';
   if (pLaborRem   > 0.5) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#80CBC4"></div>Labor Remaining</div>';
   if (pFlBudg     > 0.5) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#CE93D8"></div>FL Budgeted</div>';
   if (pFlSpent    > 0.1) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#7B1FA2"></div>FL Spent</div>';
+  if (pFlProj     > 0.5) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#AB47BC"></div>FL Projected</div>';
   if (pFlRem      > 0.5) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#CE93D8"></div>FL Remaining</div>';
   if (pOopBudg    > 0.5) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#FFCC80"></div>OOP Budgeted</div>';
   if (pOopSpent   > 0.1) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ember)"></div>OOP Spent</div>';
+  if (pOopProj    > 0.5) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#FFA726"></div>OOP Projected</div>';
   if (pOopRem     > 0.5) _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#FFCC80"></div>OOP Remaining</div>';
   _h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Profit</div>';
   _h += '</div></div>';
@@ -2235,6 +2313,47 @@ function renderProjFinancials(p) {
   var effRateColor = effRate > 0 && effRate <= 150 ? '#81C784' : effRate <= 175 ? 'var(--honey)' : effRate > 0 ? 'var(--ember)' : 'var(--white)';
 
   var laborRemaining$ = Math.max(0, hrsRemaining) * agencyRate;
+
+  /* ── Projected: future RM allocations (labor) + scheduled FL/OOP entries ── */
+  var _projToday = new Date().toISOString().slice(0,10);
+  var laborProjHrs = 0;
+  var _fpAllocs = getAllocationsForProject(p.id);
+  for (var _fpai = 0; _fpai < _fpAllocs.length; _fpai++) {
+    var _fpa = _fpAllocs[_fpai];
+    if (_fpa.date && _fpa.date > _projToday) laborProjHrs += (_fpa.hoursPerDay || 0);
+  }
+  var laborProj$ = laborProjHrs * agencyRate;
+  var flProj = 0;
+  if (!noFl) {
+    var _fpFlEnts = sb._flEntries || [];
+    for (var _fpfi = 0; _fpfi < _fpFlEnts.length; _fpfi++) {
+      var _fpfe = _fpFlEnts[_fpfi];
+      if (_fpfe.week_label === '__budget__') continue;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(_fpfe.week_label||'') && _fpfe.week_label > _projToday && !_fpfe.paid) {
+        flProj += (_fpfe.hours || 0) * (_fpfe.rate || 0);
+      }
+    }
+  }
+  var oopProj = 0;
+  if (!noOop && sb._oopEntries) {
+    var _fpSchedIds = {};
+    var _fpOopSched = (OOP_SCHEDULE && OOP_SCHEDULE.entries) ? OOP_SCHEDULE.entries : [];
+    for (var _fpos = 0; _fpos < _fpOopSched.length; _fpos++) {
+      if (_fpOopSched[_fpos].oopEntryId) _fpSchedIds[_fpOopSched[_fpos].oopEntryId] = true;
+    }
+    for (var _fpoo = 0; _fpoo < sb._oopEntries.length; _fpoo++) {
+      var _fpOopi = sb._oopEntries[_fpoo];
+      if (_fpOopi.is_active === false || _fpOopi.paid) continue;
+      if (_fpSchedIds[_fpOopi.id]) {
+        var _fpC = _fpOopi.adjusted_count      != null ? _fpOopi.adjusted_count      : (_fpOopi.count      || 0);
+        var _fpR = _fpOopi.adjusted_rate       != null ? _fpOopi.adjusted_rate       : (_fpOopi.rate       || 0);
+        var _fpD = _fpOopi.adjusted_days       != null ? _fpOopi.adjusted_days       : (_fpOopi.days       || 1);
+        var _fpH = _fpOopi.adjusted_head_count != null ? _fpOopi.adjusted_head_count : (_fpOopi.head_count || 1);
+        oopProj += _fpOopi.actual_amount != null ? _fpOopi.actual_amount : (_fpC * _fpR * _fpD * _fpH);
+      }
+    }
+  }
+
   var barTotal = tcvPrice > 0 ? tcvPrice : 1;
   /* When finished, unspent labor folds into profit — don't subtract it from the bar */
   var profitBar$ = isFinished
@@ -2319,54 +2438,87 @@ function renderProjFinancials(p) {
     h += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.7)">Proj. Actual Profit</div><div class="sf-value" style="color:' + (_pfActProfit >= 0 ? '#81C784' : 'var(--ember)') + '">$' + Math.round(_pfActProfit).toLocaleString() + '</div></div>';
     h += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.7)">Proj. Actual Margin</div><div class="sf-value' + (_pfActSparkle ? ' margin-sparkle' : '') + '" style="' + (_pfActSparkle ? '' : 'color:' + (_pfActMargin >= 0 ? '#81C784' : 'var(--ember)')) + '">' + _pfActMargin.toFixed(1) + '%</div></div>';
     h += '</div>';
+    /* ── Actuals bar ── */
+    var _pfActBarTot = tcvPrice > 0 ? tcvPrice : 1;
+    var _pfpActL = Math.max(0, Math.min(100,               _pfActLaborCost  / _pfActBarTot * 100));
+    var _pfpActFl = Math.max(0, Math.min(100 - _pfpActL,  _pfActFlInternal / _pfActBarTot * 100));
+    var _pfpActOop = Math.max(0, Math.min(100 - _pfpActL - _pfpActFl, _pfActOopSpent / _pfActBarTot * 100));
+    var _pfpActProfit = Math.max(0, 100 - _pfpActL - _pfpActFl - _pfpActOop);
+    h += '<div style="margin-top:12px">';
+    h += '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.8px;opacity:.4;margin-bottom:5px;font-weight:600">Actuals vs. Client Price</div>';
+    h += '<div class="lob-bar">';
+    if (_pfpActL      > 0.1) h += '<div class="lob-seg" style="width:' + _pfpActL.toFixed(1)      + '%;background:#1565C0">'      + (_pfpActL      >= 8 ? '$' + Math.round(_pfActLaborCost).toLocaleString()  : '') + '</div>';
+    if (_pfpActFl     > 0.1) h += '<div class="lob-seg" style="width:' + _pfpActFl.toFixed(1)     + '%;background:#7B1FA2">'      + (_pfpActFl     >= 8 ? '$' + Math.round(_pfActFlInternal).toLocaleString() : '') + '</div>';
+    if (_pfpActOop    > 0.1) h += '<div class="lob-seg" style="width:' + _pfpActOop.toFixed(1)    + '%;background:var(--ember)">' + (_pfpActOop    >= 8 ? '$' + Math.round(_pfActOopSpent).toLocaleString()   : '') + '</div>';
+    if (_pfpActProfit > 0.5) h += '<div class="lob-seg" style="width:' + _pfpActProfit.toFixed(1) + '%;background:#81C784">'      + (_pfpActProfit >= 8 ? '$' + Math.round(_pfActProfit).toLocaleString()     : '') + '</div>';
+    h += '</div>';
+    h += '<div class="lob-legend">';
+    if (_pfpActL      > 0.1) h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#1565C0"></div>Actual Labor</div>';
+    if (_pfpActFl     > 0.1) h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#7B1FA2"></div>Actual FL</div>';
+    if (_pfpActOop    > 0.1) h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ember)"></div>Actual OOP</div>';
+    if (_pfpActProfit > 0.5) h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Actual Profit</div>';
+    h += '</div></div>';
   }
 
-  /* ── Progress bar: grouped Labor | FL | OOP | Profit ──
-     Each category shows one 'Budgeted' block when untouched, then splits into
-     'Spent' + 'Remaining' once there is actual spend. */
-  var _bHasLaborSpend = laborSpent$ > 0;
-  var _bHasFlSpend    = !noFl && flSpent > 0;
-  var _bHasOopSpend   = !noOop && oopSpent > 0;
+  /* ── Progress bar: Labor | FL | OOP | Profit — each with Spent / Projected / Remaining ── */
+  var _bHasLaborSpend  = laborSpent$ > 0;
+  var _bHasProjLabor   = !isFinished && laborProj$ > 0;
+  var _bHasFlSpend     = !noFl && flSpent > 0;
+  var _bHasProjFl      = !noFl && flProj > 0;
+  var _bHasOopSpend    = !noOop && oopSpent > 0;
+  var _bHasProjOop     = !noOop && oopProj > 0;
   /* Labor */
-  var pLaborBudg  = (!_bHasLaborSpend && !isFinished) ? Math.min(100, projLaborPrice / barTotal * 100) : 0;
+  var pLaborBudg  = (!_bHasLaborSpend && !_bHasProjLabor && !isFinished) ? Math.min(100, projLaborPrice / barTotal * 100) : 0;
   var pLaborSpent = _bHasLaborSpend ? Math.min(100, laborSpent$ / barTotal * 100) : 0;
   var _bu1 = pLaborBudg + pLaborSpent;
-  var pLaborRem   = (_bHasLaborSpend && !isFinished) ? Math.min(100 - _bu1, laborRemaining$ / barTotal * 100) : 0;
-  var _bu2 = _bu1 + pLaborRem;
+  var pLaborProj  = _bHasProjLabor ? Math.min(100 - _bu1, laborProj$ / barTotal * 100) : 0;
+  var _bu1p = _bu1 + pLaborProj;
+  var pLaborRem   = (_bHasLaborSpend || _bHasProjLabor) && !isFinished ? Math.min(100 - _bu1p, Math.max(0, projLaborPrice - laborSpent$ - laborProj$) / barTotal * 100) : 0;
+  var _bu2 = _bu1p + pLaborRem;
   /* FL */
-  var pFlBudg  = (!noFl && !_bHasFlSpend && flBudget > 0) ? Math.min(100 - _bu2, flBudget / barTotal * 100) : 0;
+  var pFlBudg  = (!noFl && !_bHasFlSpend && !_bHasProjFl && flBudget > 0) ? Math.min(100 - _bu2, flBudget / barTotal * 100) : 0;
   var pFlSpent = _bHasFlSpend ? Math.min(100 - _bu2, flSpent / barTotal * 100) : 0;
   var _bu3 = _bu2 + pFlBudg + pFlSpent;
-  var pFlRem   = _bHasFlSpend ? Math.min(100 - _bu3, Math.max(0, flBudget - flSpent) / barTotal * 100) : 0;
-  var _bu4 = _bu3 + pFlRem;
+  var pFlProj  = _bHasProjFl ? Math.min(100 - _bu3, flProj / barTotal * 100) : 0;
+  var _bu3p = _bu3 + pFlProj;
+  var pFlRem   = (_bHasFlSpend || _bHasProjFl) ? Math.min(100 - _bu3p, Math.max(0, flBudget - flSpent - flProj) / barTotal * 100) : 0;
+  var _bu4 = _bu3p + pFlRem;
   /* OOP */
-  var pOopBudg  = (!noOop && !_bHasOopSpend && oopBudget > 0) ? Math.min(100 - _bu4, oopBudget / barTotal * 100) : 0;
+  var pOopBudg  = (!noOop && !_bHasOopSpend && !_bHasProjOop && oopBudget > 0) ? Math.min(100 - _bu4, oopBudget / barTotal * 100) : 0;
   var pOopSpent = _bHasOopSpend ? Math.min(100 - _bu4, oopSpent / barTotal * 100) : 0;
   var _bu5 = _bu4 + pOopBudg + pOopSpent;
-  var pOopRem   = _bHasOopSpend ? Math.min(100 - _bu5, Math.max(0, oopRemaining) / barTotal * 100) : 0;
-  var pProfit   = Math.max(0, 100 - _bu5 - pOopRem);
+  var pOopProj  = _bHasProjOop ? Math.min(100 - _bu5, oopProj / barTotal * 100) : 0;
+  var _bu5p = _bu5 + pOopProj;
+  var pOopRem   = (_bHasOopSpend || _bHasProjOop) ? Math.min(100 - _bu5p, Math.max(0, oopRemaining - oopProj) / barTotal * 100) : 0;
+  var pProfit   = Math.max(0, 100 - _bu5p - pOopRem);
   h += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1)">';
   h += '<div class="lob-bar">';
   if (pLaborBudg  > 0.1) h += '<div class="lob-seg" style="width:' + pLaborBudg.toFixed(1)  + '%;background:#80CBC4;color:var(--abyss)">' + (pLaborBudg  >= 8 ? '$' + Math.round(projLaborPrice).toLocaleString()  : '') + '</div>';
-  if (pLaborSpent > 0.1) h += '<div class="lob-seg" style="width:' + pLaborSpent.toFixed(1) + '%;background:#1565C0">' + (pLaborSpent >= 8 ? '$' + Math.round(laborSpent$).toLocaleString()    : '') + '</div>';
-  if (pLaborRem   > 0.5) h += '<div class="lob-seg" style="width:' + pLaborRem.toFixed(1)   + '%;background:#80CBC4;color:var(--abyss)">' + (pLaborRem   >= 8 ? '$' + Math.round(laborRemaining$).toLocaleString() : '') + '</div>';
-  if (pFlBudg     > 0.5) h += '<div class="lob-seg" style="width:' + pFlBudg.toFixed(1)     + '%;background:#CE93D8;color:var(--abyss)">' + (pFlBudg >= 8 ? '$' + Math.round(flBudget).toLocaleString() : '') + '</div>';
-  if (pFlSpent    > 0.1) h += '<div class="lob-seg" style="width:' + pFlSpent.toFixed(1)    + '%;background:#7B1FA2">'      + (pFlSpent    >= 8 ? '$' + Math.round(flSpent).toLocaleString()         : '') + '</div>';
-  if (pFlRem      > 0.5) h += '<div class="lob-seg" style="width:' + pFlRem.toFixed(1)      + '%;background:#CE93D8;color:var(--abyss)">' + (pFlRem >= 8 ? '$' + Math.round(Math.max(0, flBudget - flSpent)).toLocaleString() : '') + '</div>';
-  if (pOopBudg    > 0.5) h += '<div class="lob-seg" style="width:' + pOopBudg.toFixed(1)    + '%;background:#FFCC80;color:var(--abyss)">' + (pOopBudg >= 8 ? '$' + Math.round(oopBudget).toLocaleString() : '') + '</div>';
-  if (pOopSpent   > 0.1) h += '<div class="lob-seg" style="width:' + pOopSpent.toFixed(1)   + '%;background:var(--ember)">'      + (pOopSpent   >= 8 ? '$' + Math.round(oopSpent).toLocaleString()        : '') + '</div>';
-  if (pOopRem     > 0.5) h += '<div class="lob-seg" style="width:' + pOopRem.toFixed(1)     + '%;background:#FFCC80;color:var(--abyss)">' + (pOopRem >= 8 ? '$' + Math.round(Math.max(0, oopRemaining)).toLocaleString() : '') + '</div>';
-  if (pProfit     > 0.5) h += '<div class="lob-seg" style="width:' + pProfit.toFixed(1)     + '%;background:#81C784">'      + (pProfit     >= 8 ? '$' + Math.round(profitBar$).toLocaleString()      : '') + '</div>';
+  if (pLaborSpent > 0.1) h += '<div class="lob-seg" style="width:' + pLaborSpent.toFixed(1) + '%;background:#1565C0">'                    + (pLaborSpent >= 8 ? '$' + Math.round(laborSpent$).toLocaleString()    : '') + '</div>';
+  if (pLaborProj  > 0.5) h += '<div class="lob-seg" style="width:' + pLaborProj.toFixed(1)  + '%;background:#42A5F5">'                    + (pLaborProj  >= 8 ? '$' + Math.round(laborProj$).toLocaleString()     : '') + '</div>';
+  if (pLaborRem   > 0.5) h += '<div class="lob-seg" style="width:' + pLaborRem.toFixed(1)   + '%;background:#80CBC4;color:var(--abyss)">' + (pLaborRem   >= 8 ? '$' + Math.round(Math.max(0, projLaborPrice - laborSpent$ - laborProj$)).toLocaleString() : '') + '</div>';
+  if (pFlBudg     > 0.5) h += '<div class="lob-seg" style="width:' + pFlBudg.toFixed(1)     + '%;background:#CE93D8;color:var(--abyss)">' + (pFlBudg     >= 8 ? '$' + Math.round(flBudget).toLocaleString()       : '') + '</div>';
+  if (pFlSpent    > 0.1) h += '<div class="lob-seg" style="width:' + pFlSpent.toFixed(1)    + '%;background:#7B1FA2">'                    + (pFlSpent    >= 8 ? '$' + Math.round(flSpent).toLocaleString()         : '') + '</div>';
+  if (pFlProj     > 0.5) h += '<div class="lob-seg" style="width:' + pFlProj.toFixed(1)     + '%;background:#AB47BC">'                    + (pFlProj     >= 8 ? '$' + Math.round(flProj).toLocaleString()          : '') + '</div>';
+  if (pFlRem      > 0.5) h += '<div class="lob-seg" style="width:' + pFlRem.toFixed(1)      + '%;background:#CE93D8;color:var(--abyss)">' + (pFlRem      >= 8 ? '$' + Math.round(Math.max(0, flBudget - flSpent - flProj)).toLocaleString() : '') + '</div>';
+  if (pOopBudg    > 0.5) h += '<div class="lob-seg" style="width:' + pOopBudg.toFixed(1)    + '%;background:#FFCC80;color:var(--abyss)">' + (pOopBudg    >= 8 ? '$' + Math.round(oopBudget).toLocaleString()      : '') + '</div>';
+  if (pOopSpent   > 0.1) h += '<div class="lob-seg" style="width:' + pOopSpent.toFixed(1)   + '%;background:var(--ember)">'               + (pOopSpent   >= 8 ? '$' + Math.round(oopSpent).toLocaleString()        : '') + '</div>';
+  if (pOopProj    > 0.5) h += '<div class="lob-seg" style="width:' + pOopProj.toFixed(1)    + '%;background:#FFA726;color:var(--abyss)">' + (pOopProj    >= 8 ? '$' + Math.round(oopProj).toLocaleString()         : '') + '</div>';
+  if (pOopRem     > 0.5) h += '<div class="lob-seg" style="width:' + pOopRem.toFixed(1)     + '%;background:#FFCC80;color:var(--abyss)">' + (pOopRem     >= 8 ? '$' + Math.round(Math.max(0, oopRemaining - oopProj)).toLocaleString() : '') + '</div>';
+  if (pProfit     > 0.5) h += '<div class="lob-seg" style="width:' + pProfit.toFixed(1)     + '%;background:#81C784">'                    + (pProfit     >= 8 ? '$' + Math.round(profitBar$).toLocaleString()      : '') + '</div>';
   h += '</div>';
   h += '<div class="lob-legend">';
   if (pLaborBudg  > 0.1)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#80CBC4"></div>Labor Budgeted</div>';
   if (pLaborSpent > 0.1)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#1565C0"></div>Labor Spent</div>';
+  if (pLaborProj  > 0.5)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#42A5F5"></div>Labor Projected</div>';
   if (!isFinished && pLaborRem > 0.5) h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#80CBC4"></div>Labor Remaining</div>';
   if (pFlBudg     > 0.5)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#CE93D8"></div>FL Budgeted</div>';
   if (pFlSpent    > 0.1)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#7B1FA2"></div>FL Spent</div>';
+  if (pFlProj     > 0.5)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#AB47BC"></div>FL Projected</div>';
   if (pFlRem      > 0.5)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#CE93D8"></div>FL Remaining</div>';
   if (pOopBudg    > 0.5)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#FFCC80"></div>OOP Budgeted</div>';
   if (pOopSpent   > 0.1)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ember)"></div>OOP Spent</div>';
+  if (pOopProj    > 0.5)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#FFA726"></div>OOP Projected</div>';
   if (pOopRem     > 0.5)              h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#FFCC80"></div>OOP Remaining</div>';
   h += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Profit</div>';
   h += '</div></div>';
