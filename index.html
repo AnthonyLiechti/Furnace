@@ -713,7 +713,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.138 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.139 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -13818,7 +13818,7 @@ function furnaceGlobalHandleEntryChange(type, payload) {
     if (!found && payload.eventType === 'INSERT') arr.push(rec);
   }
   if (type === 'labor') sb.labor = arr;
-  else if (type === 'oop') sb.oop = arr;
+  else if (type === 'oop') { sb.oop = arr; sb._oopEntries = arr; } /* keep _oopEntries in sync for OOP planner */
   else sb._flEntries = arr;
 
   /* Recompute totals for this budget */
