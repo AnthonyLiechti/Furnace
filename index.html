@@ -713,7 +713,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.120 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.121 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -9346,8 +9346,8 @@ function rmFlDayClick(projCode, dayISO) {
   if (existingOverlay) existingOverlay.remove();
   var _d = new Date(dayISO + 'T00:00:00');
   var _dayLong = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  var h = '<div id="rmFlDayPicker" onclick="document.getElementById(\'rmFlDayPicker\').remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9000;display:flex;align-items:center;justify-content:center">';
-  h += '<div onclick="event.stopPropagation()" style="background:var(--panel);border-radius:10px;padding:20px;min-width:220px;box-shadow:0 8px 32px rgba(0,0,0,.25)">';
+  var h = '<div id="rmFlDayPicker" onclick="document.getElementById(\'rmFlDayPicker\').remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9000;display:flex;align-items:center;justify-content:center">';
+  h += '<div onclick="event.stopPropagation()" style="background:#1e1e2e;border-radius:12px;padding:22px;min-width:240px;box-shadow:0 12px 40px rgba(0,0,0,.6)">';
   h += '<div style="font-size:13px;font-weight:700;margin-bottom:4px">' + _dayLong[_d.getDay()] + ', ' + _FL_MON[_d.getMonth()] + ' ' + _d.getDate() + '</div>';
   h += '<div style="font-size:11px;color:var(--mid-gray);margin-bottom:14px">Select a freelancer</div>';
   for (var i = 0; i < freelancers.length; i++) {
@@ -12440,8 +12440,8 @@ function flDayClick(projCode, dayISO) {
   if (existing) existing.remove();
   var _d = new Date(dayISO + 'T00:00:00');
   var _dayLong = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  var h = '<div id="flDayPicker" onclick="document.getElementById(\'flDayPicker\').remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9000;display:flex;align-items:center;justify-content:center">';
-  h += '<div onclick="event.stopPropagation()" style="background:var(--panel);border-radius:10px;padding:20px;min-width:220px;box-shadow:0 8px 32px rgba(0,0,0,.25)">';
+  var h = '<div id="flDayPicker" onclick="document.getElementById(\'flDayPicker\').remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9000;display:flex;align-items:center;justify-content:center">';
+  h += '<div onclick="event.stopPropagation()" style="background:#1e1e2e;border-radius:12px;padding:22px;min-width:240px;box-shadow:0 12px 40px rgba(0,0,0,.6)">';
   h += '<div style="font-size:13px;font-weight:700;margin-bottom:4px">' + _dayLong[_d.getDay()] + ', ' + _FL_MON[_d.getMonth()] + ' ' + _d.getDate() + '</div>';
   h += '<div style="font-size:11px;color:var(--mid-gray);margin-bottom:14px">Select a freelancer</div>';
   for (var i = 0; i < freelancers.length; i++) {
