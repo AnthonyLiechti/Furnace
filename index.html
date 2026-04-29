@@ -713,7 +713,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.121 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.122 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -5907,9 +5907,10 @@ async function sparkRenderSmallProjectList(projectCode) {
       var price = b.client_price || 0;
       h += '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--canvas);border-radius:8px">';
       h += '<div style="flex:1;min-width:0">';
-      h += '<div style="font-size:13px;font-weight:600;color:var(--abyss);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (b.name || 'Untitled') + '</div>';
+      h += '<div id="snap-name-' + b.id + '" style="font-size:13px;font-weight:600;color:var(--abyss);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (b.name || 'Untitled') + '</div>';
       h += '<div style="font-size:11px;color:var(--mid-gray);margin-top:3px">$' + Math.round(price).toLocaleString() + ' &nbsp;&middot;&nbsp; <span style="color:' + sc + ';font-weight:600">' + (b.status || 'proposed') + '</span></div>';
       h += '</div>';
+      h += '<button onclick="sparkRenameSnapshot(\'' + b.id + '\',\'' + projectCode + '\',\'' + (b.name || '').replace(/'/g,'\\\'') + '\')" title="Rename snapshot" style="padding:5px 8px;border-radius:6px;border:1px solid var(--canvas);background:var(--white);color:var(--mid-gray);cursor:pointer;font-size:12px;flex-shrink:0;margin-right:4px">&#9998;</button>';
       h += '<button onclick="sparkEditSmallSnapshot(\'' + b.id + '\',\'' + projectCode + '\')" style="padding:5px 12px;border-radius:6px;border:1px solid var(--canvas);background:var(--white);color:var(--abyss);cursor:pointer;font-size:12px;font-weight:500;white-space:nowrap;flex-shrink:0">Edit ›</button>';
       h += '</div>';
     }
@@ -5917,6 +5918,26 @@ async function sparkRenderSmallProjectList(projectCode) {
   }
   h += '</div>';
   container.innerHTML = h;
+}
+
+function sparkRenameSnapshot(budgetId, projectCode, currentName) {
+  var nameEl = document.getElementById('snap-name-' + budgetId);
+  if (!nameEl) return;
+  var safeVal = (currentName || '').replace(/"/g, '&quot;');
+  nameEl.innerHTML = '<input id="snap-rename-' + budgetId + '" type="text" value="' + safeVal + '" style="font-size:13px;font-weight:600;color:var(--abyss);border:1px solid var(--ocean);border-radius:4px;padding:3px 7px;width:100%;box-sizing:border-box;outline:none" onblur="sparkConfirmRename(\'' + budgetId + '\',\'' + projectCode + '\')" onkeydown="if(event.key===\'Enter\'){event.preventDefault();sparkConfirmRename(\'' + budgetId + '\',\'' + projectCode + '\')}else if(event.key===\'Escape\'){sparkRenderSmallProjectList(\'' + projectCode + '\')}">';
+  var inp = document.getElementById('snap-rename-' + budgetId);
+  if (inp) { inp.focus(); inp.select(); }
+}
+
+async function sparkConfirmRename(budgetId, projectCode) {
+  var inp = document.getElementById('snap-rename-' + budgetId);
+  if (!inp) return;
+  var newName = inp.value.trim();
+  if (!newName) { sparkRenderSmallProjectList(projectCode); return; }
+  sparkShowSaving();
+  await sparkFetch('budgets?id=eq.' + budgetId, '', 'PATCH', { name: newName });
+  sparkHideSaving();
+  sparkRenderSmallProjectList(projectCode);
 }
 
 async function sparkEditSmallSnapshot(budgetId, projectCode) {
