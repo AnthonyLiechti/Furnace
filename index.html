@@ -713,7 +713,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.136 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.137 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -11848,14 +11848,7 @@ async function oopToggleLineItemPaid(supaOopId, newPaid, projCode) {
     var spent = 0;
     for (var i = 0; i < entries.length; i++) {
       if (entries[i].paid && entries[i].is_active !== false) {
-        var eff;
-        if (entries[i].actual_amount != null) eff = entries[i].actual_amount;
-        else if (entries[i].adjusted_count != null || entries[i].adjusted_rate != null) {
-          eff = (entries[i].adjusted_count != null ? entries[i].adjusted_count : (entries[i].count||0)) * (entries[i].adjusted_rate != null ? entries[i].adjusted_rate : (entries[i].rate||0)) * (entries[i].adjusted_days != null ? entries[i].adjusted_days : (entries[i].days||1)) * (entries[i].adjusted_head_count != null ? entries[i].adjusted_head_count : (entries[i].head_count||1));
-        } else {
-          eff = (entries[i].count||0) * (entries[i].rate||0) * (entries[i].days||1) * (entries[i].head_count||1);
-        }
-        spent += eff;
+        spent += sparkOopItemEffective(entries[i]);
       }
     }
     SUPA_BUDGETS[projCode].oopSpent = spent;
@@ -11909,10 +11902,7 @@ async function oopConfirmSchedule(projName, projCode, itemName, supaOopId) {
     if (origEntries[i].id === supaOopId) { origEntry = origEntries[i]; break; }
   }
   if (origEntry) {
-    var origEffective = (origEntry.count||0) * (origEntry.rate||0) * (origEntry.days||1) * (origEntry.head_count||1);
-    if (origEntry.adjusted_count != null || origEntry.adjusted_rate != null) {
-      origEffective = (origEntry.adjusted_count != null ? origEntry.adjusted_count : (origEntry.count||0)) * (origEntry.adjusted_rate != null ? origEntry.adjusted_rate : (origEntry.rate||0));
-    }
+    var origEffective = sparkOopItemEffective(origEntry);
     if (Math.abs(amount - origEffective) > 0.01) {
       /* Amount was adjusted — save as actual_amount in Supabase */
       await sparkFetch('oop_budget_entries?id=eq.' + supaOopId, '', 'PATCH', { actual_amount: amount });
@@ -11988,16 +11978,8 @@ function renderOopProjList() {
       for (var li = 0; li < lineItems.length; li++) {
         var oi = lineItems[li];
         if (oi.is_active === false) continue;
-        /* Calculate effective value using cascade */
-        var planned = (oi.count || 0) * (oi.rate || 0) * (oi.days || 1) * (oi.head_count || 1);
-        var effective;
-        if (oi.actual_amount != null) {
-          effective = oi.actual_amount;
-        } else if (oi.adjusted_count != null || oi.adjusted_rate != null) {
-          effective = (oi.adjusted_count != null ? oi.adjusted_count : (oi.count||0)) * (oi.adjusted_rate != null ? oi.adjusted_rate : (oi.rate||0)) * (oi.adjusted_days != null ? oi.adjusted_days : (oi.days||1)) * (oi.adjusted_head_count != null ? oi.adjusted_head_count : (oi.head_count||1));
-        } else {
-          effective = planned;
-        }
+        /* Calculate effective value — use same cascade as snapshot (actual → adjusted → planned) */
+        var effective = sparkOopItemEffective(oi);
         if (effective > 0) activeItems.push({id: oi.id, name: oi.line_item_name || 'Unnamed', effective: effective, paid: oi.paid || false, supaId: oi.id});
       }
 
