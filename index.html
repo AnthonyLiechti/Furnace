@@ -718,7 +718,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.149 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.151 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
   </div>
@@ -5733,8 +5733,9 @@ async function notifyNewProjectSlack(projName, projCode, btn) {
   }
   if (btn) { btn.textContent = '⏳ Sending…'; btn.disabled = true; }
   var result = await slackNotifyNewProject(projName, projCode);
-  if (btn) {
-    if (result.ok) {
+  if (result.ok) {
+    furnaceToast('✓ Richelle notified via Slack', 'success');
+    if (btn) {
       btn.textContent = '✓ Sent!';
       btn.style.color = '#81C784';
       btn.style.borderColor = 'rgba(129,199,132,.4)';
@@ -5746,7 +5747,10 @@ async function notifyNewProjectSlack(projName, projCode, btn) {
         btn.style.background = 'rgba(91,74,138,.12)';
         btn.disabled = false;
       }, 3000);
-    } else {
+    }
+  } else {
+    furnaceToast('✗ Slack notification failed: ' + (result.error || 'unknown'), 'error');
+    if (btn) {
       btn.textContent = '✗ Failed';
       btn.style.color = 'var(--ember)';
       btn.disabled = false;
@@ -7151,6 +7155,34 @@ async function sparkSetSectionMarkup(secId, pct) {
   sparkHideSaving();
   sparkRenderOopPanel();
   sparkComputeSummary();
+}
+
+function furnaceToast(msg, type) {
+  /* type: 'success' | 'error' | 'info' (default) */
+  var el = document.getElementById('furnaceToastEl');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'furnaceToastEl';
+    el.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(20px);padding:10px 20px;border-radius:22px;font-size:13px;font-weight:600;font-family:Arial,sans-serif;letter-spacing:.01em;z-index:99999;pointer-events:none;opacity:0;transition:opacity .25s,transform .25s;white-space:nowrap';
+    document.body.appendChild(el);
+  }
+  var colors = {
+    success: { bg:'rgba(30,50,35,.97)', border:'rgba(129,199,132,.4)', color:'#81C784' },
+    error:   { bg:'rgba(50,25,20,.97)', border:'rgba(206,115,56,.4)',  color:'#E3A65E' },
+    info:    { bg:'rgba(20,35,50,.97)', border:'rgba(48,109,124,.4)',  color:'#80CBC4' }
+  };
+  var c = colors[type] || colors.info;
+  el.style.background = c.bg;
+  el.style.border = '1px solid ' + c.border;
+  el.style.color = c.color;
+  el.textContent = msg;
+  el.style.opacity = '1';
+  el.style.transform = 'translateX(-50%) translateY(0)';
+  if (el._toastTimer) clearTimeout(el._toastTimer);
+  el._toastTimer = setTimeout(function() {
+    el.style.opacity = '0';
+    el.style.transform = 'translateX(-50%) translateY(20px)';
+  }, 3200);
 }
 
 function sparkShowSaving() {
