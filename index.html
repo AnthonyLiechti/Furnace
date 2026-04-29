@@ -713,7 +713,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.119 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.120 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -786,6 +786,8 @@ var globalDateStart = null; /* Date object or null */
 var globalDateEnd = null;   /* Date object or null */
 var masterSortCol = 'name'; /* name | client | budget | labor | oop | profit | margin */
 var masterSortDir = 'asc';  /* asc | desc */
+var masterHideNonBillable = false;
+var masterHideBizDev = false;
 function toggleMasterSort(col) {
   if (masterSortCol === col) { masterSortDir = masterSortDir === 'asc' ? 'desc' : 'asc'; }
   else { masterSortCol = col; masterSortDir = col === 'name' || col === 'client' ? 'asc' : 'desc'; }
@@ -1474,6 +1476,18 @@ function renderHourTypeSection(ht, clientId) {
 /* ── RENDER: MASTER ── */
 function renderMaster() {
   var all = showFinalized ? allProjects() : activeProjects();
+
+  /* Apply Non-Billable / Biz Dev filters */
+  if (masterHideNonBillable || masterHideBizDev) {
+    all = all.filter(function(p) {
+      var isNB = p.code === '100_00_00' || p.projectType === 'internal' || (p._supabudget && p._supabudget.status === 'nonbillable');
+      var isBD = p.projectType === 'bizdev' || (p._supabudget && p._supabudget.status === 'bizdev');
+      if (masterHideNonBillable && isNB) return false;
+      if (masterHideBizDev && isBD) return false;
+      return true;
+    });
+  }
+
   var doneCount = completedProjects().length;
   var needsReviewCount = 0;
   for (var i = 0; i < all.length; i++) {
@@ -1513,13 +1527,20 @@ function renderMaster() {
   var estRemainDollar = remainingHrs * costPerHr;
 
   /* Header */
-  var h = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">';
+  var h = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:8px">';
   h += '<h1 class="page-title" style="margin-bottom:0">Master Dashboard';
   h += '<span class="view-toggle"><button class="view-toggle-btn ' + (!showFinalized ? 'active' : '') + '" onclick="showFinalized=false;navigate(currentView)">Active</button>';
   h += '<button class="view-toggle-btn ' + (showFinalized ? 'active' : '') + '" onclick="showFinalized=true;navigate(currentView)">All</button></span>';
   h += '</h1>';
+  h += '<div style="display:flex;align-items:center;gap:8px">';
+  /* Non-Billable toggle */
+  h += '<button onclick="masterHideNonBillable=!masterHideNonBillable;navigate(currentView)" title="' + (masterHideNonBillable ? 'Show' : 'Hide') + ' non-billable projects" style="padding:5px 12px;border-radius:6px;border:1px solid ' + (masterHideNonBillable ? 'var(--ember)' : 'rgba(0,0,0,.15)') + ';background:' + (masterHideNonBillable ? 'rgba(207,71,20,.1)' : 'transparent') + ';color:' + (masterHideNonBillable ? 'var(--ember)' : 'var(--mid-gray)') + ';cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap">';
+  h += (masterHideNonBillable ? '&#10005; ' : '') + 'Non-Billable</button>';
+  /* Biz Dev toggle */
+  h += '<button onclick="masterHideBizDev=!masterHideBizDev;navigate(currentView)" title="' + (masterHideBizDev ? 'Show' : 'Hide') + ' biz dev projects" style="padding:5px 12px;border-radius:6px;border:1px solid ' + (masterHideBizDev ? 'var(--ember)' : 'rgba(0,0,0,.15)') + ';background:' + (masterHideBizDev ? 'rgba(207,71,20,.1)' : 'transparent') + ';color:' + (masterHideBizDev ? 'var(--ember)' : 'var(--mid-gray)') + ';cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap">';
+  h += (masterHideBizDev ? '&#10005; ' : '') + 'Biz Dev</button>';
   h += '<button onclick="showAddProjectForm(null)" style="padding:6px 16px;border-radius:6px;border:none;background:var(--ocean);color:var(--white);cursor:pointer;font-size:12px;font-weight:600;letter-spacing:.3px;white-space:nowrap">+ Add Project</button>';
-  h += '</div>';
+  h += '</div></div>';
   h += '<p class="page-subtitle">' + (showFinalized ? all.length + ' total projects across Forge clients' : all.length + ' active projects &middot; ' + doneCount + ' completed &middot; ' + billableCount + ' billable, ' + bizdevCount + ' biz dev') + '</p>';
 
   /* Date filter indicator */
