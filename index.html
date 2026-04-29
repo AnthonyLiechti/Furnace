@@ -713,7 +713,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.142 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.143 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -1286,7 +1286,7 @@ function activeProjects() {
   var forecast = (ALLOCATIONS && ALLOCATIONS.forecastProjects) || [];
   var out = [];
   for (var i = 0; i < all.length; i++) {
-    if (isProjectCompleted(all[i])) continue;
+    if (isProjectCompleted(all[i]) || isProjectOnHold(all[i])) continue;
     /* Include if it has a Supabase budget */
     if (all[i]._supabudget) { out.push(all[i]); continue; }
     if (forecast.length > 0 && forecast.indexOf(all[i].name) < 0) continue;
