@@ -713,7 +713,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.139 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.140 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -2440,7 +2440,21 @@ function renderProjFinancials(p) {
     }
   }
   var _pfActOopScheduled = noOop ? 0 : sbOopBudget(sb); /* all active OOP × markup */
-  var _pfActOopSpent = sb.oopSpent || 0;                /* paid only, no markup */
+  var _pfActOopPaid = sb.oopSpent || 0;                 /* paid only */
+  var _pfActOopSpent = _pfActOopPaid;
+  /* Add scheduled-but-unpaid OOP items so committed costs show in actuals */
+  if (!noOop && OOP_SCHEDULE && OOP_SCHEDULE.entries) {
+    var _oopPaidIds = {};
+    for (var _opi = 0; _opi < (sb._oopEntries || []).length; _opi++) {
+      if (sb._oopEntries[_opi].paid) _oopPaidIds[sb._oopEntries[_opi].id] = true;
+    }
+    for (var _osi = 0; _osi < OOP_SCHEDULE.entries.length; _osi++) {
+      var _ose = OOP_SCHEDULE.entries[_osi];
+      if (_ose.projectCode === p.code && _ose.supaOopId && !_oopPaidIds[_ose.supaOopId]) {
+        _pfActOopSpent += (_ose.amount || 0);
+      }
+    }
+  }
   var _pfActFlInternal = _pfActFlPaid * 0.5;            /* FL Internal Cost = 50% of paid */
   var _pfActProfit = tcvPrice - _pfActLaborCost - _pfActFlInternal - _pfActOopSpent;
   var _pfActMargin = tcvPrice > 0 ? (_pfActProfit / tcvPrice * 100) : 0;
@@ -2452,7 +2466,8 @@ function renderProjFinancials(p) {
     var _pfActSparkle = _pfActMargin > 25;
     h += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.7)">Actual Labor</div><div class="sf-value">$' + Math.round(_pfActLaborCost).toLocaleString() + '</div><div class="sf-sub">' + _pfActLaborHrs.toFixed(1) + ' hrs at cost rate</div></div>';
     h += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.7)">Actual FL</div><div class="sf-value" style="color:#CE93D8">$' + Math.round(_pfActFlInternal).toLocaleString() + '</div><div class="sf-sub">paid: $' + Math.round(_pfActFlPaid).toLocaleString() + '</div></div>';
-    h += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.7)">Actual OOP</div><div class="sf-value">$' + Math.round(_pfActOopSpent).toLocaleString() + '</div><div class="sf-sub">w/ markup: $' + Math.round(_pfActOopScheduled).toLocaleString() + '</div></div>';
+    var _pfOopSub = _pfActOopSpent > _pfActOopPaid ? 'paid: $' + Math.round(_pfActOopPaid).toLocaleString() + ' · w/ markup: $' + Math.round(_pfActOopScheduled).toLocaleString() : 'w/ markup: $' + Math.round(_pfActOopScheduled).toLocaleString();
+    h += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.7)">Actual OOP</div><div class="sf-value">$' + Math.round(_pfActOopSpent).toLocaleString() + '</div><div class="sf-sub">' + _pfOopSub + '</div></div>';
     h += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.7)">Proj. Actual Profit</div><div class="sf-value" style="color:' + (_pfActProfit >= 0 ? '#81C784' : 'var(--ember)') + '">$' + Math.round(_pfActProfit).toLocaleString() + '</div></div>';
     h += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.7)">Proj. Actual Margin</div><div class="sf-value' + (_pfActSparkle ? ' margin-sparkle' : '') + '" style="' + (_pfActSparkle ? '' : 'color:' + (_pfActMargin >= 0 ? '#81C784' : 'var(--ember)')) + '">' + _pfActMargin.toFixed(1) + '%</div></div>';
     h += '</div>';
@@ -10016,9 +10031,18 @@ async function rmFlDeleteCellEntry(entryId) {
   sparkShowSaving();
   await sparkFetch('freelancer_budget_entries?id=eq.' + entryId, '', 'DELETE', null);
   RM_FL.entries = RM_FL.entries.filter(function(e) { return e.id !== entryId; });
+  rmFlSyncBack();
   sparkHideSaving();
   document.getElementById('rmFlCellOverlay').remove();
   renderRMFlUpdate();
+}
+
+/* Sync RM_FL.entries back to SUPA_BUDGETS cache so totals + flags stay current */
+function rmFlSyncBack() {
+  if (!RM_FL.projCode || !SUPA_BUDGETS || !SUPA_BUDGETS[RM_FL.projCode]) return;
+  var sb = SUPA_BUDGETS[RM_FL.projCode];
+  sb._flEntries = RM_FL.entries.slice();
+  flRecomputeTotals(sb);
 }
 
 function rmFlGetNameForTm(tmId) {
@@ -10115,6 +10139,7 @@ async function rmFlTogglePaid(entryId, checked) {
       RM_FL.entries[i].paid = checked; RM_FL.entries[i].paid_date = checked ? today : null; break;
     }
   }
+  rmFlSyncBack();
   sparkHideSaving();
   renderRMFlUpdate();
 }
@@ -10138,6 +10163,7 @@ async function rmFlAddWeek(tmId, label) {
     display_order: RM_FL.entries.length
   });
   if (result && result.length) { result[0].team_member = memberObj; RM_FL.entries.push(result[0]); }
+  rmFlSyncBack();
   sparkHideSaving();
   renderRMFlUpdate();
 }
@@ -10146,6 +10172,7 @@ async function rmFlDeleteEntry(entryId) {
   sparkShowSaving();
   await sparkFetch('freelancer_budget_entries?id=eq.' + entryId, '', 'DELETE', null);
   RM_FL.entries = RM_FL.entries.filter(function(e) { return e.id !== entryId; });
+  rmFlSyncBack();
   sparkHideSaving();
   renderRMFlUpdate();
 }
@@ -10159,6 +10186,7 @@ async function rmFlMarkAllPaid(tmId) {
     await sparkFetch('freelancer_budget_entries?id=eq.' + e.id, '', 'PATCH', { paid: true, paid_date: today });
     RM_FL.entries[i].paid = true; RM_FL.entries[i].paid_date = today;
   }
+  rmFlSyncBack();
   sparkHideSaving();
   renderRMFlUpdate();
 }
@@ -10170,6 +10198,7 @@ async function rmFlRemoveFreelancer(tmId) {
   for (var i = 0; i < toDelete.length; i++)
     await sparkFetch('freelancer_budget_entries?id=eq.' + toDelete[i].id, '', 'DELETE', null);
   RM_FL.entries = RM_FL.entries.filter(function(e) { return e.team_member_id !== tmId; });
+  rmFlSyncBack();
   sparkHideSaving();
   renderRMFlUpdate();
 }
@@ -13819,7 +13848,7 @@ function furnaceGlobalHandleEntryChange(type, payload) {
   }
   if (type === 'labor') sb.labor = arr;
   else if (type === 'oop') { sb.oop = arr; sb._oopEntries = arr; } /* keep _oopEntries in sync for OOP planner */
-  else sb._flEntries = arr;
+  else { sb._flEntries = arr; if (RM_FL.projCode === projCode) { RM_FL.entries = arr; } } /* keep RM_FL in sync if open */
 
   /* Recompute totals for this budget */
   var laborHours = 0, laborCost = 0, laborInternal = 0;
