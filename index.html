@@ -718,7 +718,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.151 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.153 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
   </div>
@@ -2316,7 +2316,7 @@ function renderProjFinancials(p) {
 
   /* Determine finished state early so profit/margin tiles match the bar */
   var isFinished = sb.status === 'complete' || p.status === 'complete' || p.status === 'finished';
-  var agencyRate = 200;
+  var agencyRate = sb.billing_rate || 200;
   /* Use per-entry billable_rate overrides when available; falls back to $200/hr */
   var laborSpent$ = filteredProjectSpentDollars(p, agencyRate);
 
@@ -7215,12 +7215,13 @@ function sparkRecomputeBudgetTotals() {
   var sb = SUPA_BUDGETS[projCode];
 
   /* Recompute labor */
+  var _sbRate = sb.billing_rate || 200;
   var laborHours = 0, laborCost = 0, laborInternal = 0;
   for (var i = 0; i < sparkCurrentData.labor.length; i++) {
     var l = sparkCurrentData.labor[i];
     var hrs = (l.phase1||0) + (l.phase2||0) + (l.phase3_1||0) + (l.phase3_2||0) + (l.phase4||0) + (l.phase5||0);
     laborHours += hrs;
-    laborCost += hrs * 200;
+    laborCost += hrs * _sbRate;
     var tm = l.team_member || {};
     var fbr = tm.fully_burdened_rate || 200;
     laborInternal += hrs * fbr;
@@ -7550,12 +7551,13 @@ function syncProjFinancialsFromCurrent() {
   var sb = SUPA_BUDGETS[projCode];
 
   /* Recompute labor totals */
+  var _sbRate2 = sb.billing_rate || 200;
   var laborHours = 0, laborCost = 0, laborInternal = 0;
   for (var i = 0; i < sparkCurrentData.labor.length; i++) {
     var le = sparkCurrentData.labor[i];
     var hrs = sparkEntryHours(le, 'all');
     laborHours += hrs;
-    laborCost  += hrs * 200;
+    laborCost  += hrs * _sbRate2;
     var tmRate = 200;
     if (le.team_member_id) {
       for (var ti = 0; ti < FURNACE_TEAM_MEMBERS.length; ti++) {
@@ -13947,10 +13949,11 @@ function furnaceGlobalHandleEntryChange(type, payload) {
 
   /* Recompute totals for this budget */
   var laborHours = 0, laborCost = 0, laborInternal = 0;
+  var _rtRate = sb.billing_rate || 200;
   for (var i = 0; i < (sb.labor || []).length; i++) {
     var le = sb.labor[i];
     var hrs = (le.phase1||0)+(le.phase2||0)+(le.phase3_1||0)+(le.phase3_2||0)+(le.phase4||0)+(le.phase5||0);
-    laborHours += hrs; laborCost += hrs * 200;
+    laborHours += hrs; laborCost += hrs * _rtRate;
     var fbr = (le.team_member && le.team_member.fully_burdened_rate) ? le.team_member.fully_burdened_rate : 200;
     laborInternal += hrs * fbr;
   }
@@ -14030,7 +14033,7 @@ async function loadSupabaseData() {
     /* 0+1+1b. Fetch team members, budgets, and project ID map in parallel */
     var _phase1 = await Promise.all([
       sparkFetchAll('team_members', 'select=id,name,department,employment_type,fully_burdened_rate,billable_rate,is_active&is_active=eq.true&order=department.asc,name.asc'),
-      sparkFetchAll('budgets', 'select=id,name,status,client_price,total_amount,has_discount,discount_percentage,reserve_percentage,oop_markup_percentage,no_oop,no_freelancers,is_small_project,project_id,projects(id,project_code,name)&visibility=eq.visible&status=neq.opportunity&status=neq.lost'),
+      sparkFetchAll('budgets', 'select=id,name,status,client_price,total_amount,has_discount,discount_percentage,reserve_percentage,oop_markup_percentage,oop_section_markups,no_oop,no_freelancers,is_small_project,project_id,projects(id,project_code,name)&visibility=eq.visible&status=neq.opportunity&status=neq.lost'),
       sparkFetchAll('projects', 'select=id,project_code')
     ]);
     FURNACE_TEAM_MEMBERS = _phase1[0] || [];
@@ -14107,14 +14110,17 @@ async function loadSupabaseData() {
       /* Compute freelancer totals (respects __budget__ sentinels) */
       flRecomputeTotals(b);
 
-      /* Compute labor totals — flat $200/hr agency rate for everything */
+      /* Per-budget billing rate: defaults to $200, overrideable via oop_section_markups._billing_rate */
+      b.billing_rate = (b.oop_section_markups && b.oop_section_markups._billing_rate) ? b.oop_section_markups._billing_rate : 200;
+
+      /* Compute labor totals */
       var laborHours = 0;
       for (var k = 0; k < b.labor.length; k++) {
         var le = b.labor[k];
         var hrs = (le.phase1 || 0) + (le.phase2 || 0) + (le.phase3_1 || 0) + (le.phase3_2 || 0) + (le.phase4 || 0) + (le.phase5 || 0);
         laborHours += hrs;
       }
-      var laborCost = laborHours * 200;
+      var laborCost = laborHours * b.billing_rate;
 
       /* Compute internal labor cost using team member fully_burdened_rate */
       var laborInternalCost = 0;
