@@ -713,7 +713,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.133 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.134 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -1607,7 +1607,7 @@ function buildPortfolioBannerHTML(projects, bannerTitle, opts) {
   var _pActOpen        = !!(opts && opts.actualsOpen);
   var _pActToggleFn    = (opts && opts.toggleFn) ? opts.toggleFn : '';
 
-  /* ─ Progress bar: Labor | FL | OOP | Profit — each with Spent / Projected / Remaining ─ */
+  /* ─ Progress bar: proportional segments — all scaled to barTotal so profit always shows ─ */
   var barTotal   = totalClientPrice > 0 ? totalClientPrice : 1;
   var profitBar$ = Math.max(0, totalClientPrice - totalProjLaborPrice - totalFlBudget - totalOopProjected);
   var _pHasLaborSpend  = totalLaborSpent$ > 0;
@@ -1616,30 +1616,36 @@ function buildPortfolioBannerHTML(projects, bannerTitle, opts) {
   var _pHasProjFl      = totalFlProjected > 0;
   var _pHasOopSpend    = totalOopSpent > 0;
   var _pHasProjOop     = totalOopProjSched > 0;
-  /* Labor */
-  var pLaborBudg  = (!_pHasLaborSpend && !_pHasProjLabor) ? Math.min(100, totalProjLaborPrice / barTotal * 100) : 0;
-  var pLaborSpent = _pHasLaborSpend ? Math.min(100, totalLaborSpent$ / barTotal * 100) : 0;
-  var _pu1 = pLaborBudg + pLaborSpent;
-  var pLaborProj  = _pHasProjLabor ? Math.min(100 - _pu1, totalLaborProjected$ / barTotal * 100) : 0;
-  var _pu1p = _pu1 + pLaborProj;
-  var pLaborRem   = (_pHasLaborSpend || _pHasProjLabor) ? Math.min(100 - _pu1p, Math.max(0, totalProjLaborPrice - totalLaborSpent$ - totalLaborProjected$) / barTotal * 100) : 0;
-  var _pu2 = _pu1p + pLaborRem;
-  /* FL */
-  var pFlBudg  = (!_pHasFlSpend && !_pHasProjFl && totalFlBudget > 0) ? Math.min(100 - _pu2, totalFlBudget / barTotal * 100) : 0;
-  var pFlSpent = _pHasFlSpend ? Math.min(100 - _pu2, totalFlPaid / barTotal * 100) : 0;
-  var _pu3 = _pu2 + pFlBudg + pFlSpent;
-  var pFlProj  = _pHasProjFl ? Math.min(100 - _pu3, totalFlProjected / barTotal * 100) : 0;
-  var _pu3p = _pu3 + pFlProj;
-  var pFlRem   = (_pHasFlSpend || _pHasProjFl) ? Math.min(100 - _pu3p, Math.max(0, totalFlBudget - totalFlPaid - totalFlProjected) / barTotal * 100) : 0;
-  var _pu4 = _pu3p + pFlRem;
-  /* OOP */
-  var pOopBudg  = (!_pHasOopSpend && !_pHasProjOop && totalOopProjected > 0) ? Math.min(100 - _pu4, totalOopProjected / barTotal * 100) : 0;
-  var pOopSpent = _pHasOopSpend ? Math.min(100 - _pu4, totalOopSpent / barTotal * 100) : 0;
-  var _pu5 = _pu4 + pOopBudg + pOopSpent;
-  var pOopProj  = _pHasProjOop ? Math.min(100 - _pu5, totalOopProjSched / barTotal * 100) : 0;
-  var _pu5p = _pu5 + pOopProj;
-  var pOopRem   = (_pHasOopSpend || _pHasProjOop) ? Math.min(100 - _pu5p, Math.max(0, totalOopRemaining - totalOopProjSched) / barTotal * 100) : 0;
-  var pProfit   = Math.max(0, 100 - _pu5p - pOopRem);
+  /* Dollar value of each segment */
+  var _d_lbdg = (!_pHasLaborSpend && !_pHasProjLabor) ? totalProjLaborPrice : 0;
+  var _d_lsp  = _pHasLaborSpend ? totalLaborSpent$ : 0;
+  var _d_lprj = _pHasProjLabor  ? totalLaborProjected$ : 0;
+  var _d_lrem = (_pHasLaborSpend || _pHasProjLabor) ? Math.max(0, totalProjLaborPrice - totalLaborSpent$ - totalLaborProjected$) : 0;
+  var _d_fbdg = (!_pHasFlSpend && !_pHasProjFl && totalFlBudget > 0) ? totalFlBudget : 0;
+  var _d_fsp  = _pHasFlSpend ? totalFlPaid : 0;
+  var _d_fprj = _pHasProjFl  ? totalFlProjected : 0;
+  var _d_frem = (_pHasFlSpend || _pHasProjFl) ? Math.max(0, totalFlBudget - totalFlPaid - totalFlProjected) : 0;
+  var _d_obdg = (!_pHasOopSpend && !_pHasProjOop && totalOopProjected > 0) ? totalOopProjected : 0;
+  var _d_osp  = _pHasOopSpend ? totalOopSpent : 0;
+  var _d_oprj = _pHasProjOop  ? totalOopProjSched : 0;
+  var _d_orem = (_pHasOopSpend || _pHasProjOop) ? Math.max(0, totalOopRemaining - totalOopProjSched) : 0;
+  var _d_prof = profitBar$;
+  /* Scale: compress all segments proportionally if spending exceeds client price */
+  var _d_tot = _d_lbdg + _d_lsp + _d_lprj + _d_lrem + _d_fbdg + _d_fsp + _d_fprj + _d_frem + _d_obdg + _d_osp + _d_oprj + _d_orem + _d_prof;
+  var _d_sc  = (_d_tot > barTotal && _d_tot > 0) ? (barTotal / _d_tot) : 1;
+  var pLaborBudg = _d_lbdg / barTotal * 100 * _d_sc;
+  var pLaborSpent= _d_lsp  / barTotal * 100 * _d_sc;
+  var pLaborProj = _d_lprj / barTotal * 100 * _d_sc;
+  var pLaborRem  = _d_lrem / barTotal * 100 * _d_sc;
+  var pFlBudg    = _d_fbdg / barTotal * 100 * _d_sc;
+  var pFlSpent   = _d_fsp  / barTotal * 100 * _d_sc;
+  var pFlProj    = _d_fprj / barTotal * 100 * _d_sc;
+  var pFlRem     = _d_frem / barTotal * 100 * _d_sc;
+  var pOopBudg   = _d_obdg / barTotal * 100 * _d_sc;
+  var pOopSpent  = _d_osp  / barTotal * 100 * _d_sc;
+  var pOopProj   = _d_oprj / barTotal * 100 * _d_sc;
+  var pOopRem    = _d_orem / barTotal * 100 * _d_sc;
+  var pProfit    = _d_prof / barTotal * 100 * _d_sc;
 
   var _h = '';
   _h += '<div class="snapshot-banner" style="margin-bottom:16px">';
@@ -2461,37 +2467,43 @@ function renderProjFinancials(p) {
     h += '</div></div>';
   }
 
-  /* ── Progress bar: Labor | FL | OOP | Profit — each with Spent / Projected / Remaining ── */
+  /* ── Progress bar: proportional segments — all scaled to barTotal so profit always shows ── */
   var _bHasLaborSpend  = laborSpent$ > 0;
   var _bHasProjLabor   = !isFinished && laborProj$ > 0;
   var _bHasFlSpend     = !noFl && flSpent > 0;
   var _bHasProjFl      = !noFl && flProj > 0;
   var _bHasOopSpend    = !noOop && oopSpent > 0;
   var _bHasProjOop     = !noOop && oopProj > 0;
-  /* Labor */
-  var pLaborBudg  = (!_bHasLaborSpend && !_bHasProjLabor && !isFinished) ? Math.min(100, projLaborPrice / barTotal * 100) : 0;
-  var pLaborSpent = _bHasLaborSpend ? Math.min(100, laborSpent$ / barTotal * 100) : 0;
-  var _bu1 = pLaborBudg + pLaborSpent;
-  var pLaborProj  = _bHasProjLabor ? Math.min(100 - _bu1, laborProj$ / barTotal * 100) : 0;
-  var _bu1p = _bu1 + pLaborProj;
-  var pLaborRem   = (_bHasLaborSpend || _bHasProjLabor) && !isFinished ? Math.min(100 - _bu1p, Math.max(0, projLaborPrice - laborSpent$ - laborProj$) / barTotal * 100) : 0;
-  var _bu2 = _bu1p + pLaborRem;
-  /* FL */
-  var pFlBudg  = (!noFl && !_bHasFlSpend && !_bHasProjFl && flBudget > 0) ? Math.min(100 - _bu2, flBudget / barTotal * 100) : 0;
-  var pFlSpent = _bHasFlSpend ? Math.min(100 - _bu2, flSpent / barTotal * 100) : 0;
-  var _bu3 = _bu2 + pFlBudg + pFlSpent;
-  var pFlProj  = _bHasProjFl ? Math.min(100 - _bu3, flProj / barTotal * 100) : 0;
-  var _bu3p = _bu3 + pFlProj;
-  var pFlRem   = (_bHasFlSpend || _bHasProjFl) ? Math.min(100 - _bu3p, Math.max(0, flBudget - flSpent - flProj) / barTotal * 100) : 0;
-  var _bu4 = _bu3p + pFlRem;
-  /* OOP */
-  var pOopBudg  = (!noOop && !_bHasOopSpend && !_bHasProjOop && oopBudget > 0) ? Math.min(100 - _bu4, oopBudget / barTotal * 100) : 0;
-  var pOopSpent = _bHasOopSpend ? Math.min(100 - _bu4, oopSpent / barTotal * 100) : 0;
-  var _bu5 = _bu4 + pOopBudg + pOopSpent;
-  var pOopProj  = _bHasProjOop ? Math.min(100 - _bu5, oopProj / barTotal * 100) : 0;
-  var _bu5p = _bu5 + pOopProj;
-  var pOopRem   = (_bHasOopSpend || _bHasProjOop) ? Math.min(100 - _bu5p, Math.max(0, oopRemaining - oopProj) / barTotal * 100) : 0;
-  var pProfit   = Math.max(0, 100 - _bu5p - pOopRem);
+  /* Dollar value of each segment */
+  var _b_lbdg = (!_bHasLaborSpend && !_bHasProjLabor && !isFinished) ? projLaborPrice : 0;
+  var _b_lsp  = _bHasLaborSpend ? laborSpent$ : 0;
+  var _b_lprj = _bHasProjLabor  ? laborProj$ : 0;
+  var _b_lrem = (_bHasLaborSpend || _bHasProjLabor) && !isFinished ? Math.max(0, projLaborPrice - laborSpent$ - laborProj$) : 0;
+  var _b_fbdg = (!noFl && !_bHasFlSpend && !_bHasProjFl && flBudget > 0) ? flBudget : 0;
+  var _b_fsp  = _bHasFlSpend ? flSpent : 0;
+  var _b_fprj = _bHasProjFl  ? flProj : 0;
+  var _b_frem = (_bHasFlSpend || _bHasProjFl) ? Math.max(0, flBudget - flSpent - flProj) : 0;
+  var _b_obdg = (!noOop && !_bHasOopSpend && !_bHasProjOop && oopBudget > 0) ? oopBudget : 0;
+  var _b_osp  = _bHasOopSpend ? oopSpent : 0;
+  var _b_oprj = _bHasProjOop  ? oopProj : 0;
+  var _b_orem = (_bHasOopSpend || _bHasProjOop) ? Math.max(0, oopRemaining - oopProj) : 0;
+  var _b_prof = profitBar$;
+  /* Scale: compress proportionally if spending exceeds client price */
+  var _b_tot = _b_lbdg + _b_lsp + _b_lprj + _b_lrem + _b_fbdg + _b_fsp + _b_fprj + _b_frem + _b_obdg + _b_osp + _b_oprj + _b_orem + _b_prof;
+  var _b_sc  = (_b_tot > barTotal && _b_tot > 0) ? (barTotal / _b_tot) : 1;
+  var pLaborBudg = _b_lbdg / barTotal * 100 * _b_sc;
+  var pLaborSpent= _b_lsp  / barTotal * 100 * _b_sc;
+  var pLaborProj = _b_lprj / barTotal * 100 * _b_sc;
+  var pLaborRem  = _b_lrem / barTotal * 100 * _b_sc;
+  var pFlBudg    = _b_fbdg / barTotal * 100 * _b_sc;
+  var pFlSpent   = _b_fsp  / barTotal * 100 * _b_sc;
+  var pFlProj    = _b_fprj / barTotal * 100 * _b_sc;
+  var pFlRem     = _b_frem / barTotal * 100 * _b_sc;
+  var pOopBudg   = _b_obdg / barTotal * 100 * _b_sc;
+  var pOopSpent  = _b_osp  / barTotal * 100 * _b_sc;
+  var pOopProj   = _b_oprj / barTotal * 100 * _b_sc;
+  var pOopRem    = _b_orem / barTotal * 100 * _b_sc;
+  var pProfit    = _b_prof / barTotal * 100 * _b_sc;
   h += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1)">';
   h += '<div class="lob-bar">';
   if (pLaborBudg  > 0.1) h += '<div class="lob-seg" style="width:' + pLaborBudg.toFixed(1)  + '%;background:#80CBC4;color:var(--abyss)">' + (pLaborBudg  >= 8 ? '$' + Math.round(projLaborPrice).toLocaleString()  : '') + '</div>';
@@ -13918,7 +13930,7 @@ async function loadSupabaseData() {
       sparkFetchAll('labor_budget_entries', 'select=id,budget_id,department,employment_type,phase1,phase2,phase3_1,phase3_2,phase4,phase5,rate_override,team_member_id,team_member:team_members(id,name,fully_burdened_rate)&budget_id=in.(' + _bids + ')'),
       sparkFetchAll('oop_budget_entries', 'select=id,budget_id,line_item_name,count,rate,days,head_count,adjusted_count,adjusted_rate,adjusted_days,adjusted_head_count,actual_count,actual_rate,actual_days,actual_head_count,actual_amount,paid,paid_date,is_active&budget_id=in.(' + _bids + ')'),
       sparkFetchAll('freelancer_budget_entries', 'select=id,budget_id,team_member_id,week_label,hours,rate,paid,paid_date,notes&budget_id=in.(' + _bids + ')'),
-      sparkFetchAll('labor_actuals', 'select=id,hours,work_date,person_name,project_code,phase_key,is_billable,is_bizdev,is_timeoff,board_name,billable_rate&source=eq.timetracker&work_date=gte.2024-01-01&is_timeoff=neq.true&project_code=not.like.100_%&order=work_date.desc'),
+      sparkFetchAll('labor_actuals', 'select=id,hours,work_date,person_name,project_code,phase_key,is_billable,is_bizdev,is_timeoff,board_name,billable_rate&source=eq.timetracker&work_date=gte.2024-01-01&is_timeoff=not.is.true&project_code=not.like.100_%25&order=work_date.desc'),
       sparkFetchAll('allocations', 'select=id,person,project,date,hours_per_day,week_of&order=date.asc')
     ]);
     var laborEntries = _phase2[0];
