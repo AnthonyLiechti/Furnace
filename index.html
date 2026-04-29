@@ -713,7 +713,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.141 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v0.28.142 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 29, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
@@ -1257,9 +1257,10 @@ function projectSpent(proj) {
   }
   return s;
 }
+function isProjectOnHold(p) { return p.status === 'onhold'; }
 function isProjectCompleted(p) {
   /* Explicitly active projects always show as active, regardless of budget/phase state */
-  if (p.status === 'active') return false;
+  if (p.status === 'active' || p.status === 'onhold') return false;
   if (p.status === 'finished' || p.status === 'complete') return true;
   /* Check if Supabase budget is marked complete */
   if (p._supabudget && p._supabudget.status === 'complete') return true;
@@ -1335,7 +1336,7 @@ function renderSidebar() {
   function clientHasActiveBillable(c) {
     for (var _i = 0; _i < c.projects.length; _i++) {
       var _p = c.projects[_i];
-      if (isProjectCompleted(_p)) continue;
+      if (isProjectCompleted(_p) || isProjectOnHold(_p)) continue;
       if (_p.code === '100_00_00' || _p.projectType === 'internal' || _p.projectType === 'bizdev') continue;
       if (_p._supabudget && (_p._supabudget.status === 'nonbillable' || _p._supabudget.status === 'bizdev')) continue;
       return true;
@@ -1355,7 +1356,7 @@ function renderSidebar() {
       var c = clients[ci];
       var sorted = c.projects.slice().sort(function(a,b){ return a.code < b.code ? -1 : a.code > b.code ? 1 : 0; });
 
-      /* Filter projects when search is active */
+      /* Filter projects when search is active — on-hold always included (dimmed) */
       var visibleProjects = sorted.filter(function(p) {
         if (isProjectCompleted(p)) return false;
         if (!q) return true;
@@ -1377,8 +1378,9 @@ function renderSidebar() {
       for (var pi = 0; pi < visibleProjects.length; pi++) {
         var p = visibleProjects[pi];
         var isActive = currentView === 'project:' + p.id;
+        var _onHold = isProjectOnHold(p);
         var label = q ? ('<span class="proj-code">' + p.code + '</span>' + p.name) : ('<span><span class="proj-code">' + p.code + '</span>' + p.name + '</span>');
-        out += '<div class="nav-item ' + (isActive ? 'active' : '') + '" onclick="navigate(\'project:' + p.id + '\')"><span class="icon">&mdash;</span> ' + label + '</div>';
+        out += '<div class="nav-item ' + (isActive ? 'active' : '') + '" onclick="navigate(\'project:' + p.id + '\')" style="' + (_onHold ? 'opacity:.45;font-style:italic' : '') + '"><span class="icon">' + (_onHold ? '⏸' : '&mdash;') + '</span> ' + label + '</div>';
       }
       out += '</div></div>';
     }
@@ -1510,6 +1512,7 @@ function buildPortfolioBannerHTML(projects, bannerTitle, opts) {
   for (var _i = 0; _i < projects.length; _i++) {
     var _p = projects[_i], _sb = _p._supabudget;
     if (!_sb) continue;
+    if (isProjectOnHold(_p)) continue; /* On Hold projects excluded from portfolio totals */
     snapshotCount++;
     var _rawP = _sb.client_price || 0;
     var _tcvP = _rawP - (_sb.has_discount ? _rawP * 0.035 : 0);
@@ -2003,13 +2006,14 @@ function renderMaster() {
 function renderClient(clientId) {
   var c = clientById(clientId);
   if (!c) return;
-  /* Split active vs completed */
-  var activeList = [], doneList = [];
+  /* Split active vs completed vs on-hold */
+  var activeList = [], doneList = [], onHoldList = [];
   for (var i = 0; i < c.projects.length; i++) {
-    if (isProjectCompleted(c.projects[i])) doneList.push(c.projects[i]);
+    if (isProjectOnHold(c.projects[i])) onHoldList.push(c.projects[i]);
+    else if (isProjectCompleted(c.projects[i])) doneList.push(c.projects[i]);
     else activeList.push(c.projects[i]);
   }
-  var visibleList = showFinalized ? c.projects : activeList;
+  var visibleList = showFinalized ? c.projects.filter(function(p) { return !isProjectOnHold(p); }) : activeList;
   var rate = getRate(c.id);
 
   /* Aggregate financials from snapshots and Supabase budgets */
@@ -2039,7 +2043,7 @@ function renderClient(clientId) {
   h += '</h1>';
   h += '<button onclick="showAddProjectForm(\'' + c.id + '\')" style="padding:6px 16px;border-radius:6px;border:none;background:var(--ocean);color:var(--white);cursor:pointer;font-size:12px;font-weight:600;letter-spacing:.3px;white-space:nowrap">+ Add Project</button>';
   h += '</div>';
-  var label = showFinalized ? (visibleList.length + ' total project' + (visibleList.length !== 1 ? 's' : '')) : (activeList.length + ' active project' + (activeList.length !== 1 ? 's' : '') + (doneList.length ? ' &middot; ' + doneList.length + ' completed' : ''));
+  var label = showFinalized ? (visibleList.length + ' total project' + (visibleList.length !== 1 ? 's' : '')) : (activeList.length + ' active project' + (activeList.length !== 1 ? 's' : '') + (onHoldList.length ? ' &middot; ' + onHoldList.length + ' on hold' : '') + (doneList.length ? ' &middot; ' + doneList.length + ' completed' : ''));
   h += '<p class="page-subtitle">' + label + ' &middot; Rate: ' + (rate > 0 ? '$' + rate + '/hr' : 'Not set') + '</p>';
 
   /* ── CLIENT FINANCIALS BANNER ── */
@@ -2698,7 +2702,9 @@ function renderProject(projectId) {
   h += '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px">';
   h += '<h1 class="page-title" style="margin:0">' + p.name + '</h1>';
   h += _phasePill;
+  var _isOnHold = p.status === 'onhold';
   h += '<button onclick="notifyNewProjectSlack(' + JSON.stringify(p.name) + ',' + JSON.stringify(p.code) + ',this)" title="DM Richelle with new project number" style="margin-left:auto;padding:5px 13px;border-radius:20px;border:1px solid rgba(91,74,138,.4);background:rgba(91,74,138,.12);color:#9B8EC2;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit;white-space:nowrap">📣 Notify Team</button>';
+  h += '<button onclick="toggleProjectOnHold(\'' + p.code + '\')" title="' + (_isOnHold ? 'Resume this project' : 'Put project on hold — hides from overviews') + '" style="padding:5px 13px;border-radius:20px;border:1px solid rgba(255,183,77,.4);background:' + (_isOnHold ? 'rgba(255,183,77,.18)' : 'transparent') + ';color:' + (_isOnHold ? '#FFB74D' : 'rgba(255,183,77,.55)') + ';cursor:pointer;font-size:11px;font-weight:600;font-family:inherit;white-space:nowrap">' + (_isOnHold ? '⏸ On Hold' : '⏸ Hold') + '</button>';
   h += '<button data-supa-id="' + (p._supaId||'') + '" data-proj-code="' + p.code + '" data-client-id="' + (p.clientId||'') + '" onclick="deleteProject(this)" title="Delete this project" style="padding:5px 10px;border-radius:20px;border:1px solid rgba(198,40,40,.3);background:transparent;color:rgba(198,40,40,.6);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap" onmouseenter="this.style.background=\'rgba(198,40,40,.1)\';this.style.color=\'#EF9A9A\'" onmouseleave="this.style.background=\'transparent\';this.style.color=\'rgba(198,40,40,.6)\'">🗑 Delete</button>';
   h += '</div>';
   h += '<p class="page-subtitle">' + p.clientCode + ' ' + p.clientName + ' &middot; Rate: ' + (rate > 0 ? '$' + rate + '/hr' : 'Not set') + '</p>';
@@ -3163,7 +3169,7 @@ function renderFlagged() {
 
   for (var i = 0; i < all.length; i++) {
     var p = all[i];
-    if (!showFlaggedAll && isProjectCompleted(p)) continue;
+    if (!showFlaggedAll && (isProjectCompleted(p) || isProjectOnHold(p))) continue;
     var sb = p._supabudget;
 
     /* Skip non-billable, bizdev, and internal projects from Needs Attention entirely */
@@ -4913,6 +4919,19 @@ async function toggleYTDProjectClosed(code) {
   }
 
   renderYTD();
+}
+
+async function toggleProjectOnHold(projCode) {
+  var proj = null;
+  for (var ci = 0; ci < CLIENTS.length && !proj; ci++)
+    for (var pi = 0; pi < CLIENTS[ci].projects.length && !proj; pi++)
+      if (CLIENTS[ci].projects[pi].code === projCode) proj = CLIENTS[ci].projects[pi];
+  if (!proj || !proj._supaId) return;
+  var newStatus = proj.status === 'onhold' ? 'active' : 'onhold';
+  await sparkFetch('projects?id=eq.' + proj._supaId, '', 'PATCH', { project_status: newStatus });
+  proj.status = newStatus;
+  renderSidebar();
+  navigate('project:' + projCode);
 }
 
 async function setProjectCurrentPhase(supaId, phase, projCode) {
