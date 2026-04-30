@@ -1335,7 +1335,7 @@ function renderSidebar() {
   html += '<div class="nav-item ' + (currentView === 'resource' ? 'active' : '') + '" onclick="navigate(\'resource\')"><span class="icon">&#9202;</span> Resource Analytics</div>';
   html += '<div class="nav-item ' + (currentView === 'completed' ? 'active' : '') + '" onclick="navigate(\'completed\')"><span class="icon">&#10003;</span> Completed Projects</div>';
   html += '<div class="nav-item ' + (currentView === 'opportunities' ? 'active' : '') + '" onclick="navigate(\'opportunities\')"><span class="icon">&#9733;</span> New Opportunities</div>';
-  html += '<div class="nav-item ' + (currentView === 'settings' ? 'active' : '') + '" onclick="navigate(\'settings\')"><span class="icon">&#9881;</span> Settings</div>';
+  if (canViewActuals()) html += '<div class="nav-item ' + (currentView === 'settings' ? 'active' : '') + '" onclick="navigate(\'settings\')"><span class="icon">&#9881;</span> Settings</div>';
   html += '<div class="nav-divider"></div>';
 
   /* Split clients into active and inactive.
@@ -13588,7 +13588,7 @@ function navigate(view) {
   else if (view === 'resource') renderResource();
   else if (view === 'allocations') renderAllocations();
   else if (view === 'spark') renderSpark();
-  else if (view === 'settings') renderSettings();
+  else if (view === 'settings') { if (canViewActuals()) renderSettings(); else navigate('master'); }
   else if (view === 'opportunities') renderOpportunities();
   else if (view.indexOf('opportunity:') === 0) renderOpportunityEditor(view.split(':')[1]);
   else if (view.indexOf('client:') === 0) renderClient(view.split(':')[1]);
@@ -13631,7 +13631,7 @@ window.addEventListener('hashchange', function() {
         else if (view === 'resource') renderResource();
         else if (view === 'allocations') renderAllocations();
         else if (view === 'spark') renderSpark();
-        else if (view === 'settings') renderSettings();
+        else if (view === 'settings') { if (canViewActuals()) renderSettings(); else navigate('master'); }
         else if (view.indexOf('client:') === 0) renderClient(view.split(':')[1]);
         else if (view.indexOf('project:') === 0) renderProject(view.split(':')[1]);
       }
