@@ -4275,6 +4275,7 @@ async function renderOpportunityEditor(budgetId) {
   mc.innerHTML = '<div>'
     + '<div style="margin-bottom:14px"><button onclick="navigate(\'opportunities\')" class="opp-back-btn" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--mid-gray);font-weight:600;padding:0;letter-spacing:.3px">&#8249; All Opportunities</button></div>'
     + '<div id="oppActionBar"></div>'
+    + '<div id="oppFinancials"></div>'
     + '<div id="sparkProjectOverview"></div>'
     + '<div id="sparkProjectBudget"><div style="padding:20px;color:var(--mid-gray)">Loading&#8230;</div></div>'
     + '</div>';
@@ -9080,6 +9081,27 @@ function sparkRenderBudgetContent(embedded) {
   var h = '';
 
   if (embedded) {
+    /* ── FINANCIAL SUMMARY → renders into oppFinancials (tile row at top of opp editor) ── */
+    var finEl = document.getElementById('oppFinancials');
+    if (finEl) {
+      var totalCost = totalLaborCost + totalFreelancerCost + totalOopWithMarkup;
+      var oppProfit = clientPrice - totalCost;
+      var oppMargin = clientPrice > 0 ? (oppProfit / clientPrice * 100) : 0;
+      var mColor = oppMargin > 25 ? '#81C784' : oppMargin > 15 ? '#81C784' : oppMargin > 10 ? '#F57F17' : '#EF5350';
+      var fh = '<div class="snapshot-banner" style="margin-bottom:16px;padding:16px 20px">';
+      fh += '<div class="snap-financials">';
+      fh += '<div class="snap-fin-item"><div class="sf-label">Client Price</div><div class="sf-value sf-gold">$' + Math.round(tcv).toLocaleString() + '</div></div>';
+      fh += '<div class="snap-fin-item"><div class="sf-label">Fee (Labor)</div><div class="sf-value" style="color:var(--ocean)">$' + Math.round(totalLaborCost).toLocaleString() + '</div><div class="sf-sub">' + totalLaborHrs.toFixed(0) + ' hrs</div></div>';
+      if (totalFreelancerCost > 0 || totalFreelancerHrs > 0) {
+        fh += '<div class="snap-fin-item"><div class="sf-label">Freelancers</div><div class="sf-value" style="color:#CE93D8">$' + Math.round(totalFreelancerCost).toLocaleString() + '</div></div>';
+      }
+      fh += '<div class="snap-fin-item"><div class="sf-label">OOP</div><div class="sf-value">$' + Math.round(totalOopWithMarkup).toLocaleString() + '</div></div>';
+      fh += '<div class="snap-fin-item"><div class="sf-label">Est. Profit</div><div class="sf-value' + (oppProfit >= 0 ? ' sf-green' : '') + '">$' + Math.round(oppProfit).toLocaleString() + '</div></div>';
+      fh += '<div class="snap-fin-item"><div class="sf-label">Est. Margin</div><div class="sf-value" style="color:' + mColor + '">' + oppMargin.toFixed(1) + '%</div></div>';
+      fh += '</div></div>';
+      finEl.innerHTML = fh;
+    }
+
     /* ── PROJECT OVERVIEW → renders into sparkProjectOverview (always visible) ── */
     var overviewEl = document.getElementById('sparkProjectOverview');
     if (overviewEl) {
