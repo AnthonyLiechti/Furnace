@@ -1009,6 +1009,7 @@ var SUPA_ACTUALS_ALL = []; // raw labor_actuals array
 var SUPA_LOADED = false;
 var FURNACE_TEAM_MEMBERS = [];
 var SLACK_BOT_TOKEN = ''; /* loaded from agency_settings on init */
+var TREVOR_API_KEY  = ''; /* loaded from agency_settings on init */
 var FURNACE_CURRENT_USER_EMAIL = ''; /* set on login from Google OAuth user.email */
 var ACTUALS_ALLOWED_EMAILS = ['anthony@createdbyforge.com','richelle@createdbyforge.com']; /* Show Actuals access list */
 var SUPA_POS = [];        /* purchase orders sent to clients, loaded from pos table */
@@ -3520,6 +3521,25 @@ function renderImportTime() {
   h += '<input type="file" id="importFileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="importHandleFile(this.files[0])">';
   h += '</div>';
 
+  /* Trevor API Sync */
+  var _tNow = new Date(); var _tFrom = new Date(_tNow); _tFrom.setDate(_tFrom.getDate() - 30);
+  var _tFromStr = _tFrom.toISOString().slice(0,10); var _tToStr = _tNow.toISOString().slice(0,10);
+  h += '<div style="background:var(--white);border:1px solid var(--canvas);border-radius:12px;padding:20px;margin-bottom:20px">';
+  h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">';
+  h += '<span style="font-size:18px">⚡</span><div style="font-size:13px;font-weight:700;color:var(--abyss)">Trevor Morse — Direct API Sync</div>';
+  if (!TREVOR_API_KEY) h += '<span style="font-size:10px;color:var(--ember);font-weight:600;margin-left:4px">Key not loaded — refresh page</span>';
+  h += '</div>';
+  h += '<div style="font-size:12px;color:var(--mid-gray);margin-bottom:14px">Pulls hours directly from Trevor\'s personal time tracker. Replaces any existing Trevor API entries for the selected range.</div>';
+  h += '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">';
+  h += '<div><label style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);display:block;margin-bottom:4px;letter-spacing:.5px">From</label>';
+  h += '<input type="date" id="trevorApiFrom" value="' + _tFromStr + '" style="padding:7px 10px;border:1px solid var(--canvas);border-radius:6px;font-size:13px;font-family:inherit;background:var(--light-gray)"></div>';
+  h += '<div><label style="font-size:10px;text-transform:uppercase;color:var(--mid-gray);display:block;margin-bottom:4px;letter-spacing:.5px">To</label>';
+  h += '<input type="date" id="trevorApiTo" value="' + _tToStr + '" style="padding:7px 10px;border:1px solid var(--canvas);border-radius:6px;font-size:13px;font-family:inherit;background:var(--light-gray)"></div>';
+  h += '<button onclick="trevorApiSync()" style="padding:8px 20px;border-radius:6px;border:none;background:var(--ocean);color:#fff;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit">Sync Trevor\'s Hours</button>';
+  h += '</div>';
+  h += '<div id="trevorApiStatus" style="margin-top:12px"></div>';
+  h += '</div>';
+
   /* Maintenance */
   h += '<div style="display:flex;gap:12px;margin-bottom:20px">';
   h += '<button onclick="importDedup()" style="padding:8px 16px;border-radius:6px;border:1px solid var(--canvas);background:var(--white);cursor:pointer;font-size:12px;color:var(--mid-gray)">&#128270; Find &amp; Remove Duplicates</button>';
@@ -3532,6 +3552,93 @@ function renderImportTime() {
   h += '<div id="importLog"></div>';
 
   document.getElementById('mainContent').innerHTML = h;
+}
+
+async function trevorApiSync() {
+  var fromEl = document.getElementById('trevorApiFrom');
+  var toEl   = document.getElementById('trevorApiTo');
+  var statusEl = document.getElementById('trevorApiStatus');
+  if (!fromEl || !toEl || !statusEl) return;
+  var from = fromEl.value, to = toEl.value;
+  if (!from || !to) { statusEl.innerHTML = '<span style="color:var(--ember)">Select a date range first.</span>'; return; }
+  if (!TREVOR_API_KEY) { statusEl.innerHTML = '<span style="color:var(--ember)">Trevor API key not loaded — refresh page.</span>'; return; }
+
+  statusEl.innerHTML = '<span style="color:var(--ocean)">⏳ Fetching from Trevor\'s tracker…</span>';
+
+  var raw;
+  try {
+    var resp = await fetch('https://daily-hours-tracker.vercel.app/api/v1/time-entries?from=' + from + '&to=' + to, {
+      headers: { 'Authorization': 'Bearer ' + TREVOR_API_KEY }
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    raw = await resp.json();
+  } catch(e) {
+    statusEl.innerHTML = '<span style="color:var(--ember)">⚠ Fetch failed: ' + (e.message || 'network error') + '</span>';
+    return;
+  }
+
+  /* Extract project_code from matched_project_name */
+  var codeRx = /(\d+_\d+_\d+)/;
+  var rows = [];
+  for (var i = 0; i < raw.length; i++) {
+    var e = raw[i];
+    var hrs = parseFloat(e.parsed_hours) || 0;
+    if (hrs <= 0) continue;
+    var projName = e.matched_project_name || '';
+    var codeMatch = projName.match(codeRx);
+    var projCode = codeMatch ? codeMatch[1] : null;
+    rows.push({
+      person_name:  'Trevor Morse',
+      work_date:    e.date,
+      hours:        hrs,
+      project_code: projCode,
+      board_name:   projName.slice(0, 200),
+      item_name:    (e.parsed_activity || '').slice(0, 200),
+      source:       'trevor_api',
+      is_billable:  e.entry_type === 'project',
+      is_bizdev:    false,
+      is_timeoff:   false,
+      phase_key:    null,
+      phase_group:  null
+    });
+  }
+
+  var billable = rows.filter(function(r) { return r.project_code; });
+  var skipped  = rows.length - billable.length;
+
+  statusEl.innerHTML = '<span style="color:var(--ocean)">⏳ Found ' + rows.length + ' entries (' + billable.length + ' with project codes, ' + skipped + ' internal/unmatched). Syncing…</span>';
+
+  /* Delete existing trevor_api entries for this date range */
+  try {
+    await sparkFetch('labor_actuals?source=eq.trevor_api&work_date=gte.' + from + '&work_date=lte.' + to, '', 'DELETE');
+  } catch(e) { console.warn('Trevor delete error:', e); }
+
+  /* Insert all rows (including internal ones without project_code — they'll have null project_code) */
+  var inserted = 0, errors = 0;
+  var batchSize = 200;
+  for (var b = 0; b < rows.length; b += batchSize) {
+    try {
+      var res = await sparkFetch('labor_actuals', '', 'POST', rows.slice(b, b + batchSize));
+      if (res && res.error) { errors += Math.min(batchSize, rows.length - b); }
+      else { inserted += Math.min(batchSize, rows.length - b); }
+    } catch(ex) { errors += Math.min(batchSize, rows.length - b); }
+  }
+
+  /* Refresh in-memory actuals */
+  try {
+    var fresh = await sparkFetchAll('labor_actuals', 'select=id,hours,work_date,person_name,project_code,phase_key,is_billable,is_bizdev,is_timeoff,board_name,billable_rate&source=eq.trevor_api&work_date=gte.' + from + '&work_date=lte.' + to);
+    /* Merge into SUPA_ACTUALS_ALL — remove old trevor_api entries for range, add fresh */
+    SUPA_ACTUALS_ALL = SUPA_ACTUALS_ALL.filter(function(a) {
+      return !(a.source === 'trevor_api' && a.work_date >= from && a.work_date <= to);
+    });
+    if (fresh) SUPA_ACTUALS_ALL = SUPA_ACTUALS_ALL.concat(fresh);
+  } catch(e) {}
+
+  furnaceToast('✓ Trevor: ' + inserted + ' entries synced (' + from + ' – ' + to + ')', 'success');
+  statusEl.innerHTML = '<div style="background:#E8F5E9;border-radius:8px;padding:12px;font-size:12px;color:#2E7D32">' +
+    '<strong>✓ Sync complete</strong> — ' + inserted + ' entries written' + (errors ? ', ' + errors + ' errors' : '') +
+    ' &nbsp;|&nbsp; ' + billable.length + ' mapped to projects, ' + skipped + ' internal/unmatched' +
+    '</div>';
 }
 
 function importHandleDrop(event) {
@@ -14258,6 +14365,10 @@ async function loadSupabaseData() {
       try {
         var slackSetting = await sparkFetch('agency_settings', 'key=eq.slack_bot_token&select=value');
         if (slackSetting && slackSetting[0] && slackSetting[0].value) SLACK_BOT_TOKEN = slackSetting[0].value;
+      } catch(e) {}
+      try {
+        var trevorSetting = await sparkFetch('agency_settings', 'key=eq.trevor_api_key&select=value');
+        if (trevorSetting && trevorSetting[0] && trevorSetting[0].value) TREVOR_API_KEY = trevorSetting[0].value;
       } catch(e) {}
       try {
         var hoursSetting = await sparkFetch('agency_settings', 'key=eq.hours_last_updated&select=value');
