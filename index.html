@@ -718,7 +718,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.3 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Apr 30, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.4 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 1, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
   </div>
@@ -3577,23 +3577,26 @@ async function trevorApiSync() {
     return;
   }
 
-  /* Extract project_code from matched_project_name */
+  /* Extract project_code — check matched_project_name, then pulse_name, then parsed_activity */
   var codeRx = /(\d+_\d+_\d+)/;
   var rows = [];
   for (var i = 0; i < raw.length; i++) {
     var e = raw[i];
     var hrs = parseFloat(e.parsed_hours) || 0;
     if (hrs <= 0) continue;
-    var projName = e.matched_project_name || '';
-    var codeMatch = projName.match(codeRx);
-    var projCode = codeMatch ? codeMatch[1] : null;
+    var projName  = e.matched_project_name || '';
+    var pulseName = e.pulse_name || '';
+    var activity  = e.parsed_activity || '';
+    var codeMatch = projName.match(codeRx) || pulseName.match(codeRx) || activity.match(codeRx);
+    var projCode  = codeMatch ? codeMatch[1] : null;
+    var boardName = projName || pulseName || activity;
     rows.push({
       person_name:  'Trevor Morse',
       work_date:    e.date,
       hours:        hrs,
       project_code: projCode,
-      board_name:   projName.slice(0, 200),
-      item_name:    (e.parsed_activity || '').slice(0, 200),
+      board_name:   boardName.slice(0, 200),
+      item_name:    activity.slice(0, 200),
       source:       'trevor_api',
       is_billable:  e.entry_type === 'project',
       is_bizdev:    false,
