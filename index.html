@@ -746,7 +746,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.6 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 4, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.7 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 4, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
   </div>
@@ -9286,7 +9286,7 @@ function sparkRenderBudgetContent(embedded) {
       var curStatus = budget.status || 'active';
       oh += '<div class="snapshot-banner" style="margin-bottom:16px">';
       if (sparkSmallProjProjectCode) {
-        oh += '<div style="margin-bottom:12px"><button onclick="sparkRenderSmallProjectList(\'' + sparkSmallProjProjectCode + '\')" style="background:none;border:none;cursor:pointer;font-size:12px;color:rgba(255,255,255,.6);font-weight:600;padding:0;letter-spacing:.3px">&#8249; All Snapshots</button></div>';
+        oh += '<div style="margin-bottom:16px"><button onclick="sparkRenderSmallProjectList(\'' + sparkSmallProjProjectCode + '\')" style="display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border-radius:20px;border:1.5px solid rgba(255,255,255,.3);background:rgba(255,255,255,.12);color:var(--white);cursor:pointer;font-size:13px;font-weight:600;letter-spacing:.2px;transition:background .15s" onmouseover="this.style.background=\'rgba(255,255,255,.2)\'" onmouseout="this.style.background=\'rgba(255,255,255,.12)\'"><span style="font-size:16px;line-height:1">&#8592;</span> All Snapshots</button></div>';
       }
       oh += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">';
       oh += '<div style="font-size:16px;font-weight:700;display:flex;align-items:center;gap:10px">PROJECT OVERVIEW <span style="font-size:13px;font-weight:400;opacity:.5">#' + (budget.estimate_number || '\u2014') + '</span><span id="sparkLiveDot" title="Live updates active" style="display:none;width:8px;height:8px;border-radius:50%;background:rgba(129,199,132,.5);transition:background .4s"></span></div>';
