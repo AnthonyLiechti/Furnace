@@ -664,6 +664,34 @@ html.dark .oop-modal { background:var(--dm-surface); color:var(--dm-text); }
 html.dark .oop-modal input, html.dark .oop-modal select, html.dark .oop-modal textarea { background:var(--dm-surface2); border-color:var(--dm-border); color:var(--dm-text); }
 html.dark .oop-modal-actions button { background:var(--dm-surface2); border-color:var(--dm-border); color:var(--dm-text); }
 
+/* ── SMALL PROJECT SNAPSHOT LIST ── */
+.snap-list-wrap { background:var(--white); border-radius:10px; padding:18px 20px; margin-bottom:16px; }
+html.dark .snap-list-wrap { background:var(--dm-surface); }
+.snap-list-hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+.snap-list-title { font-size:14px; font-weight:700; color:var(--abyss); }
+html.dark .snap-list-title { color:var(--dm-text); }
+.snap-item { display:flex; align-items:center; gap:12px; padding:10px 14px; background:var(--canvas); border-radius:8px; cursor:pointer; transition:background .15s; }
+.snap-item:hover { background:#C8C3BC; }
+html.dark .snap-item { background:var(--dm-surface2); }
+html.dark .snap-item:hover { background:#3a3a3a; }
+.snap-item-name { font-size:13px; font-weight:600; color:var(--abyss); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+html.dark .snap-item-name { color:var(--dm-text); }
+.snap-item-meta { font-size:11px; color:var(--mid-gray); margin-top:3px; }
+.snap-item-btn { padding:5px 8px; border-radius:6px; border:1px solid rgba(0,0,0,.1); background:rgba(255,255,255,.6); color:var(--mid-gray); cursor:pointer; font-size:12px; flex-shrink:0; }
+html.dark .snap-item-btn { border-color:var(--dm-border); background:var(--dm-surface); color:var(--dm-text-muted); }
+.snap-item-arrow { font-size:12px; font-weight:500; color:var(--mid-gray); padding-right:2px; pointer-events:none; flex-shrink:0; }
+html.dark .snap-item-arrow { color:var(--dm-text-muted); }
+.unassigned-panel { background:var(--white); border-radius:10px; padding:16px 20px; margin-bottom:16px; border:1px solid rgba(206,115,56,.3); }
+html.dark .unassigned-panel { background:var(--dm-surface); border-color:rgba(206,115,56,.2); }
+.unassigned-row { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:6px; background:var(--light-gray); margin-bottom:6px; }
+html.dark .unassigned-row { background:var(--dm-surface2); }
+.ua-label { font-size:12px; color:var(--abyss); flex:1; min-width:0; overflow:hidden; }
+html.dark .ua-label { color:var(--dm-text); }
+.ua-meta { font-size:10px; color:var(--mid-gray); }
+html.dark .ua-meta { color:var(--dm-text-muted); }
+.ua-assign-select { font-size:11px; padding:4px 6px; border-radius:4px; border:1px solid var(--canvas); background:var(--white); color:var(--abyss); cursor:pointer; flex-shrink:0; }
+html.dark .ua-assign-select { border-color:var(--dm-border); background:var(--dm-surface); color:var(--dm-text); }
+
 /* ── DARK MODE: Global Toolbar & Selects ── */
 html.dark #globalToolbar { border-bottom-color:var(--dm-border); }
 html.dark #globalToolbar select { background:var(--dm-surface2); border-color:var(--dm-border); color:var(--dm-text); }
@@ -718,7 +746,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.4 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 1, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.5 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 4, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
   </div>
@@ -6322,46 +6350,52 @@ async function sparkRenderSmallProjectList(projectCode) {
   if (!container) return;
   sparkSmallProjProjectCode = null;
 
-  /* Show a small-projects overview banner in the always-visible area */
   var overviewEl = document.getElementById('sparkProjectOverview');
   if (overviewEl) {
-    var totalBudget = 0, snapshotCount = 0;
-    /* We'll populate this after fetching budgets — placeholder for now */
-    overviewEl.innerHTML = '<div class="snapshot-banner" style="margin-bottom:16px"><div style="font-size:16px;font-weight:700;margin-bottom:4px">SMALL PROJECTS</div><div style="font-size:12px;opacity:.55">Loading snapshots\u2026</div></div>';
+    overviewEl.innerHTML = '<div class="snapshot-banner" style="margin-bottom:16px"><div style="font-size:16px;font-weight:700;margin-bottom:4px">SMALL PROJECTS</div><div style="font-size:12px;opacity:.55">Loading…</div></div>';
   }
-
-  container.innerHTML = '<div style="padding:16px;color:var(--mid-gray);font-size:13px">Loading snapshots\u2026</div>';
+  container.innerHTML = '<div style="padding:16px;color:var(--mid-gray);font-size:13px">Loading…</div>';
 
   /* Fetch project record */
   var projRows = await sparkFetch('projects', 'project_code=eq.' + encodeURIComponent(projectCode) + '&select=id');
   var projId = projRows && projRows.length ? projRows[0].id : null;
 
-  var budgets = projId
-    ? await sparkFetch('budgets', 'project_id=eq.' + projId + '&visibility=eq.visible&select=id,name,status,client_price,has_discount,created_at&order=created_at.asc')
-    : [];
+  var fetchResults = projId ? await Promise.all([
+    sparkFetch('budgets', 'project_id=eq.' + projId + '&visibility=eq.visible&select=id,name,status,client_price,has_discount,created_at&order=created_at.asc'),
+    sparkFetch('labor_actuals', 'project_code=eq.' + encodeURIComponent(projectCode) + '&budget_id=is.null&select=id,person_name,work_date,hours,item_name,source&order=work_date.desc')
+  ]) : [[], []];
+  var budgets = fetchResults[0] || [];
+  var unassigned = fetchResults[1] || [];
 
   /* Update overview banner with real totals */
   if (overviewEl) {
     var aggPrice = 0;
-    for (var bi = 0; bi < (budgets || []).length; bi++) aggPrice += budgets[bi].client_price || 0;
-    var bCount = budgets ? budgets.length : 0;
+    for (var bi = 0; bi < budgets.length; bi++) aggPrice += budgets[bi].client_price || 0;
+    var bCount = budgets.length;
+    var uCount = unassigned.length;
     overviewEl.innerHTML = '<div class="snapshot-banner" style="margin-bottom:16px">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
       + '<div style="font-size:16px;font-weight:700">SMALL PROJECTS</div>'
-      + '<div style="font-size:11px;opacity:.5">' + bCount + ' snapshot' + (bCount !== 1 ? 's' : '') + '</div>'
+      + '<div style="font-size:11px;opacity:.5">' + bCount + ' snapshot' + (bCount !== 1 ? 's' : '') + (uCount > 0 ? ' &nbsp;&middot;&nbsp; <span style="color:#F57F17;opacity:1">' + uCount + ' unassigned</span>' : '') + '</div>'
       + '</div>'
       + '<div class="snap-financials">'
       + '<div class="snap-fin-item"><div class="sf-label">Total Budget</div><div class="sf-value sf-gold">$' + Math.round(aggPrice).toLocaleString() + '</div></div>'
       + '</div></div>';
   }
 
-  var h = '<div style="background:var(--white);border-radius:10px;padding:18px 20px;margin-bottom:16px">';
-  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
-  h += '<div style="font-size:14px;font-weight:700;color:var(--abyss)">Snapshots <span style="font-size:11px;font-weight:400;color:var(--mid-gray)">(' + (budgets ? budgets.length : 0) + ')</span></div>';
+  /* Snapshot dropdown options for unassigned-hours selects */
+  var snapOpts = '';
+  for (var si = 0; si < budgets.length; si++) {
+    snapOpts += '<option value="' + budgets[si].id + '">' + (budgets[si].name || 'Untitled') + '</option>';
+  }
+
+  var h = '<div class="snap-list-wrap">';
+  h += '<div class="snap-list-hdr">';
+  h += '<div class="snap-list-title">Snapshots <span style="font-size:11px;font-weight:400;color:var(--mid-gray)">(' + budgets.length + ')</span></div>';
   h += '<button onclick="sparkShowAddSnapshotForm(\'' + projectCode + '\')" style="padding:6px 14px;border-radius:6px;border:none;background:var(--ocean);color:var(--white);cursor:pointer;font-size:12px;font-weight:600">+ Add Snapshot</button>';
   h += '</div>';
 
-  if (!budgets || !budgets.length) {
+  if (!budgets.length) {
     h += '<div style="font-size:13px;color:var(--mid-gray);text-align:center;padding:20px 0">No snapshots yet — add the first one above.</div>';
   } else {
     h += '<div style="display:flex;flex-direction:column;gap:8px">';
@@ -6370,26 +6404,56 @@ async function sparkRenderSmallProjectList(projectCode) {
       var b = budgets[i];
       var sc = statusColors[b.status] || 'var(--mid-gray)';
       var price = b.client_price || 0;
-      h += '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--canvas);border-radius:8px">';
+      h += '<div class="snap-item" onclick="sparkEditSmallSnapshot(\'' + b.id + '\',\'' + projectCode + '\')">';
       h += '<div style="flex:1;min-width:0">';
-      h += '<div id="snap-name-' + b.id + '" style="font-size:13px;font-weight:600;color:var(--abyss);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (b.name || 'Untitled') + '</div>';
-      h += '<div style="font-size:11px;color:var(--mid-gray);margin-top:3px">$' + Math.round(price).toLocaleString() + ' &nbsp;&middot;&nbsp; <span style="color:' + sc + ';font-weight:600">' + (b.status || 'proposed') + '</span></div>';
+      h += '<div id="snap-name-' + b.id + '" class="snap-item-name">' + (b.name || 'Untitled') + '</div>';
+      h += '<div class="snap-item-meta">$' + Math.round(price).toLocaleString() + ' &nbsp;&middot;&nbsp; <span style="color:' + sc + ';font-weight:600">' + (b.status || 'proposed') + '</span></div>';
       h += '</div>';
-      h += '<button onclick="sparkRenameSnapshot(\'' + b.id + '\',\'' + projectCode + '\',\'' + (b.name || '').replace(/'/g,'\\\'') + '\')" title="Rename snapshot" style="padding:5px 8px;border-radius:6px;border:1px solid var(--canvas);background:var(--white);color:var(--mid-gray);cursor:pointer;font-size:12px;flex-shrink:0;margin-right:4px">&#9998;</button>';
-      h += '<button onclick="sparkEditSmallSnapshot(\'' + b.id + '\',\'' + projectCode + '\')" style="padding:5px 12px;border-radius:6px;border:1px solid var(--canvas);background:var(--white);color:var(--abyss);cursor:pointer;font-size:12px;font-weight:500;white-space:nowrap;flex-shrink:0">Edit ›</button>';
+      h += '<button onclick="event.stopPropagation();sparkRenameSnapshot(\'' + b.id + '\',\'' + projectCode + '\',\'' + (b.name || '').replace(/'/g,'\\\'') + '\')" title="Rename snapshot" class="snap-item-btn" style="margin-right:4px">&#9998;</button>';
+      h += '<span class="snap-item-arrow">&#8250;</span>';
       h += '</div>';
     }
     h += '</div>';
   }
   h += '</div>';
+
+  /* Unassigned hours panel: actuals with matching project_code but no snapshot assignment */
+  if (unassigned.length > 0) {
+    var totalUA = 0;
+    for (var i = 0; i < unassigned.length; i++) totalUA += unassigned[i].hours || 0;
+    h += '<div class="unassigned-panel">';
+    h += '<div style="margin-bottom:10px">';
+    h += '<div style="font-size:13px;font-weight:700;color:var(--ember)">&#9202; Unassigned Hours</div>';
+    h += '<div style="font-size:11px;color:var(--mid-gray);margin-top:3px">' + unassigned.length + ' entr' + (unassigned.length === 1 ? 'y' : 'ies') + ' · ' + totalUA.toFixed(1) + ' hrs — assign each to a snapshot</div>';
+    h += '</div>';
+    for (var i = 0; i < unassigned.length; i++) {
+      var ua = unassigned[i];
+      var uDate = ua.work_date ? ua.work_date.slice(0, 10) : '—';
+      var uHrs = (ua.hours || 0).toFixed(1);
+      h += '<div class="unassigned-row">';
+      h += '<div class="ua-label">';
+      h += '<span style="font-weight:600">' + (ua.person_name || '—') + '</span>';
+      h += ' <span class="ua-meta">' + uDate + ' · ' + uHrs + 'h</span>';
+      if (ua.item_name) h += '<div class="ua-meta" style="margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + ua.item_name + '</div>';
+      h += '</div>';
+      if (budgets.length) {
+        h += '<select class="ua-assign-select" onchange="sparkAssignActual(\'' + ua.id + '\',this.value,\'' + projectCode + '\')">';
+        h += '<option value="">Assign to…</option>';
+        h += snapOpts;
+        h += '</select>';
+      }
+      h += '</div>';
+    }
+    h += '</div>';
+  }
+
   container.innerHTML = h;
 }
-
 function sparkRenameSnapshot(budgetId, projectCode, currentName) {
   var nameEl = document.getElementById('snap-name-' + budgetId);
   if (!nameEl) return;
   var safeVal = (currentName || '').replace(/"/g, '&quot;');
-  nameEl.innerHTML = '<input id="snap-rename-' + budgetId + '" type="text" value="' + safeVal + '" style="font-size:13px;font-weight:600;color:var(--abyss);border:1px solid var(--ocean);border-radius:4px;padding:3px 7px;width:100%;box-sizing:border-box;outline:none" onblur="sparkConfirmRename(\'' + budgetId + '\',\'' + projectCode + '\')" onkeydown="if(event.key===\'Enter\'){event.preventDefault();sparkConfirmRename(\'' + budgetId + '\',\'' + projectCode + '\')}else if(event.key===\'Escape\'){sparkRenderSmallProjectList(\'' + projectCode + '\')}">';
+  nameEl.innerHTML = '<input id="snap-rename-' + budgetId + '" type="text" value="' + safeVal + '" style="font-size:13px;font-weight:600;color:var(--abyss);border:1px solid var(--ocean);border-radius:4px;padding:3px 7px;width:100%;box-sizing:border-box;outline:none" onclick="event.stopPropagation()" onblur="sparkConfirmRename(\'' + budgetId + '\',\'' + projectCode + '\')" onkeydown="if(event.key===\'Enter\'){event.preventDefault();sparkConfirmRename(\'' + budgetId + '\',\'' + projectCode + '\')}else if(event.key===\'Escape\'){sparkRenderSmallProjectList(\'' + projectCode + '\')}">';
   var inp = document.getElementById('snap-rename-' + budgetId);
   if (inp) { inp.focus(); inp.select(); }
 }
@@ -6401,6 +6465,14 @@ async function sparkConfirmRename(budgetId, projectCode) {
   if (!newName) { sparkRenderSmallProjectList(projectCode); return; }
   sparkShowSaving();
   await sparkFetch('budgets?id=eq.' + budgetId, '', 'PATCH', { name: newName });
+  sparkHideSaving();
+  sparkRenderSmallProjectList(projectCode);
+}
+
+async function sparkAssignActual(actualId, budgetId, projectCode) {
+  if (!budgetId) return;
+  sparkShowSaving();
+  await sparkFetch('labor_actuals?id=eq.' + actualId, '', 'PATCH', { budget_id: budgetId });
   sparkHideSaving();
   sparkRenderSmallProjectList(projectCode);
 }
