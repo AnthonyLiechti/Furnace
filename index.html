@@ -746,7 +746,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.5 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 4, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.6 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 4, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
   </div>
@@ -3644,6 +3644,10 @@ async function trevorApiSync() {
     await sparkFetch('labor_actuals?source=eq.trevor_api&work_date=gte.' + from + '&work_date=lte.' + to, '', 'DELETE');
   } catch(e) { console.warn('Trevor delete error:', e); }
 
+  /* Auto-assign snapshot budget_id using same prefix logic as XLSX import */
+  statusEl.innerHTML = '<span style="color:var(--ocean)">&#9203; Resolving snapshot assignments…</span>';
+  var trevorAssign = await importAutoAssignBudgets(rows);
+
   /* Insert all rows (including internal ones without project_code — they'll have null project_code) */
   var inserted = 0, errors = 0;
   var batchSize = 200;
@@ -3666,9 +3670,12 @@ async function trevorApiSync() {
   } catch(e) {}
 
   furnaceToast('✓ Trevor: ' + inserted + ' entries synced (' + from + ' – ' + to + ')', 'success');
+  var trevorSnapNote = trevorAssign && trevorAssign.assigned > 0
+    ? ' &nbsp;|&nbsp; &#128193; ' + trevorAssign.assigned + ' assigned to snapshots' : '';
   statusEl.innerHTML = '<div style="background:#E8F5E9;border-radius:8px;padding:12px;font-size:12px;color:#2E7D32">' +
     '<strong>✓ Sync complete</strong> — ' + inserted + ' entries written' + (errors ? ', ' + errors + ' errors' : '') +
     ' &nbsp;|&nbsp; ' + billable.length + ' mapped to projects, ' + skipped + ' internal/unmatched' +
+    trevorSnapNote +
     '</div>';
 }
 
@@ -3871,6 +3878,7 @@ async function importHandleFile(file) {
   preview += '<button onclick="importTimeState.status=\'idle\';renderImportTime()" style="padding:8px 16px;border-radius:6px;border:1px solid var(--canvas);background:transparent;color:var(--mid-gray);cursor:pointer;font-size:13px">Cancel</button>';
   preview += '</div>';
   preview += '<div style="font-size:10px;color:var(--mid-gray);margin-top:6px">&#x1F504; <b>Replace All</b> wipes all existing timetracker entries and imports this file as the single source of truth.</div>';
+  preview += '<div style="font-size:10px;color:var(--ocean);margin-top:4px">&#128193; Snapshot auto-assign: hours whose pulse item name starts with a snapshot name will be linked automatically. Others land in the Unassigned Hours panel.</div>';
   preview += '</div>';
 
   statusEl.innerHTML = preview;
@@ -3880,6 +3888,97 @@ async function importHandleFile(file) {
   importTimeState.allParsed = entries; /* Full set (pre-dedup) for Replace All */
   importTimeState.maxDate = dateMax;   /* Latest date in file — used for Hours Updated stamp */
   importTimeState.status = 'preview';
+}
+
+/* ── SNAPSHOT AUTO-ASSIGN ──────────────────────────────────────────────────
+   For each entry in the batch, look up visible budgets (snapshots) for that
+   project code and set budget_id:
+   • 1 snapshot → assign unconditionally (no ambiguity)
+   • 2+ snapshots → match item_name prefix against snapshot name, case-
+     insensitive, separator-agnostic (dash / em-dash / space all treated the same)
+   Non-fatal: if the fetch fails, entries simply stay with budget_id = null
+   and land in the Unassigned Hours panel for manual assignment.
+─────────────────────────────────────────────────────────────────────────── */
+async function importAutoAssignBudgets(entries) {
+  try {
+    /* 1. Collect unique project codes */
+    var codeSet = {};
+    for (var i = 0; i < entries.length; i++) {
+      if (entries[i].project_code && !entries[i].budget_id) codeSet[entries[i].project_code] = true;
+    }
+    var codes = Object.keys(codeSet);
+    if (!codes.length) return { assigned: 0, total: entries.length };
+
+    /* 2. Project codes → project IDs */
+    var projRows = await sparkFetchAll('projects',
+      'select=id,project_code&project_code=in.(' + codes.map(encodeURIComponent).join(',') + ')');
+    if (!projRows || !projRows.length) return { assigned: 0, total: entries.length };
+
+    var projIdToCode = {}, projIds = [];
+    for (var i = 0; i < projRows.length; i++) {
+      projIdToCode[projRows[i].id] = projRows[i].project_code;
+      projIds.push(projRows[i].id);
+    }
+
+    /* 3. Fetch visible budgets (snapshots) for those projects */
+    var budgetRows = await sparkFetchAll('budgets',
+      'select=id,name,project_id&project_id=in.(' + projIds.join(',') + ')&visibility=eq.visible&order=created_at.asc');
+    if (!budgetRows || !budgetRows.length) return { assigned: 0, total: entries.length };
+
+    /* 4. Group snapshots by project code */
+    var snapsByCode = {};
+    for (var i = 0; i < budgetRows.length; i++) {
+      var b = budgetRows[i];
+      var code = projIdToCode[b.project_id];
+      if (!code) continue;
+      if (!snapsByCode[code]) snapsByCode[code] = [];
+      snapsByCode[code].push({ id: b.id, name: (b.name || '').trim() });
+    }
+
+    /* Normalize: lowercase + collapse any separator (space, dash, em-dash, en-dash) to single space */
+    function norm(s) { return (s || '').toLowerCase().replace(/[\s—–\-]+/g, ' ').trim(); }
+
+    /* 5. Apply budget_id to each unassigned entry */
+    var assigned = 0;
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (!e.project_code || e.budget_id) continue;
+      var snaps = snapsByCode[e.project_code];
+      if (!snaps || !snaps.length) continue;
+
+      if (snaps.length === 1) {
+        /* Single snapshot — no ambiguity, assign everything */
+        e.budget_id = snaps[0].id;
+        assigned++;
+        continue;
+      }
+
+      /* Multi-snapshot: prefix-match item_name against snapshot names.
+         Use the longest matching name to handle cases like "Apr 2026" vs "Apr 2026 Retainer". */
+      if (!e.item_name) continue;
+      var itemNorm = norm(e.item_name);
+      var bestId = null, bestLen = -1;
+      for (var j = 0; j < snaps.length; j++) {
+        var sn = norm(snaps[j].name);
+        if (!sn || sn.length <= bestLen) continue;
+        /* Accept match if item equals snap name, or snap name is followed by a separator */
+        if (itemNorm === sn ||
+            itemNorm.startsWith(sn + ' ') ||
+            itemNorm.startsWith(sn + '-') ||
+            itemNorm.startsWith(sn + ':') ||
+            itemNorm.startsWith(sn + '|')) {
+          bestLen = sn.length;
+          bestId = snaps[j].id;
+        }
+      }
+      if (bestId) { e.budget_id = bestId; assigned++; }
+    }
+
+    return { assigned: assigned, total: entries.length };
+  } catch (ex) {
+    console.warn('importAutoAssignBudgets failed (non-fatal):', ex);
+    return { assigned: 0, total: entries.length };
+  }
 }
 
 async function importExecute(replaceAll) {
@@ -3914,12 +4013,10 @@ async function importExecute(replaceAll) {
   var imported = 0;
   var errors = 0;
 
-  /* Resolve team_member_id and budget_id for entries */
-  /* Build lookups from Supabase data already loaded */
-  var tmByName = {};
-  if (SUPA_BUDGETS) {
-    /* We don't have team member lookup readily available in browser — skip for now, set to null */
-  }
+  /* Auto-assign snapshot budget_id based on item_name prefix matching */
+  if (prog) prog.textContent = 'Resolving snapshot assignments…';
+  var assignResult = await importAutoAssignBudgets(entries);
+  if (prog) prog.textContent = assignResult.assigned + ' entries matched to snapshots. Importing…';
 
   for (var i = 0; i < entries.length; i += batchSize) {
     var batch = entries.slice(i, i + batchSize);
@@ -3952,7 +4049,11 @@ async function importExecute(replaceAll) {
   var icon = errors === 0 ? '&#10003;' : '&#9888;';
   var bg = errors === 0 ? '#E8F5E9' : '#FFF8E1';
   var color = errors === 0 ? '#2E7D32' : '#F57F17';
-  statusEl.innerHTML = '<div style="background:' + bg + ';border-radius:8px;padding:16px;margin-bottom:12px"><div style="font-weight:600;color:' + color + ';margin-bottom:4px">' + icon + ' Import Complete</div><div style="font-size:12px;color:' + color + '">' + imported + ' entries imported' + (errors > 0 ? ', ' + errors + ' errors' : '') + '.</div></div>';
+  var unmatched = assignResult ? (assignResult.total - assignResult.assigned) : 0;
+  var snapNote = assignResult && assignResult.assigned > 0
+    ? '<div style="font-size:11px;color:' + color + ';margin-top:4px">&#128193; ' + assignResult.assigned + ' assigned to snapshots automatically' + (unmatched > 0 ? ' · ' + unmatched + ' in Unassigned Hours panel' : '') + '</div>'
+    : '';
+  statusEl.innerHTML = '<div style="background:' + bg + ';border-radius:8px;padding:16px;margin-bottom:12px"><div style="font-weight:600;color:' + color + ';margin-bottom:4px">' + icon + ' Import Complete</div><div style="font-size:12px;color:' + color + '">' + imported + ' entries imported' + (errors > 0 ? ', ' + errors + ' errors' : '') + '.</div>' + snapNote + '</div>';
 
   importTimeState.status = 'done';
   importTimeState.parsed = null;
