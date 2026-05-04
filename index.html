@@ -746,7 +746,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.7 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 4, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.8 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 4, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
   </div>
@@ -6457,39 +6457,74 @@ async function sparkRenderSmallProjectList(projectCode) {
   }
   container.innerHTML = '<div style="padding:16px;color:var(--mid-gray);font-size:13px">Loading…</div>';
 
-  /* Fetch project record */
   var projRows = await sparkFetch('projects', 'project_code=eq.' + encodeURIComponent(projectCode) + '&select=id');
   var projId = projRows && projRows.length ? projRows[0].id : null;
 
   var fetchResults = projId ? await Promise.all([
     sparkFetch('budgets', 'project_id=eq.' + projId + '&visibility=eq.visible&select=id,name,status,client_price,has_discount,created_at&order=created_at.asc'),
-    sparkFetch('labor_actuals', 'project_code=eq.' + encodeURIComponent(projectCode) + '&budget_id=is.null&select=id,person_name,work_date,hours,item_name,source&order=work_date.desc')
-  ]) : [[], []];
-  var budgets = fetchResults[0] || [];
+    sparkFetch('labor_actuals', 'project_code=eq.' + encodeURIComponent(projectCode) + '&budget_id=is.null&select=id,person_name,work_date,hours,item_name,source&order=item_name.asc,work_date.asc'),
+    sparkFetch('labor_actuals', 'project_code=eq.' + encodeURIComponent(projectCode) + '&budget_id=not.is.null&select=budget_id,hours,person_name&order=budget_id.asc')
+  ]) : [[], [], []];
+  var budgets    = fetchResults[0] || [];
   var unassigned = fetchResults[1] || [];
+  var assigned   = fetchResults[2] || [];
 
-  /* Update overview banner with real totals */
+  /* ── Hours/people per snapshot ── */
+  var snapStats = {};
+  for (var i = 0; i < assigned.length; i++) {
+    var a = assigned[i];
+    var bid = a.budget_id;
+    if (!snapStats[bid]) snapStats[bid] = { hrs: 0, people: [] };
+    snapStats[bid].hrs += a.hours || 0;
+    if (snapStats[bid].people.indexOf(a.person_name) < 0) snapStats[bid].people.push(a.person_name);
+  }
+
+  /* ── Group unassigned by item_name ── */
+  var uaGroups = {};
+  var uaTotalHrs = 0;
+  for (var i = 0; i < unassigned.length; i++) {
+    var ua = unassigned[i];
+    var key = ua.item_name || '(no item name)';
+    if (!uaGroups[key]) uaGroups[key] = { hrs: 0, people: [], minDate: ua.work_date, maxDate: ua.work_date };
+    uaGroups[key].hrs += ua.hours || 0;
+    if (uaGroups[key].people.indexOf(ua.person_name) < 0) uaGroups[key].people.push(ua.person_name);
+    if (ua.work_date < uaGroups[key].minDate) uaGroups[key].minDate = ua.work_date;
+    if (ua.work_date > uaGroups[key].maxDate) uaGroups[key].maxDate = ua.work_date;
+    uaTotalHrs += ua.hours || 0;
+  }
+  var uaItemNames = Object.keys(uaGroups).sort();
+
+  /* ── Overview banner ── */
   if (overviewEl) {
     var aggPrice = 0;
     for (var bi = 0; bi < budgets.length; bi++) aggPrice += budgets[bi].client_price || 0;
     var bCount = budgets.length;
-    var uCount = unassigned.length;
+    var uCount = uaItemNames.length;
     overviewEl.innerHTML = '<div class="snapshot-banner" style="margin-bottom:16px">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
       + '<div style="font-size:16px;font-weight:700">SMALL PROJECTS</div>'
-      + '<div style="font-size:11px;opacity:.5">' + bCount + ' snapshot' + (bCount !== 1 ? 's' : '') + (uCount > 0 ? ' &nbsp;&middot;&nbsp; <span style="color:#F57F17;opacity:1">' + uCount + ' unassigned</span>' : '') + '</div>'
+      + '<div style="font-size:11px;opacity:.5">' + bCount + ' snapshot' + (bCount !== 1 ? 's' : '') + (uCount > 0 ? ' &nbsp;&middot;&nbsp; <span style="color:#F57F17;opacity:1">' + uCount + ' unallocated</span>' : '') + '</div>'
       + '</div>'
       + '<div class="snap-financials">'
       + '<div class="snap-fin-item"><div class="sf-label">Total Budget</div><div class="sf-value sf-gold">$' + Math.round(aggPrice).toLocaleString() + '</div></div>'
       + '</div></div>';
   }
 
-  /* Snapshot dropdown options for unassigned-hours selects */
+  /* ── Snapshot dropdown options ── */
   var snapOpts = '';
   for (var si = 0; si < budgets.length; si++) {
     snapOpts += '<option value="' + budgets[si].id + '">' + (budgets[si].name || 'Untitled') + '</option>';
   }
 
+  /* ── Date formatter ── */
+  var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function fmtD(d) {
+    if (!d) return '';
+    var p = String(d).slice(0,10).split('-');
+    return MONTHS[parseInt(p[1])-1] + ' ' + parseInt(p[2]);
+  }
+
+  /* ── Snapshot cards with financials ── */
   var h = '<div class="snap-list-wrap">';
   h += '<div class="snap-list-hdr">';
   h += '<div class="snap-list-title">Snapshots <span style="font-size:11px;font-weight:400;color:var(--mid-gray)">(' + budgets.length + ')</span></div>';
@@ -6499,50 +6534,102 @@ async function sparkRenderSmallProjectList(projectCode) {
   if (!budgets.length) {
     h += '<div style="font-size:13px;color:var(--mid-gray);text-align:center;padding:20px 0">No snapshots yet — add the first one above.</div>';
   } else {
-    h += '<div style="display:flex;flex-direction:column;gap:8px">';
+    var BILLING_RATE = 200; /* standard client-facing rate for estimate */
     var statusColors = { active:'var(--ocean)', complete:'#81C784', proposed:'var(--sand)', nonbillable:'var(--mid-gray)', bizdev:'#F57F17' };
+    h += '<div style="display:flex;flex-direction:column;gap:10px">';
     for (var i = 0; i < budgets.length; i++) {
       var b = budgets[i];
-      var sc = statusColors[b.status] || 'var(--mid-gray)';
+      var sc  = statusColors[b.status] || 'var(--mid-gray)';
       var price = b.client_price || 0;
-      h += '<div class="snap-item" onclick="sparkEditSmallSnapshot(\'' + b.id + '\',\'' + projectCode + '\')">';
-      h += '<div style="flex:1;min-width:0">';
-      h += '<div id="snap-name-' + b.id + '" class="snap-item-name">' + (b.name || 'Untitled') + '</div>';
-      h += '<div class="snap-item-meta">$' + Math.round(price).toLocaleString() + ' &nbsp;&middot;&nbsp; <span style="color:' + sc + ';font-weight:600">' + (b.status || 'proposed') + '</span></div>';
+      var stats = snapStats[b.id] || { hrs: 0, people: [] };
+      var estBilling = Math.round(stats.hrs * BILLING_RATE);
+      var delta = price - estBilling;
+      var hasActuals = stats.hrs > 0;
+
+      h += '<div class="snap-item" style="flex-direction:column;align-items:stretch;padding:14px 16px;gap:0" onclick="sparkEditSmallSnapshot(\'' + b.id + '\',\'' + projectCode + '\')">';
+
+      /* Top row: name + status + buttons */
+      h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:' + (hasActuals ? '10' : '0') + 'px">';
+      h += '<div id="snap-name-' + b.id + '" class="snap-item-name" style="flex:1;font-size:14px">' + (b.name || 'Untitled') + '</div>';
+      h += '<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;background:' + sc + ';color:var(--white);flex-shrink:0;white-space:nowrap">' + (b.status || 'proposed') + '</span>';
+      h += '<button onclick="event.stopPropagation();sparkRenameSnapshot(\'' + b.id + '\',\'' + projectCode + '\',\'' + (b.name || '').replace(/'/g,'\\\'') + '\')" title="Rename snapshot" class="snap-item-btn" style="margin-left:4px">&#9998;</button>';
+      h += '<span class="snap-item-arrow" style="margin-left:4px">&#8250;</span>';
       h += '</div>';
-      h += '<button onclick="event.stopPropagation();sparkRenameSnapshot(\'' + b.id + '\',\'' + projectCode + '\',\'' + (b.name || '').replace(/'/g,'\\\'') + '\')" title="Rename snapshot" class="snap-item-btn" style="margin-right:4px">&#9998;</button>';
-      h += '<span class="snap-item-arrow">&#8250;</span>';
-      h += '</div>';
+
+      /* Financial tiles — only if snapshot has a price */
+      if (hasActuals || price > 0) {
+        h += '<div style="display:flex;gap:16px;flex-wrap:wrap;padding-top:' + (hasActuals ? '0' : '8') + 'px">';
+
+        /* Budget */
+        h += '<div style="min-width:80px">';
+        h += '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.6px;opacity:.5;margin-bottom:3px">Budget</div>';
+        h += '<div style="font-size:16px;font-weight:700">$' + Math.round(price).toLocaleString() + '</div>';
+        h += '</div>';
+
+        if (hasActuals) {
+          /* Tracked hours */
+          h += '<div style="min-width:70px">';
+          h += '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.6px;opacity:.5;margin-bottom:3px">Tracked</div>';
+          h += '<div style="font-size:16px;font-weight:700">' + stats.hrs.toFixed(1) + 'h</div>';
+          h += '</div>';
+
+          /* Est. billing */
+          var billColor = delta >= 0 ? 'color:#81C784' : 'color:#EF5350';
+          h += '<div style="min-width:90px">';
+          h += '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.6px;opacity:.5;margin-bottom:3px">Est. Billing</div>';
+          h += '<div style="font-size:16px;font-weight:700;' + billColor + '">$' + Math.round(estBilling).toLocaleString() + '</div>';
+          h += '</div>';
+
+          /* Under/over */
+          h += '<div style="min-width:90px;align-self:flex-end">';
+          if (delta >= 0) {
+            h += '<div style="font-size:11px;color:#81C784;font-weight:600">$' + Math.round(delta).toLocaleString() + ' remaining</div>';
+          } else {
+            h += '<div style="font-size:11px;color:#EF5350;font-weight:600">$' + Math.round(-delta).toLocaleString() + ' over</div>';
+          }
+          h += '<div style="font-size:10px;opacity:.45;margin-top:2px">' + stats.people.length + ' ' + (stats.people.length === 1 ? 'person' : 'people') + ' &middot; est. @ $' + BILLING_RATE + '/hr</div>';
+          h += '</div>';
+        }
+
+        h += '</div>';
+      }
+
+      h += '</div>'; /* end snap-item */
     }
     h += '</div>';
   }
   h += '</div>';
 
-  /* Unassigned hours panel: actuals with matching project_code but no snapshot assignment */
-  if (unassigned.length > 0) {
-    var totalUA = 0;
-    for (var i = 0; i < unassigned.length; i++) totalUA += unassigned[i].hours || 0;
+  /* ── Unallocated Hours tracker ── */
+  if (uaItemNames.length > 0) {
     h += '<div class="unassigned-panel">';
-    h += '<div style="margin-bottom:10px">';
-    h += '<div style="font-size:13px;font-weight:700;color:var(--ember)">&#9202; Unassigned Hours</div>';
-    h += '<div style="font-size:11px;color:var(--mid-gray);margin-top:3px">' + unassigned.length + ' entr' + (unassigned.length === 1 ? 'y' : 'ies') + ' · ' + totalUA.toFixed(1) + ' hrs — assign each to a snapshot</div>';
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
+    h += '<div>';
+    h += '<div style="font-size:13px;font-weight:700;color:var(--ember)">&#9202; Unallocated Hours</div>';
+    h += '<div style="font-size:11px;color:var(--mid-gray);margin-top:2px">' + uaItemNames.length + ' item' + (uaItemNames.length !== 1 ? 's' : '') + ' &nbsp;&middot;&nbsp; ' + uaTotalHrs.toFixed(1) + 'h total &nbsp;&middot;&nbsp; assign each to a snapshot below</div>';
     h += '</div>';
-    for (var i = 0; i < unassigned.length; i++) {
-      var ua = unassigned[i];
-      var uDate = ua.work_date ? ua.work_date.slice(0, 10) : '—';
-      var uHrs = (ua.hours || 0).toFixed(1);
-      h += '<div class="unassigned-row">';
-      h += '<div class="ua-label">';
-      h += '<span style="font-weight:600">' + (ua.person_name || '—') + '</span>';
-      h += ' <span class="ua-meta">' + uDate + ' · ' + uHrs + 'h</span>';
-      if (ua.item_name) h += '<div class="ua-meta" style="margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + ua.item_name + '</div>';
-      h += '</div>';
+    h += '</div>';
+
+    for (var i = 0; i < uaItemNames.length; i++) {
+      var uaItem = uaItemNames[i];
+      var uaG = uaGroups[uaItem];
+      var dateRange = uaG.minDate === uaG.maxDate ? fmtD(uaG.minDate) : fmtD(uaG.minDate) + ' – ' + fmtD(uaG.maxDate);
+      var peopleStr = uaG.people.slice(0, 3).join(', ') + (uaG.people.length > 3 ? ' +' + (uaG.people.length - 3) : '');
+      var encodedItem = encodeURIComponent(uaItem).replace(/'/g, '%27');
+      var isLast = (i === uaItemNames.length - 1);
+
+      h += '<div class="unassigned-row" style="flex-direction:column;align-items:stretch;gap:6px;margin-bottom:' + (isLast ? '0' : '6') + 'px">';
+      h += '<div style="display:flex;align-items:center;gap:10px">';
+      h += '<div class="ua-label" style="font-weight:700;font-size:12px;flex:1">' + uaItem + '</div>';
+      h += '<span style="font-size:13px;font-weight:700;flex-shrink:0;color:var(--abyss)">' + uaG.hrs.toFixed(1) + 'h</span>';
       if (budgets.length) {
-        h += '<select class="ua-assign-select" onchange="sparkAssignActual(\'' + ua.id + '\',this.value,\'' + projectCode + '\')">';
+        h += '<select class="ua-assign-select" onchange="sparkAssignItemToSnapshot(\'' + encodedItem + '\',this.value,\'' + projectCode + '\')">';
         h += '<option value="">Assign to…</option>';
         h += snapOpts;
         h += '</select>';
       }
+      h += '</div>';
+      h += '<div class="ua-meta">' + peopleStr + ' &nbsp;&middot;&nbsp; ' + dateRange + '</div>';
       h += '</div>';
     }
     h += '</div>';
@@ -6574,6 +6661,15 @@ async function sparkAssignActual(actualId, budgetId, projectCode) {
   if (!budgetId) return;
   sparkShowSaving();
   await sparkFetch('labor_actuals?id=eq.' + actualId, '', 'PATCH', { budget_id: budgetId });
+  sparkHideSaving();
+  sparkRenderSmallProjectList(projectCode);
+}
+
+async function sparkAssignItemToSnapshot(encodedItem, budgetId, projectCode) {
+  if (!budgetId) return;
+  var itemName = decodeURIComponent(encodedItem);
+  sparkShowSaving();
+  await sparkFetch('labor_actuals?item_name=eq.' + encodeURIComponent(itemName) + '&budget_id=is.null&project_code=eq.' + encodeURIComponent(projectCode), '', 'PATCH', { budget_id: budgetId });
   sparkHideSaving();
   sparkRenderSmallProjectList(projectCode);
 }
