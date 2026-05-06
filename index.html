@@ -746,7 +746,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.11 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 6, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.12 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 6, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
   </div>
@@ -7701,6 +7701,9 @@ function sparkRecomputeBudgetTotals() {
   sb.oopMarkupPct = oopEffective > 0 ? Math.round((_oopWithMarkup1 / oopEffective - 1) * 100 * 10000) / 10000 : sparkSettingVal((sparkCurrentData && sparkCurrentData.settings) || [], 'markup', 'oop_markup_percentage', 20);
   sb.oopSpent = oopSpent;
 
+  /* Skip project financials banner update for small-project snapshot mode */
+  if (sparkSmallProjProjectCode) return;
+
   /* Update portfolio project data and re-render the financials banner */
   for (var ci = 0; ci < CLIENTS.length; ci++) {
     for (var pi = 0; pi < CLIENTS[ci].projects.length; pi++) {
@@ -8048,6 +8051,10 @@ function syncProjFinancialsFromCurrent() {
   sb.oopMarkupPct = oopEffective > 0 ? Math.round((_oopWithMarkup / oopEffective - 1) * 100 * 10000) / 10000 : sparkSettingVal((sparkCurrentData && sparkCurrentData.settings) || [], 'markup', 'oop_markup_percentage', 20);
   sb.oopSpent     = oopSpent;
 
+  /* Skip project financials update for small-project snapshot mode —
+     the project header should stay at aggregate level, not reflect one snapshot's budget */
+  if (sparkSmallProjProjectCode) return;
+
   /* Find the project and re-render the financials banner */
   if (CLIENTS) {
     outerSync: for (var ci = 0; ci < CLIENTS.length; ci++) {
@@ -8118,7 +8125,15 @@ function sparkRenderSummary() {
     }
   }
   var _actLaborHrs = 0, _actLaborCost = 0;
-  if (_projCodeA && SUPA_ACTUALS_ALL) {
+  if (sparkSmallProjProjectCode && sparkCurrentData && sparkCurrentData.actuals) {
+    /* Small-project snapshot mode: only count actuals assigned to this snapshot */
+    for (var _ai = 0; _ai < sparkCurrentData.actuals.length; _ai++) {
+      var _ae = sparkCurrentData.actuals[_ai];
+      var _aeRate = (_ae.person_name && _tmRateMap[_ae.person_name]) ? _tmRateMap[_ae.person_name] : (_ae.billable_rate || 200);
+      _actLaborHrs += (_ae.hours || 0);
+      _actLaborCost += (_ae.hours || 0) * _aeRate;
+    }
+  } else if (_projCodeA && SUPA_ACTUALS_ALL) {
     for (var _ai = 0; _ai < SUPA_ACTUALS_ALL.length; _ai++) {
       var _ae = SUPA_ACTUALS_ALL[_ai];
       if (_ae.project_code !== _projCodeA) continue;
