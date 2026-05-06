@@ -746,7 +746,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.9 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 5, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.10 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 6, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
   </div>
@@ -6461,8 +6461,8 @@ async function sparkRenderSmallProjectList(projectCode) {
   var projId = projRows && projRows.length ? projRows[0].id : null;
 
   var fetchResults = projId ? await Promise.all([
-    sparkFetch('budgets', 'project_id=eq.' + projId + '&visibility=eq.visible&select=id,name,status,client_price,has_discount,created_at&order=created_at.asc'),
-    sparkFetch('labor_actuals', 'project_code=eq.' + encodeURIComponent(projectCode) + '&budget_id=is.null&select=id,person_name,work_date,hours,item_name,source&order=item_name.asc,work_date.asc'),
+    sparkFetch('budgets', 'project_id=eq.' + projId + '&visibility=eq.visible&select=id,name,status,client_price,agency_fee,has_discount,created_at&order=created_at.asc'),
+    sparkFetch('labor_actuals', 'project_code=eq.' + encodeURIComponent(projectCode) + '&budget_id=is.null&select=id,person_name,work_date,hours,item_name,source,is_billable,is_bizdev&order=item_name.asc,work_date.asc'),
     sparkFetch('labor_actuals', 'project_code=eq.' + encodeURIComponent(projectCode) + '&budget_id=not.is.null&select=budget_id,hours,person_name&order=budget_id.asc')
   ]) : [[], [], []];
   var budgets    = fetchResults[0] || [];
@@ -6485,19 +6485,23 @@ async function sparkRenderSmallProjectList(projectCode) {
   for (var i = 0; i < unassigned.length; i++) {
     var ua = unassigned[i];
     var key = ua.item_name || '(no item name)';
-    if (!uaGroups[key]) uaGroups[key] = { hrs: 0, people: [], minDate: ua.work_date, maxDate: ua.work_date };
+    if (!uaGroups[key]) uaGroups[key] = { hrs: 0, people: [], minDate: ua.work_date, maxDate: ua.work_date, isNonBill: false, isBizDev: false };
     uaGroups[key].hrs += ua.hours || 0;
     if (uaGroups[key].people.indexOf(ua.person_name) < 0) uaGroups[key].people.push(ua.person_name);
     if (ua.work_date < uaGroups[key].minDate) uaGroups[key].minDate = ua.work_date;
     if (ua.work_date > uaGroups[key].maxDate) uaGroups[key].maxDate = ua.work_date;
+    if (ua.is_bizdev) uaGroups[key].isBizDev = true;
+    if (ua.is_billable === false) uaGroups[key].isNonBill = true;
     uaTotalHrs += ua.hours || 0;
   }
-  var uaItemNames = Object.keys(uaGroups).sort();
+  var allUaNames = Object.keys(uaGroups).sort();
+  var uaItemNames = allUaNames.filter(function(n) { return !uaGroups[n].isNonBill && !uaGroups[n].isBizDev; });
+  var uaMarkedNames = allUaNames.filter(function(n) { return uaGroups[n].isNonBill || uaGroups[n].isBizDev; });
 
   /* ── Overview banner ── */
   if (overviewEl) {
-    var aggPrice = 0;
-    for (var bi = 0; bi < budgets.length; bi++) aggPrice += budgets[bi].client_price || 0;
+    var aggPrice = 0, aggFee = 0;
+    for (var bi = 0; bi < budgets.length; bi++) { aggPrice += budgets[bi].client_price || 0; aggFee += budgets[bi].agency_fee || 0; }
     var bCount = budgets.length;
     var uCount = uaItemNames.length;
     overviewEl.innerHTML = '<div class="snapshot-banner" style="margin-bottom:16px">'
@@ -6507,6 +6511,8 @@ async function sparkRenderSmallProjectList(projectCode) {
       + '</div>'
       + '<div class="snap-financials">'
       + '<div class="snap-fin-item"><div class="sf-label">Total Budget</div><div class="sf-value sf-gold">$' + Math.round(aggPrice).toLocaleString() + '</div></div>'
+      + (aggFee > 0 ? '<div class="snap-fin-item"><div class="sf-label">Agency Fees</div><div class="sf-value" style="color:#81C784">$' + Math.round(aggFee).toLocaleString() + '</div></div>' : '')
+      + (aggFee > 0 ? '<div class="snap-fin-item"><div class="sf-label">Total Revenue</div><div class="sf-value sf-gold">$' + Math.round(aggPrice + aggFee).toLocaleString() + '</div></div>' : '')
       + '</div></div>';
   }
 
@@ -6541,58 +6547,80 @@ async function sparkRenderSmallProjectList(projectCode) {
       var b = budgets[i];
       var sc  = statusColors[b.status] || 'var(--mid-gray)';
       var price = b.client_price || 0;
+      var fee = b.agency_fee || 0;
       var stats = snapStats[b.id] || { hrs: 0, people: [] };
       var estBilling = Math.round(stats.hrs * BILLING_RATE);
       var delta = price - estBilling;
       var hasActuals = stats.hrs > 0;
+      var inlineInputStyle = 'font-size:16px;font-weight:700;border:none;background:transparent;width:90px;outline:none;cursor:text;padding:0;color:inherit;font-family:inherit';
 
       h += '<div class="snap-item" style="flex-direction:column;align-items:stretch;padding:14px 16px;gap:0" onclick="sparkEditSmallSnapshot(\'' + b.id + '\',\'' + projectCode + '\')">';
 
       /* Top row: name + status + buttons */
-      h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:' + (hasActuals ? '10' : '0') + 'px">';
+      h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:' + (hasActuals || price > 0 || fee > 0 ? '10' : '0') + 'px">';
       h += '<div id="snap-name-' + b.id + '" class="snap-item-name" style="flex:1;font-size:14px">' + (b.name || 'Untitled') + '</div>';
       h += '<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;background:' + sc + ';color:var(--white);flex-shrink:0;white-space:nowrap">' + (b.status || 'proposed') + '</span>';
       h += '<button onclick="event.stopPropagation();sparkRenameSnapshot(\'' + b.id + '\',\'' + projectCode + '\',\'' + (b.name || '').replace(/'/g,'\\\'') + '\')" title="Rename snapshot" class="snap-item-btn" style="margin-left:4px">&#9998;</button>';
       h += '<span class="snap-item-arrow" style="margin-left:4px">&#8250;</span>';
       h += '</div>';
 
-      /* Financial tiles — only if snapshot has a price */
-      if (hasActuals || price > 0) {
-        h += '<div style="display:flex;gap:16px;flex-wrap:wrap;padding-top:' + (hasActuals ? '0' : '8') + 'px">';
+      /* Financial tiles — always show budget + agency fee fields */
+      h += '<div style="display:flex;gap:16px;flex-wrap:wrap;padding-top:0">';
 
-        /* Budget */
-        h += '<div style="min-width:80px">';
-        h += '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.6px;opacity:.5;margin-bottom:3px">Budget</div>';
-        h += '<div style="font-size:16px;font-weight:700">$' + Math.round(price).toLocaleString() + '</div>';
+      /* Budget (editable) */
+      h += '<div style="min-width:90px">';
+      h += '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.6px;opacity:.5;margin-bottom:3px">Budget</div>';
+      h += '<div style="display:flex;align-items:baseline;gap:2px">';
+      h += '<span style="font-size:16px;font-weight:700">$</span>';
+      h += '<input type="text" value="' + (price > 0 ? Math.round(price).toLocaleString() : '') + '" placeholder="0"'
+        + ' onclick="event.stopPropagation()"'
+        + ' onfocus="this.value=this.value.replace(/[^0-9.]/g,\'\')"'
+        + ' onblur="sparkPatchSmallBudget(\'' + b.id + '\',\'client_price\',parseFloat(this.value.replace(/,/g,\'\'))||0,\'' + projectCode + '\');this.value=(parseFloat(this.value.replace(/,/g,\'\'))||0)>0?Math.round(parseFloat(this.value.replace(/,/g,\'\'))).toLocaleString():\'\'"'
+        + ' onkeydown="if(event.key===\'Enter\'){this.blur()}"'
+        + ' style="' + inlineInputStyle + '">';
+      h += '</div>';
+      h += '</div>';
+
+      /* Agency Fee (editable) */
+      h += '<div style="min-width:90px">';
+      h += '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.6px;opacity:.5;margin-bottom:3px">Agency Fee</div>';
+      h += '<div style="display:flex;align-items:baseline;gap:2px">';
+      h += '<span style="font-size:16px;font-weight:700;color:#81C784">$</span>';
+      h += '<input type="text" value="' + (fee > 0 ? Math.round(fee).toLocaleString() : '') + '" placeholder="0"'
+        + ' onclick="event.stopPropagation()"'
+        + ' onfocus="this.value=this.value.replace(/[^0-9.]/g,\'\')"'
+        + ' onblur="sparkPatchSmallBudget(\'' + b.id + '\',\'agency_fee\',parseFloat(this.value.replace(/,/g,\'\'))||0,\'' + projectCode + '\');this.value=(parseFloat(this.value.replace(/,/g,\'\'))||0)>0?Math.round(parseFloat(this.value.replace(/,/g,\'\'))).toLocaleString():\'\'"'
+        + ' onkeydown="if(event.key===\'Enter\'){this.blur()}"'
+        + ' style="' + inlineInputStyle + ';color:#81C784">';
+      h += '</div>';
+      h += '</div>';
+
+      if (hasActuals) {
+        /* Tracked hours */
+        h += '<div style="min-width:70px">';
+        h += '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.6px;opacity:.5;margin-bottom:3px">Tracked</div>';
+        h += '<div style="font-size:16px;font-weight:700">' + stats.hrs.toFixed(1) + 'h</div>';
         h += '</div>';
 
-        if (hasActuals) {
-          /* Tracked hours */
-          h += '<div style="min-width:70px">';
-          h += '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.6px;opacity:.5;margin-bottom:3px">Tracked</div>';
-          h += '<div style="font-size:16px;font-weight:700">' + stats.hrs.toFixed(1) + 'h</div>';
-          h += '</div>';
+        /* Est. billing */
+        var billColor = delta >= 0 ? 'color:#81C784' : 'color:#EF5350';
+        h += '<div style="min-width:90px">';
+        h += '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.6px;opacity:.5;margin-bottom:3px">Est. Billing</div>';
+        h += '<div style="font-size:16px;font-weight:700;' + billColor + '">$' + Math.round(estBilling).toLocaleString() + '</div>';
+        h += '</div>';
 
-          /* Est. billing */
-          var billColor = delta >= 0 ? 'color:#81C784' : 'color:#EF5350';
-          h += '<div style="min-width:90px">';
-          h += '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.6px;opacity:.5;margin-bottom:3px">Est. Billing</div>';
-          h += '<div style="font-size:16px;font-weight:700;' + billColor + '">$' + Math.round(estBilling).toLocaleString() + '</div>';
-          h += '</div>';
-
-          /* Under/over */
-          h += '<div style="min-width:90px;align-self:flex-end">';
-          if (delta >= 0) {
-            h += '<div style="font-size:11px;color:#81C784;font-weight:600">$' + Math.round(delta).toLocaleString() + ' remaining</div>';
-          } else {
-            h += '<div style="font-size:11px;color:#EF5350;font-weight:600">$' + Math.round(-delta).toLocaleString() + ' over</div>';
-          }
-          h += '<div style="font-size:10px;opacity:.45;margin-top:2px">' + stats.people.length + ' ' + (stats.people.length === 1 ? 'person' : 'people') + ' &middot; est. @ $' + BILLING_RATE + '/hr</div>';
-          h += '</div>';
+        /* Under/over */
+        h += '<div style="min-width:90px;align-self:flex-end">';
+        if (delta >= 0) {
+          h += '<div style="font-size:11px;color:#81C784;font-weight:600">$' + Math.round(delta).toLocaleString() + ' remaining</div>';
+        } else {
+          h += '<div style="font-size:11px;color:#EF5350;font-weight:600">$' + Math.round(-delta).toLocaleString() + ' over</div>';
         }
-
+        h += '<div style="font-size:10px;opacity:.45;margin-top:2px">' + stats.people.length + ' ' + (stats.people.length === 1 ? 'person' : 'people') + ' &middot; est. @ $' + BILLING_RATE + '/hr</div>';
         h += '</div>';
       }
+
+      h += '</div>'; /* end financial tiles */
 
       h += '</div>'; /* end snap-item */
     }
@@ -6601,12 +6629,14 @@ async function sparkRenderSmallProjectList(projectCode) {
   h += '</div>';
 
   /* ── Unallocated Hours tracker ── */
-  if (uaItemNames.length > 0) {
+  var hasPending = uaItemNames.length > 0;
+  var hasMarked  = uaMarkedNames.length > 0;
+  if (hasPending || hasMarked) {
     h += '<div class="unassigned-panel">';
     h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
     h += '<div>';
     h += '<div style="font-size:13px;font-weight:700;color:var(--ember)">&#9202; Unallocated Hours</div>';
-    h += '<div style="font-size:11px;color:var(--mid-gray);margin-top:2px">' + uaItemNames.length + ' item' + (uaItemNames.length !== 1 ? 's' : '') + ' &nbsp;&middot;&nbsp; ' + uaTotalHrs.toFixed(1) + 'h total &nbsp;&middot;&nbsp; assign each to a snapshot below</div>';
+    h += '<div style="font-size:11px;color:var(--mid-gray);margin-top:2px">' + uaItemNames.length + ' item' + (uaItemNames.length !== 1 ? 's' : '') + ' &nbsp;&middot;&nbsp; ' + uaTotalHrs.toFixed(1) + 'h total &nbsp;&middot;&nbsp; assign each to a snapshot or mark below</div>';
     h += '</div>';
     h += '</div>';
 
@@ -6616,27 +6646,79 @@ async function sparkRenderSmallProjectList(projectCode) {
       var dateRange = uaG.minDate === uaG.maxDate ? fmtD(uaG.minDate) : fmtD(uaG.minDate) + ' – ' + fmtD(uaG.maxDate);
       var peopleStr = uaG.people.slice(0, 3).join(', ') + (uaG.people.length > 3 ? ' +' + (uaG.people.length - 3) : '');
       var encodedItem = encodeURIComponent(uaItem).replace(/'/g, '%27');
-      var isLast = (i === uaItemNames.length - 1);
+      var isLast = (i === uaItemNames.length - 1) && !hasMarked;
 
       h += '<div class="unassigned-row" style="flex-direction:column;align-items:stretch;gap:6px;margin-bottom:' + (isLast ? '0' : '6') + 'px">';
-      h += '<div style="display:flex;align-items:center;gap:10px">';
-      h += '<div class="ua-label" style="font-weight:700;font-size:12px;flex:1">' + uaItem + '</div>';
+      h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+      h += '<div class="ua-label" style="font-weight:700;font-size:12px;flex:1;min-width:80px">' + uaItem + '</div>';
       h += '<span style="font-size:13px;font-weight:700;flex-shrink:0;color:var(--abyss)">' + uaG.hrs.toFixed(1) + 'h</span>';
+      /* Assign dropdown */
       if (budgets.length) {
         h += '<select class="ua-assign-select" onchange="sparkAssignItemToSnapshot(\'' + encodedItem + '\',this.value,\'' + projectCode + '\')">';
         h += '<option value="">Assign to…</option>';
         h += snapOpts;
         h += '</select>';
       }
+      /* Mark as Non-Billable */
+      h += '<button onclick="event.stopPropagation();sparkMarkUnallocItems(\'' + encodedItem + '\',\'nonbillable\',\'' + projectCode + '\')" title="Mark as non-billable" style="padding:3px 8px;border-radius:4px;border:1px solid var(--mid-gray);background:transparent;color:var(--mid-gray);cursor:pointer;font-size:10px;font-weight:600;flex-shrink:0;white-space:nowrap">Non-Bill</button>';
+      /* Mark as Biz Dev */
+      h += '<button onclick="event.stopPropagation();sparkMarkUnallocItems(\'' + encodedItem + '\',\'bizdev\',\'' + projectCode + '\')" title="Mark as business development" style="padding:3px 8px;border-radius:4px;border:1px solid #F57F17;background:transparent;color:#F57F17;cursor:pointer;font-size:10px;font-weight:600;flex-shrink:0;white-space:nowrap">Biz Dev</button>';
       h += '</div>';
       h += '<div class="ua-meta">' + peopleStr + ' &nbsp;&middot;&nbsp; ' + dateRange + '</div>';
       h += '</div>';
     }
+
+    /* Marked items (collapsed list at bottom) */
+    if (hasMarked) {
+      h += '<div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(0,0,0,.07)">';
+      h += '<div style="font-size:11px;font-weight:600;color:var(--mid-gray);margin-bottom:6px">Marked (' + uaMarkedNames.length + ')</div>';
+      for (var j = 0; j < uaMarkedNames.length; j++) {
+        var mn = uaMarkedNames[j];
+        var mg = uaGroups[mn];
+        var mLabel = mg.isBizDev ? 'Biz Dev' : 'Non-Bill';
+        var mColor = mg.isBizDev ? '#F57F17' : 'var(--mid-gray)';
+        var encMn = encodeURIComponent(mn).replace(/'/g, '%27');
+        h += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;opacity:.65">';
+        h += '<span style="font-size:11px;flex:1;color:var(--abyss)">' + mn + '</span>';
+        h += '<span style="font-size:10px;font-weight:700;color:' + mColor + '">' + mg.hrs.toFixed(1) + 'h &middot; ' + mLabel + '</span>';
+        h += '<button onclick="event.stopPropagation();sparkMarkUnallocItems(\'' + encMn + '\',\'reset\',\'' + projectCode + '\')" style="padding:2px 6px;border-radius:4px;border:1px solid rgba(0,0,0,.2);background:transparent;color:var(--mid-gray);cursor:pointer;font-size:9px;flex-shrink:0">Undo</button>';
+        h += '</div>';
+      }
+      h += '</div>';
+    }
+
     h += '</div>';
   }
 
   container.innerHTML = h;
 }
+async function sparkPatchSmallBudget(budgetId, field, value, projectCode) {
+  if (!budgetId) return;
+  sparkShowSaving();
+  var patch = {};
+  patch[field] = value;
+  await sparkFetch('budgets?id=eq.' + budgetId, '', 'PATCH', patch);
+  sparkHideSaving();
+  sparkRenderSmallProjectList(projectCode);
+}
+
+async function sparkMarkUnallocItems(encodedItem, type, projectCode) {
+  var itemName = decodeURIComponent(encodedItem);
+  sparkShowSaving();
+  var patch;
+  if (type === 'nonbillable') {
+    patch = { is_billable: false, is_bizdev: false };
+  } else if (type === 'bizdev') {
+    patch = { is_bizdev: true, is_billable: true };
+  } else {
+    /* reset */
+    patch = { is_billable: true, is_bizdev: false };
+  }
+  await sparkFetch('labor_actuals?item_name=eq.' + encodeURIComponent(itemName) + '&budget_id=is.null&project_code=eq.' + encodeURIComponent(projectCode), '', 'PATCH', patch);
+  sparkHideSaving();
+  sparkRenderSmallProjectList(projectCode);
+}
+
 function sparkRenameSnapshot(budgetId, projectCode, currentName) {
   var nameEl = document.getElementById('snap-name-' + budgetId);
   if (!nameEl) return;
