@@ -746,7 +746,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.12 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 6, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.13 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 6, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
   </div>
@@ -9522,6 +9522,16 @@ function sparkRenderBudgetContent(embedded) {
       oh += '<input type="text" id="sparkBudgetAmount" class="spark-input" style="width:160px;font-size:16px;font-weight:600;padding:6px 10px 6px 22px;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);color:var(--white)" value="' + Math.round(clientPrice || 0).toLocaleString() + '" onfocus="sparkBudgetAmtFocus(this)" onblur="sparkBudgetAmtBlur(this)">';
       oh += '</div>';
       oh += '</div>';
+      if (sparkSmallProjProjectCode) {
+        var agencyFeeVal = budget.agency_fee || 0;
+        oh += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">';
+        oh += '<span style="font-size:12px;opacity:.6;color:#81C784">Agency Fee</span>';
+        oh += '<div style="position:relative;display:inline-flex;align-items:center"><span style="position:absolute;left:10px;font-size:14px;font-weight:600;color:rgba(129,199,132,.5);pointer-events:none">$</span>';
+        oh += '<input type="text" id="sparkAgencyFeeAmount" class="spark-input" style="width:160px;font-size:16px;font-weight:600;padding:6px 10px 6px 22px;background:rgba(129,199,132,.08);border-color:rgba(129,199,132,.2);color:#81C784" placeholder="0" value="' + (agencyFeeVal > 0 ? Math.round(agencyFeeVal).toLocaleString() : '') + '" onfocus="this.value=this.value.replace(/[^0-9.]/g,\'\')" onblur="var _v=parseFloat(this.value.replace(/,/g,\'\'))||0;sparkPatchBudgetField(\'agency_fee\',_v);this.value=_v>0?Math.round(_v).toLocaleString():\'\'">';
+        oh += '</div>';
+        oh += '<span style="font-size:10px;opacity:.45;white-space:nowrap">pure profit / quick-turn fee</span>';
+        oh += '</div>';
+      }
       oh += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
       oh += '<span style="font-size:12px;opacity:.6">Discount 3.5%</span>';
       oh += '<label style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer"><input type="checkbox" ' + (budget.has_discount ? 'checked' : '') + ' onchange="sparkPatchBudgetField(\'has_discount\',this.checked)" style="opacity:0;width:0;height:0"><span style="position:absolute;top:0;left:0;right:0;bottom:0;background:' + (budget.has_discount ? 'var(--ocean)' : 'rgba(255,255,255,.2)') + ';border-radius:10px;transition:.3s"></span><span style="position:absolute;left:' + (budget.has_discount ? '18px' : '2px') + ';top:2px;width:16px;height:16px;background:white;border-radius:50%;transition:.3s"></span></label>';
