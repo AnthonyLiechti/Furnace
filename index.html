@@ -746,7 +746,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.13 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 6, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.14 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 6, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
   </div>
@@ -1262,7 +1262,7 @@ async function ensureProjectActuals(projCode, proj) {
   _lazyLoadedProjects[projCode] = true;
   /* Fetch ALL actuals for this project — no date filter, authoritative total */
   var entries = await sparkFetchAll('labor_actuals',
-    'select=id,hours,work_date,person_name,project_code,phase_key,is_billable,is_bizdev,is_timeoff,board_name,billable_rate&source=eq.timetracker&project_code=eq.' + projCode + '&order=work_date.desc');
+    'select=id,budget_id,hours,work_date,person_name,project_code,phase_key,is_billable,is_bizdev,is_timeoff,board_name,billable_rate&source=eq.timetracker&project_code=eq.' + projCode + '&order=work_date.desc');
   if (entries && entries.length > 0) {
     /* Replace (not add to) any stale bulk-load entry for this project */
     SUPA_ACTUALS[projCode] = { totalHours: 0, phases: {}, people: {}, byDate: {} };
@@ -1277,6 +1277,25 @@ async function ensureProjectActuals(projCode, proj) {
     /* Sync SUPA_ACTUALS_ALL: drop stale entries for this code, append fresh ones */
     SUPA_ACTUALS_ALL = (SUPA_ACTUALS_ALL || []).filter(function(a) { return a.project_code !== projCode; });
     SUPA_ACTUALS_ALL = SUPA_ACTUALS_ALL.concat(entries);
+    /* Recompute per-snapshot timesheetHours from the refreshed actuals */
+    if (SUPA_BUDGETS[projCode] && SUPA_BUDGETS[projCode]._snapshots) {
+      var _lazySHMap = {};
+      for (var _lsi = 0; _lsi < entries.length; _lsi++) {
+        var _lse = entries[_lsi];
+        if (_lse.budget_id) _lazySHMap[_lse.budget_id] = (_lazySHMap[_lse.budget_id] || 0) + (_lse.hours || 0);
+      }
+      var _lazySnaps = SUPA_BUDGETS[projCode]._snapshots;
+      for (var _lssi = 0; _lssi < _lazySnaps.length; _lssi++) {
+        _lazySnaps[_lssi].timesheetHours = _lazySHMap[_lazySnaps[_lssi].id] || 0;
+      }
+      /* Propagate to p.subSnapshots if available */
+      if (proj && proj.subSnapshots) {
+        for (var _lssj = 0; _lssj < proj.subSnapshots.length; _lssj++) {
+          var _lssId = proj.subSnapshots[_lssj].id;
+          proj.subSnapshots[_lssj].timesheetHours = _lazySHMap[_lssId] || 0;
+        }
+      }
+    }
     /* Re-render the project financials card if still on that project's page */
     if (proj) renderProjFinancials(proj);
   }
@@ -14557,7 +14576,7 @@ async function loadSupabaseData() {
     /* 0+1+1b. Fetch team members, budgets, and project ID map in parallel */
     var _phase1 = await Promise.all([
       sparkFetchAll('team_members', 'select=id,name,department,employment_type,fully_burdened_rate,billable_rate,is_active&is_active=eq.true&order=department.asc,name.asc'),
-      sparkFetchAll('budgets', 'select=id,name,status,client_price,total_amount,has_discount,discount_percentage,reserve_percentage,oop_markup_percentage,oop_section_markups,no_oop,no_freelancers,is_small_project,project_id,projects(id,project_code,name)&visibility=eq.visible&status=neq.opportunity&status=neq.lost'),
+      sparkFetchAll('budgets', 'select=id,name,status,client_price,agency_fee,total_amount,has_discount,discount_percentage,reserve_percentage,oop_markup_percentage,oop_section_markups,no_oop,no_freelancers,is_small_project,project_id,projects(id,project_code,name)&visibility=eq.visible&status=neq.opportunity&status=neq.lost'),
       sparkFetchAll('projects', 'select=id,project_code')
     ]);
     FURNACE_TEAM_MEMBERS = _phase1[0] || [];
@@ -14567,7 +14586,7 @@ async function loadSupabaseData() {
     if (!budgets || !budgets.length) {
       /* Fallback: try without the projects join in case join is failing */
       console.warn('[Furnace] budgets with join returned empty — trying without join');
-      budgets = await sparkFetchAll('budgets', 'select=id,name,status,client_price,total_amount,has_discount,discount_percentage,reserve_percentage,oop_markup_percentage,no_oop,no_freelancers,is_small_project,project_id&visibility=eq.visible&status=neq.opportunity&status=neq.lost');
+      budgets = await sparkFetchAll('budgets', 'select=id,name,status,client_price,agency_fee,total_amount,has_discount,discount_percentage,reserve_percentage,oop_markup_percentage,no_oop,no_freelancers,is_small_project,project_id&visibility=eq.visible&status=neq.opportunity&status=neq.lost');
       if (!budgets || !budgets.length) { console.warn('[Furnace] No Supabase budgets found — check Supabase RLS policies and table data'); SUPA_LOADED = false; return; }
     }
 
@@ -14584,7 +14603,7 @@ async function loadSupabaseData() {
       sparkFetchAll('labor_budget_entries', 'select=id,budget_id,department,employment_type,phase1,phase2,phase3_1,phase3_2,phase4,phase5,rate_override,team_member_id,team_member:team_members(id,name,fully_burdened_rate)&budget_id=in.(' + _bids + ')'),
       sparkFetchAll('oop_budget_entries', 'select=id,budget_id,line_item_name,count,rate,days,head_count,adjusted_count,adjusted_rate,adjusted_days,adjusted_head_count,actual_count,actual_rate,actual_days,actual_head_count,actual_amount,paid,paid_date,is_active&budget_id=in.(' + _bids + ')'),
       sparkFetchAll('freelancer_budget_entries', 'select=id,budget_id,team_member_id,week_label,hours,rate,paid,paid_date,notes&budget_id=in.(' + _bids + ')'),
-      sparkFetchAll('labor_actuals', 'select=id,hours,work_date,person_name,project_code,phase_key,is_billable,is_bizdev,is_timeoff,board_name,billable_rate&source=eq.timetracker&work_date=gte.2024-01-01&project_code=not.like.100_%25&order=work_date.desc'),
+      sparkFetchAll('labor_actuals', 'select=id,budget_id,hours,work_date,person_name,project_code,phase_key,is_billable,is_bizdev,is_timeoff,board_name,billable_rate&source=eq.timetracker&work_date=gte.2024-01-01&project_code=not.like.100_%25&order=work_date.desc'),
       sparkFetchAll('allocations', 'select=id,person,project,date,hours_per_day,week_of&order=date.asc')
     ]);
     var laborEntries = _phase2[0];
@@ -14702,11 +14721,60 @@ async function loadSupabaseData() {
       b.oopSpent = oopSpent;
       b._oopEntries = b.oop; /* store raw OOP entries for planner sidebar */
 
-      SUPA_BUDGETS[projCode] = b;
+      if (isSmallProjectCode(projCode)) {
+        /* Small projects: aggregate all snapshots into one entry rather than overwriting */
+        var _snap = {
+          id: b.id, name: b.name, code: projCode,
+          client_price: b.client_price || 0, agency_fee: b.agency_fee || 0,
+          laborHours: b.laborHours, laborCost: b.laborTotal, laborCostInternal: b.laborCostInternal,
+          oopCost: sbOopBudget(b), oopEffective: b.oopEffective, oopEffectiveWithMarkup: b.oopEffectiveWithMarkup, oopSpent: b.oopSpent,
+          flTotal: b.flTotal || 0, flSpent: b.flSpent || 0,
+          status: b.status, timesheetHours: 0
+        };
+        if (!SUPA_BUDGETS[projCode]) {
+          b._snapshots = [_snap];
+          SUPA_BUDGETS[projCode] = b;
+        } else {
+          var _agg = SUPA_BUDGETS[projCode];
+          _agg._snapshots.push(_snap);
+          _agg.client_price           = (_agg.client_price           || 0) + (b.client_price  || 0);
+          _agg.agency_fee             = (_agg.agency_fee             || 0) + (b.agency_fee     || 0);
+          _agg.laborHours             = (_agg.laborHours             || 0) + (b.laborHours     || 0);
+          _agg.laborTotal             = (_agg.laborTotal             || 0) + (b.laborTotal     || 0);
+          _agg.laborCostInternal      = (_agg.laborCostInternal      || 0) + (b.laborCostInternal || 0);
+          _agg.oopTotal               = (_agg.oopTotal               || 0) + (b.oopTotal       || 0);
+          _agg.oopEffective           = (_agg.oopEffective           || 0) + (b.oopEffective   || 0);
+          _agg.oopEffectiveWithMarkup = (_agg.oopEffectiveWithMarkup || 0) + (b.oopEffectiveWithMarkup || 0);
+          _agg.oopSpent               = (_agg.oopSpent               || 0) + (b.oopSpent       || 0);
+          _agg.flTotal                = (_agg.flTotal                || 0) + (b.flTotal         || 0);
+          _agg.flSpent                = (_agg.flSpent                || 0) + (b.flSpent         || 0);
+          _agg.labor                  = (_agg.labor                  || []).concat(b.labor      || []);
+          _agg.oop                    = (_agg.oop                    || []).concat(b.oop        || []);
+          _agg._oopEntries            = _agg.oop; /* keep alias in sync */
+          _agg._flEntries             = (_agg._flEntries             || []).concat(b._flEntries || []);
+        }
+      } else {
+        SUPA_BUDGETS[projCode] = b;
+      }
     }
 
     /* 5. labor_actuals already fetched in phase 2 parallel batch */
     SUPA_ACTUALS_ALL = _phase2[3] || [];
+
+    /* 5a. Compute per-snapshot timesheetHours for small project aggregates */
+    var _snapHrsMap = {};
+    for (var _shi = 0; _shi < SUPA_ACTUALS_ALL.length; _shi++) {
+      var _sha = SUPA_ACTUALS_ALL[_shi];
+      if (_sha.budget_id) _snapHrsMap[_sha.budget_id] = (_snapHrsMap[_sha.budget_id] || 0) + (_sha.hours || 0);
+    }
+    for (var _shCode in SUPA_BUDGETS) {
+      var _shSb = SUPA_BUDGETS[_shCode];
+      if (_shSb._snapshots) {
+        for (var _shSi = 0; _shSi < _shSb._snapshots.length; _shSi++) {
+          _shSb._snapshots[_shSi].timesheetHours = _snapHrsMap[_shSb._snapshots[_shSi].id] || 0;
+        }
+      }
+    }
 
     /* 6. Build SUPA_ACTUALS keyed by project_code */
     /* Code aliases: map 7pace board codes to Furnace project codes */
@@ -14842,6 +14910,23 @@ function enrichProjectsWithSupabase() {
         p.profit = (sb.client_price || 0) - computedTotal;
         p.profitMargin = sb.client_price > 0 ? ((p.profit / sb.client_price) * 100) : 0;
         p.totalBudget = sb.laborHours || 0;
+        /* For small projects: expose individual snapshots for the sub-breakdown view */
+        if (sb._snapshots && sb._snapshots.length > 0) {
+          p.subSnapshots = sb._snapshots.map(function(snap) {
+            return {
+              id: snap.id,
+              name: snap.name,
+              code: snap.code,
+              dollarBudget: snap.client_price || 0,
+              laborCost: snap.laborCost || 0,
+              oopCost: snap.oopCost || 0,
+              profit: (snap.client_price || 0) - (snap.laborCost || 0) - (snap.oopCost || 0),
+              totalBudget: snap.laborHours || 0,
+              timesheetHours: snap.timesheetHours || 0,
+              status: snap.status
+            };
+          });
+        }
       } else {
         p._supabudget = null;
         /* Non-billable and internal projects don't need a budget */
