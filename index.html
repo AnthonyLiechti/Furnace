@@ -746,7 +746,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.16 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 7, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.17 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 7, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
   </div>
@@ -14755,10 +14755,12 @@ async function loadSupabaseData() {
       b._oopEntries = b.oop; /* store raw OOP entries for planner sidebar */
 
       if (isSmallProjectCode(projCode)) {
-        /* For snapshots with no labor entries, derive implied hours from
-           (client_price − OOP with markup − contractor budget) ÷ billing_rate */
+        /* For snapshots with no labor entries, derive implied hours targeting 25% profit margin:
+           implied_labor = (client_price × 75%) − OOP_with_markup − contractor_budget
+           implied_hours = round(implied_labor ÷ billing_rate) */
         if (b.laborHours === 0 && (b.client_price || 0) > 0) {
-          var _netLaborPrice = Math.max(0, (b.client_price || 0) - (b.oopEffectiveWithMarkup || 0) - (b.flTotal || 0));
+          var _targetMargin = 0.25; /* agency profit target */
+          var _netLaborPrice = Math.max(0, (b.client_price || 0) * (1 - _targetMargin) - (b.oopEffectiveWithMarkup || 0) - (b.flTotal || 0));
           b.laborHours = Math.round(_netLaborPrice / (b.billing_rate || 200));
           b.laborTotal = _netLaborPrice;
           b._hoursImplied = true;
