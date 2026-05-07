@@ -746,7 +746,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.15 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 7, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.16 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 7, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
   </div>
@@ -2860,16 +2860,21 @@ function renderProject(projectId) {
       var ssHrsSpent = ss.timesheetHours || 0;
       var ssHrsBudget = ss.totalBudget || 0;
       var ssHrsProg = ssHrsBudget > 0 ? Math.round((ssHrsSpent / ssHrsBudget) * 100) : 0;
+      var ssImplied = ss.hoursImplied || false;
+      var ssHrsBudgetLabel = ssImplied
+        ? '<span style="opacity:.55;font-size:13px">~</span>' + ssHrsBudget.toFixed(0)
+        : ssHrsBudget.toFixed(1);
+      var ssLaborLabel = ssImplied ? '<span style="font-size:11px;opacity:.45;margin-left:4px">implied</span>' : '';
       h += '<div class="snapshot-banner" style="margin-bottom:12px;padding:16px 20px">';
       h += '<div class="snap-header"><div class="snap-title" style="font-size:14px">' + (ss.code ? ss.code + ' — ' : '') + ss.name + '</div></div>';
       h += '<div class="snap-financials" style="margin-top:10px">';
       h += '<div class="snap-fin-item"><div class="sf-label">Budget</div><div class="sf-value sf-gold" style="font-size:18px">$' + (ss.dollarBudget || 0).toLocaleString() + '</div></div>';
-      h += '<div class="snap-fin-item"><div class="sf-label">FMG Labor</div><div class="sf-value" style="font-size:18px">$' + (ss.laborCost || 0).toLocaleString() + '</div></div>';
+      h += '<div class="snap-fin-item"><div class="sf-label">FMG Labor</div><div class="sf-value" style="font-size:18px">$' + (ss.laborCost || 0).toLocaleString() + ssLaborLabel + '</div></div>';
       h += '<div class="snap-fin-item"><div class="sf-label">OOP</div><div class="sf-value" style="font-size:18px">$' + (ss.oopCost || 0).toLocaleString() + '</div></div>';
       h += '<div class="snap-fin-item"><div class="sf-label">Profit</div><div class="sf-value ' + ((ss.profit || 0) >= 0 ? 'sf-green' : '') + '" style="font-size:18px">$' + (ss.profit || 0).toLocaleString() + '</div><div class="sf-sub">' + ssMargin + '%</div></div>';
       h += '</div>';
       h += '<div class="snap-financials" style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08)">';
-      h += '<div class="snap-fin-item"><div class="sf-label">Hrs Budgeted</div><div class="sf-value" style="font-size:16px">' + ssHrsBudget.toFixed(1) + '</div></div>';
+      h += '<div class="snap-fin-item"><div class="sf-label">Hrs Budgeted' + (ssImplied ? ' <span style="font-size:10px;opacity:.4">(derived)</span>' : '') + '</div><div class="sf-value" style="font-size:16px">' + ssHrsBudgetLabel + '</div></div>';
       h += '<div class="snap-fin-item"><div class="sf-label">Hrs Spent</div><div class="sf-value" style="font-size:16px;color:var(--ember)">' + ssHrsSpent.toFixed(1) + '</div><div class="sf-sub">' + ssHrsProg + '% of budget</div></div>';
       h += '</div></div>';
     }
@@ -14750,6 +14755,14 @@ async function loadSupabaseData() {
       b._oopEntries = b.oop; /* store raw OOP entries for planner sidebar */
 
       if (isSmallProjectCode(projCode)) {
+        /* For snapshots with no labor entries, derive implied hours from
+           (client_price − OOP with markup − contractor budget) ÷ billing_rate */
+        if (b.laborHours === 0 && (b.client_price || 0) > 0) {
+          var _netLaborPrice = Math.max(0, (b.client_price || 0) - (b.oopEffectiveWithMarkup || 0) - (b.flTotal || 0));
+          b.laborHours = Math.round(_netLaborPrice / (b.billing_rate || 200));
+          b.laborTotal = _netLaborPrice;
+          b._hoursImplied = true;
+        }
         /* Small projects: aggregate all snapshots into one entry rather than overwriting */
         var _snap = {
           id: b.id, name: b.name, code: projCode,
@@ -14757,7 +14770,7 @@ async function loadSupabaseData() {
           laborHours: b.laborHours, laborCost: b.laborTotal, laborCostInternal: b.laborCostInternal,
           oopCost: sbOopBudget(b), oopEffective: b.oopEffective, oopEffectiveWithMarkup: b.oopEffectiveWithMarkup, oopSpent: b.oopSpent,
           flTotal: b.flTotal || 0, flSpent: b.flSpent || 0,
-          status: b.status, timesheetHours: 0
+          status: b.status, timesheetHours: 0, hoursImplied: b._hoursImplied || false
         };
         if (!SUPA_BUDGETS[projCode]) {
           b._snapshots = [_snap];
@@ -14952,7 +14965,8 @@ function enrichProjectsWithSupabase() {
               profit: (snap.client_price || 0) - (snap.laborCost || 0) - (snap.oopCost || 0),
               totalBudget: snap.laborHours || 0,
               timesheetHours: snap.timesheetHours || 0,
-              status: snap.status
+              status: snap.status,
+              hoursImplied: snap.hoursImplied || false
             };
           });
         }
