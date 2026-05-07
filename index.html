@@ -746,7 +746,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.14 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 6, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.15 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 7, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
   </div>
@@ -929,8 +929,22 @@ function getFilteredProjectHours(projectName) {
 }
 
 function filteredProjectSpent(proj) {
-  /* Returns spent hours: filtered from RT if date filter active, otherwise from phases */
-  if (globalDateFilter === 'all') return projectSpent(proj);
+  /* Returns spent hours: for small projects only billable (non-bizdev, non-timeoff) hours count */
+  var _isSmallFPS = isSmallProjectCode(proj.code);
+
+  if (globalDateFilter === 'all') {
+    /* Small projects: scan SUPA_ACTUALS_ALL filtering to billable-only */
+    if (_isSmallFPS && SUPA_LOADED && SUPA_ACTUALS_ALL) {
+      var _spTot = 0;
+      for (var _spi = 0; _spi < SUPA_ACTUALS_ALL.length; _spi++) {
+        var _spa = SUPA_ACTUALS_ALL[_spi];
+        if (_spa.project_code === proj.code && _spa.is_billable !== false && !_spa.is_bizdev && !_spa.is_timeoff)
+          _spTot += _spa.hours || 0;
+      }
+      return _spTot;
+    }
+    return projectSpent(proj);
+  }
 
   /* If Supabase data loaded, filter actuals by date range */
   if (SUPA_LOADED && SUPA_ACTUALS_ALL.length > 0) {
@@ -942,9 +956,9 @@ function filteredProjectSpent(proj) {
     var total = 0;
     for (var i = 0; i < SUPA_ACTUALS_ALL.length; i++) {
       var a = SUPA_ACTUALS_ALL[i];
-      if (a.project_code === code && a.work_date >= start && a.work_date <= end) {
-        total += a.hours || 0;
-      }
+      if (a.project_code !== code || a.work_date < start || a.work_date > end) continue;
+      if (_isSmallFPS && (a.is_billable === false || a.is_bizdev || a.is_timeoff)) continue;
+      total += a.hours || 0;
     }
     return total;
   }
@@ -959,6 +973,7 @@ function filteredProjectSpentDollars(proj, defaultRate) {
   defaultRate = defaultRate || 200;
   if (!SUPA_LOADED || !SUPA_ACTUALS_ALL.length) return filteredProjectSpent(proj) * defaultRate;
   var code = proj.code;
+  var _isSmallFPD = isSmallProjectCode(code);
   var range = globalDateFilter !== 'all' ? getDateRange(globalDateFilter) : null;
   var start = range ? range.start.toISOString().slice(0, 10) : null;
   var end   = range ? range.end.toISOString().slice(0, 10)   : null;
@@ -967,6 +982,7 @@ function filteredProjectSpentDollars(proj, defaultRate) {
     var a = SUPA_ACTUALS_ALL[i];
     if (a.project_code !== code) continue;
     if (start && (a.work_date < start || a.work_date > end)) continue;
+    if (_isSmallFPD && (a.is_billable === false || a.is_bizdev || a.is_timeoff)) continue;
     total += (a.hours || 0) * (a.billable_rate || defaultRate);
   }
   return total;
@@ -1282,7 +1298,8 @@ async function ensureProjectActuals(projCode, proj) {
       var _lazySHMap = {};
       for (var _lsi = 0; _lsi < entries.length; _lsi++) {
         var _lse = entries[_lsi];
-        if (_lse.budget_id) _lazySHMap[_lse.budget_id] = (_lazySHMap[_lse.budget_id] || 0) + (_lse.hours || 0);
+        if (_lse.budget_id && _lse.is_billable !== false && !_lse.is_bizdev && !_lse.is_timeoff)
+          _lazySHMap[_lse.budget_id] = (_lazySHMap[_lse.budget_id] || 0) + (_lse.hours || 0);
       }
       var _lazySnaps = SUPA_BUDGETS[projCode]._snapshots;
       for (var _lssi = 0; _lssi < _lazySnaps.length; _lssi++) {
@@ -2326,7 +2343,18 @@ function renderProjFinancials(p) {
   if (!el || !p._supabudget) return;
   var sb = p._supabudget;
 
-  var allTimeHrs = SUPA_ACTUALS[p.code] ? SUPA_ACTUALS[p.code].totalHours : 0;
+  /* Small projects: count only billable hours so overhead doesn't inflate "hours remaining" */
+  var allTimeHrs;
+  if (isSmallProjectCode(p.code) && SUPA_ACTUALS_ALL) {
+    allTimeHrs = 0;
+    for (var _athi = 0; _athi < SUPA_ACTUALS_ALL.length; _athi++) {
+      var _atha = SUPA_ACTUALS_ALL[_athi];
+      if (_atha.project_code === p.code && _atha.is_billable !== false && !_atha.is_bizdev && !_atha.is_timeoff)
+        allTimeHrs += _atha.hours || 0;
+    }
+  } else {
+    allTimeHrs = SUPA_ACTUALS[p.code] ? SUPA_ACTUALS[p.code].totalHours : 0;
+  }
   var saHrs = filteredProjectSpent(p); /* respects global date filter */
   var isFiltered = (globalDateFilter !== 'all');
   var allocHrs = 0;
@@ -14761,11 +14789,12 @@ async function loadSupabaseData() {
     /* 5. labor_actuals already fetched in phase 2 parallel batch */
     SUPA_ACTUALS_ALL = _phase2[3] || [];
 
-    /* 5a. Compute per-snapshot timesheetHours for small project aggregates */
+    /* 5a. Compute per-snapshot timesheetHours for small project aggregates (billable only) */
     var _snapHrsMap = {};
     for (var _shi = 0; _shi < SUPA_ACTUALS_ALL.length; _shi++) {
       var _sha = SUPA_ACTUALS_ALL[_shi];
-      if (_sha.budget_id) _snapHrsMap[_sha.budget_id] = (_snapHrsMap[_sha.budget_id] || 0) + (_sha.hours || 0);
+      if (_sha.budget_id && _sha.is_billable !== false && !_sha.is_bizdev && !_sha.is_timeoff)
+        _snapHrsMap[_sha.budget_id] = (_snapHrsMap[_sha.budget_id] || 0) + (_sha.hours || 0);
     }
     for (var _shCode in SUPA_BUDGETS) {
       var _shSb = SUPA_BUDGETS[_shCode];
