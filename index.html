@@ -746,7 +746,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.17 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 7, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.18 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 7, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
   </div>
@@ -2465,25 +2465,8 @@ function renderProjFinancials(p) {
     return '<button style="' + (isOn ? onStyle : offStyle) + '" onclick="sparkToggleBudgetSection(\'' + sb.id + '\',\'' + p.code + '\',\'' + field + '\')" title="' + (isOn ? 'Click to re-enable' : 'Click to mark as not needed') + '">' + (isOn ? '✕ ' : '') + label + '</button>';
   }
 
-  var h = '';
-  h += '<div class="snapshot-banner" style="margin-bottom:16px">';
-  h += '<div class="snap-header"><div class="snap-title">Project Financials</div><div class="snap-version">Live from Furnace &#128293;</div></div>';
-
-  /* ── Top summary row ── */
-  h += '<div class="snap-financials">';
-  h += '<div class="snap-fin-item"><div class="sf-label">Client Price</div><div class="sf-value sf-gold">$' + Math.round(tcvPrice).toLocaleString() + '</div>';
-  if (hasDisc) h += '<div class="sf-sub">Before discount: $' + Math.round(rawPrice).toLocaleString() + '</div>';
-  h += '</div>';
-  h += '<div class="snap-fin-item"><div class="sf-label">Projected Labor Price</div><div class="sf-value">$' + Math.round(projLaborPrice).toLocaleString() + '</div><div class="sf-sub">' + (sb.laborHours || 0).toFixed(0) + ' hrs @ $200/hr</div></div>';
-  h += '<div class="snap-fin-item"><div class="sf-label">Projected Freelancer Price</div><div class="sf-value" style="color:#CE93D8">' + (noFl ? '<span style="opacity:.4">—</span>' : '$' + Math.round(flBudget).toLocaleString()) + '</div>' + (!noFl && flBudget > 0 ? '<div class="sf-sub">' + (sb._flEntries || []).length + ' entries</div>' : '') + '</div>';
-  h += '<div class="snap-fin-item"><div class="sf-label">Projected OOP Price</div><div class="sf-value">' + (noOop ? '<span style="opacity:.4">—</span>' : '$' + Math.round(oopProjected).toLocaleString()) + '</div><div class="sf-sub">' + (!noOop && oopProjected > 0 ? _oopMkPct + '% markup' : '') + '</div></div>';
-  h += '<div class="snap-fin-item"><div class="sf-label">Projected Profit</div><div class="sf-value ' + (profitVal >= 0 ? 'sf-green' : '') + '">$' + Math.round(profitVal).toLocaleString() + '</div><div class="sf-sub">' + profitPctVal + '%</div></div>';
-  h += '<div class="snap-fin-item"><div class="sf-label">Projected Profit Margin</div><div class="sf-value' + (marginSparkle ? ' margin-sparkle' : '') + '" style="' + (marginSparkle ? '' : 'color:' + marginColor) + '">' + marginPctVal + '%</div><div class="sf-sub">Proj. labor: $' + Math.round(projLaborPrice).toLocaleString() + '</div></div>';
-  h += '<div class="snap-fin-item"><div class="sf-label">Eff. Rate</div><div class="sf-value" style="color:' + effRateColor + '">' + effRateDisplay + '</div>' + (saHrs > 0 ? '<div class="sf-sub">vs $200 bill rate</div>' : '<div class="sf-sub">No hours tracked</div>') + '</div>';
-  h += '</div>';
-
-  /* ── Actuals row ── */
-  var _pfActOpen = !!projFinActualsOpen[p.code];
+  /* ── Pre-compute actuals (needed for finished-project top row) ── */
+  var _pfActOpen = isFinished || !!projFinActualsOpen[p.code];
   /* Build name → fully_burdened_rate lookup */
   var _pfTmRateMap = {};
   if (FURNACE_TEAM_MEMBERS) {
@@ -2538,10 +2521,46 @@ function renderProjFinancials(p) {
   var _pfActFlInternal = _pfActFlPaid * 0.5;            /* FL Internal Cost = 50% of paid */
   var _pfActProfit = tcvPrice - _pfActLaborCost - _pfActFlInternal - _pfActOopSpent;
   var _pfActMargin = tcvPrice > 0 ? (_pfActProfit / tcvPrice * 100) : 0;
-  if (canViewActuals()) {
+
+  var h = '';
+  h += '<div class="snapshot-banner" style="margin-bottom:16px">';
+  /* Header: CLOSED badge for finished projects */
+  if (isFinished) {
+    h += '<div class="snap-header"><div class="snap-title">Project Financials <span style="font-size:10px;font-weight:700;background:#81C784;color:#1a1a1a;border-radius:3px;padding:1px 6px;letter-spacing:.06em;margin-left:6px;vertical-align:middle">CLOSED</span></div><div class="snap-version" style="color:#81C784">Final Actuals ✓</div></div>';
+  } else {
+    h += '<div class="snap-header"><div class="snap-title">Project Financials</div><div class="snap-version">Live from Furnace &#128293;</div></div>';
+  }
+
+  /* ── Top summary row ── */
+  h += '<div class="snap-financials">';
+  h += '<div class="snap-fin-item"><div class="sf-label">Client Price</div><div class="sf-value sf-gold">$' + Math.round(tcvPrice).toLocaleString() + '</div>';
+  if (hasDisc) h += '<div class="sf-sub">Before discount: $' + Math.round(rawPrice).toLocaleString() + '</div>';
+  h += '</div>';
+  if (isFinished) {
+    /* Finished: show actuals in the top row */
+    var _pfActSparkleTop = _pfActMargin > 45;
+    var _pfActMarginColorTop = _pfActMargin > 25 ? '#81C784' : _pfActMargin > 10 ? '#F57F17' : '#EF5350';
+    h += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.8)">Actual Labor <span style="font-size:9px;background:rgba(129,199,132,.15);border-radius:2px;padding:0 4px;letter-spacing:.04em">ACTUAL</span></div><div class="sf-value">$' + Math.round(_pfActLaborCost).toLocaleString() + '</div><div class="sf-sub">' + _pfActLaborHrs.toFixed(1) + ' hrs · budget $' + Math.round(projLaborPrice).toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.8)">Actual Freelancer <span style="font-size:9px;background:rgba(129,199,132,.15);border-radius:2px;padding:0 4px;letter-spacing:.04em">ACTUAL</span></div><div class="sf-value" style="color:#CE93D8">$' + Math.round(_pfActFlInternal).toLocaleString() + '</div><div class="sf-sub">budget $' + Math.round(flBudget).toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.8)">Actual OOP <span style="font-size:9px;background:rgba(129,199,132,.15);border-radius:2px;padding:0 4px;letter-spacing:.04em">ACTUAL</span></div><div class="sf-value">$' + Math.round(_pfActOopSpent).toLocaleString() + '</div><div class="sf-sub">budget $' + Math.round(oopProjected).toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.8)">Final Profit <span style="font-size:9px;background:rgba(129,199,132,.15);border-radius:2px;padding:0 4px;letter-spacing:.04em">ACTUAL</span></div><div class="sf-value" style="color:' + (_pfActProfit >= 0 ? '#81C784' : 'var(--ember)') + '">$' + Math.round(_pfActProfit).toLocaleString() + '</div><div class="sf-sub">budget $' + Math.round(profitVal).toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.8)">Final Margin <span style="font-size:9px;background:rgba(129,199,132,.15);border-radius:2px;padding:0 4px;letter-spacing:.04em">ACTUAL</span></div><div class="sf-value' + (_pfActSparkleTop ? ' margin-sparkle' : '') + '" style="' + (_pfActSparkleTop ? '' : 'color:' + _pfActMarginColorTop) + '">' + _pfActMargin.toFixed(1) + '%</div><div class="sf-sub">budget ' + marginPctVal + '%</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Eff. Rate</div><div class="sf-value" style="color:' + effRateColor + '">' + effRateDisplay + '</div>' + (saHrs > 0 ? '<div class="sf-sub">vs $200 bill rate</div>' : '<div class="sf-sub">No hours tracked</div>') + '</div>';
+  } else {
+    h += '<div class="snap-fin-item"><div class="sf-label">Projected Labor Price</div><div class="sf-value">$' + Math.round(projLaborPrice).toLocaleString() + '</div><div class="sf-sub">' + (sb.laborHours || 0).toFixed(0) + ' hrs @ $200/hr</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Projected Freelancer Price</div><div class="sf-value" style="color:#CE93D8">' + (noFl ? '<span style="opacity:.4">—</span>' : '$' + Math.round(flBudget).toLocaleString()) + '</div>' + (!noFl && flBudget > 0 ? '<div class="sf-sub">' + (sb._flEntries || []).length + ' entries</div>' : '') + '</div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Projected OOP Price</div><div class="sf-value">' + (noOop ? '<span style="opacity:.4">—</span>' : '$' + Math.round(oopProjected).toLocaleString()) + '</div><div class="sf-sub">' + (!noOop && oopProjected > 0 ? _oopMkPct + '% markup' : '') + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Projected Profit</div><div class="sf-value ' + (profitVal >= 0 ? 'sf-green' : '') + '">$' + Math.round(profitVal).toLocaleString() + '</div><div class="sf-sub">' + profitPctVal + '%</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Projected Profit Margin</div><div class="sf-value' + (marginSparkle ? ' margin-sparkle' : '') + '" style="' + (marginSparkle ? '' : 'color:' + marginColor) + '">' + marginPctVal + '%</div><div class="sf-sub">Proj. labor: $' + Math.round(projLaborPrice).toLocaleString() + '</div></div>';
+    h += '<div class="snap-fin-item"><div class="sf-label">Eff. Rate</div><div class="sf-value" style="color:' + effRateColor + '">' + effRateDisplay + '</div>' + (saHrs > 0 ? '<div class="sf-sub">vs $200 bill rate</div>' : '<div class="sf-sub">No hours tracked</div>') + '</div>';
+  }
+  h += '</div>';
+
+  /* ── Actuals row (open projects only — finished projects show actuals in top row) ── */
+  if (!isFinished && canViewActuals()) {
     h += '<div style="display:flex;justify-content:flex-end;margin-top:6px">';
     h += '<button onclick="projFinToggleActuals(\'' + p.code + '\')" style="font-size:11px;padding:3px 12px;border-radius:20px;border:1px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.45);cursor:pointer;font-family:inherit;letter-spacing:.02em">';
-    h += (_pfActOpen ? '\u25b2 Hide Actuals' : '\u25bc Show Actuals') + '</button></div>';
+    h += (projFinActualsOpen[p.code] ? '\u25b2 Hide Actuals' : '\u25bc Show Actuals') + '</button></div>';
   }
   if (_pfActOpen) {
     h += '<div class="snap-financials" style="margin-top:6px;padding-top:12px;border-top:1px solid rgba(129,199,132,.25)">';
