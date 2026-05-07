@@ -746,7 +746,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.18 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 7, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.19 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 7, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
   </div>
@@ -1056,6 +1056,13 @@ var SLACK_BOT_TOKEN = ''; /* loaded from agency_settings on init */
 var TREVOR_API_KEY  = ''; /* loaded from agency_settings on init */
 var FURNACE_CURRENT_USER_EMAIL = ''; /* set on login from Google OAuth user.email */
 var ACTUALS_ALLOWED_EMAILS = ['anthony@createdbyforge.com','richelle@createdbyforge.com']; /* Show Actuals access list */
+var EXEC_ALLOWED_EMAILS = [
+  'anthony@createdbyforge.com',
+  'richelle@createdbyforge.com',
+  'davem@createdbyforge.com',
+  'jeff.cole@createdbyforge.com',
+  'jeff.butcher@createdbyforge.com'
+]; /* Full-access: master dashboard, YTD, completed, import time, settings */
 var SUPA_POS = [];        /* purchase orders sent to clients, loaded from pos table */
 var HOURS_LAST_UPDATED = ''; /* human-readable date string, stored in agency_settings */
 var OPP_PHASES = [
@@ -1392,15 +1399,15 @@ function projectById(id) {
 /* ── SIDEBAR ── */
 function renderSidebar() {
   var html = '';
-  html += '<div class="nav-item ' + (currentView === 'master' ? 'active' : '') + '" onclick="navigate(\'master\')"><span class="icon">&#9673;</span> Master Dashboard</div>';
-  html += '<div class="nav-item ' + (currentView === 'ytd' ? 'active' : '') + '" onclick="navigate(\'ytd\')"><span class="icon">&#128200;</span> 2026 Year to Date</div>';
+  if (canViewSensitive()) html += '<div class="nav-item ' + (currentView === 'master' ? 'active' : '') + '" onclick="navigate(\'master\')"><span class="icon">&#9673;</span> Master Dashboard</div>';
+  if (canViewSensitive()) html += '<div class="nav-item ' + (currentView === 'ytd' ? 'active' : '') + '" onclick="navigate(\'ytd\')"><span class="icon">&#128200;</span> 2026 Year to Date</div>';
   html += '<div class="nav-item ' + (currentView === 'flagged' ? 'active' : '') + '" onclick="navigate(\'flagged\')"><span class="icon">&#9888;</span> Needs Attention</div>';
-  html += '<div class="nav-item ' + (currentView === 'importTime' ? 'active' : '') + '" onclick="navigate(\'importTime\')"><span class="icon">&#128337;</span> Import Time</div>';
+  if (canViewSensitive()) html += '<div class="nav-item ' + (currentView === 'importTime' ? 'active' : '') + '" onclick="navigate(\'importTime\')"><span class="icon">&#128337;</span> Import Time</div>';
   html += '<div class="nav-item ' + (currentView === 'allocations' ? 'active' : '') + '" onclick="navigate(\'allocations\')"><span class="icon">&#9881;</span> Manage Resources</div>';
   html += '<div class="nav-item ' + (currentView === 'resource' ? 'active' : '') + '" onclick="navigate(\'resource\')"><span class="icon">&#9202;</span> Resource Analytics</div>';
-  html += '<div class="nav-item ' + (currentView === 'completed' ? 'active' : '') + '" onclick="navigate(\'completed\')"><span class="icon">&#10003;</span> Completed Projects</div>';
+  if (canViewSensitive()) html += '<div class="nav-item ' + (currentView === 'completed' ? 'active' : '') + '" onclick="navigate(\'completed\')"><span class="icon">&#10003;</span> Completed Projects</div>';
   html += '<div class="nav-item ' + (currentView === 'opportunities' ? 'active' : '') + '" onclick="navigate(\'opportunities\')"><span class="icon">&#9733;</span> New Opportunities</div>';
-  if (canViewActuals()) html += '<div class="nav-item ' + (currentView === 'settings' ? 'active' : '') + '" onclick="navigate(\'settings\')"><span class="icon">&#9881;</span> Settings</div>';
+  if (canViewSensitive()) html += '<div class="nav-item ' + (currentView === 'settings' ? 'active' : '') + '" onclick="navigate(\'settings\')"><span class="icon">&#9881;</span> Settings</div>';
   html += '<div class="nav-divider"></div>';
 
   /* Split clients into active and inactive.
@@ -5094,6 +5101,15 @@ function canViewActuals() {
   if (!email) return false;
   for (var i = 0; i < ACTUALS_ALLOWED_EMAILS.length; i++) {
     if (email === ACTUALS_ALLOWED_EMAILS[i].toLowerCase()) return true;
+  }
+  return false;
+}
+/* canViewSensitive — gates master dashboard, YTD, completed projects, import time, settings */
+function canViewSensitive() {
+  var email = (FURNACE_CURRENT_USER_EMAIL || '').toLowerCase();
+  if (!email) return false;
+  for (var i = 0; i < EXEC_ALLOWED_EMAILS.length; i++) {
+    if (email === EXEC_ALLOWED_EMAILS[i].toLowerCase()) return true;
   }
   return false;
 }
@@ -14183,6 +14199,9 @@ function navigate(view) {
     }
   }
   renderSidebar();
+  /* Redirect non-exec users away from sensitive views */
+  var _sensitiveViews = ['master','ytd','completed','importTime','settings'];
+  if (_sensitiveViews.indexOf(view) >= 0 && !canViewSensitive()) { navigate('flagged'); return; }
   if (view === 'master') renderMaster();
   else if (view === 'ytd') renderYTD();
   else if (view === 'flagged') renderFlagged();
@@ -14191,7 +14210,7 @@ function navigate(view) {
   else if (view === 'resource') renderResource();
   else if (view === 'allocations') renderAllocations();
   else if (view === 'spark') renderSpark();
-  else if (view === 'settings') { if (canViewActuals()) renderSettings(); else navigate('master'); }
+  else if (view === 'settings') { if (canViewActuals()) renderSettings(); else navigate('flagged'); }
   else if (view === 'opportunities') renderOpportunities();
   else if (view.indexOf('opportunity:') === 0) renderOpportunityEditor(view.split(':')[1]);
   else if (view.indexOf('client:') === 0) renderClient(view.split(':')[1]);
@@ -14234,7 +14253,7 @@ window.addEventListener('hashchange', function() {
         else if (view === 'resource') renderResource();
         else if (view === 'allocations') renderAllocations();
         else if (view === 'spark') renderSpark();
-        else if (view === 'settings') { if (canViewActuals()) renderSettings(); else navigate('master'); }
+        else if (view === 'settings') { if (canViewActuals()) renderSettings(); else navigate('flagged'); }
         else if (view.indexOf('client:') === 0) renderClient(view.split(':')[1]);
         else if (view.indexOf('project:') === 0) renderProject(view.split(':')[1]);
       }
@@ -15188,7 +15207,10 @@ async function loadData() {
         return;
       }
     }
-    navigate(savedView || 'master');
+    var _initView = savedView || 'master';
+    var _sensitiveInit = ['master','ytd','completed','importTime','settings'];
+    if (_sensitiveInit.indexOf(_initView) >= 0 && !canViewSensitive()) _initView = 'flagged';
+    navigate(_initView);
   } catch(e) {
     console.error('loadData error:', e);
     document.getElementById('mainContent').innerHTML = '<div style="padding:60px 40px;text-align:center"><h2 style="color:var(--ember)">Unable to load data</h2><p style="color:var(--mid-gray);margin-top:12px">' + e.message + '</p></div>';
