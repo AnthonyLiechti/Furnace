@@ -746,7 +746,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.19 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 7, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.20 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 8, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
   </div>
@@ -811,6 +811,7 @@ var flaggedCollapsedOop = new Set(); /* collapsed project IDs in OOP Unscheduled
 var flaggedCollapsedFl  = new Set(); /* collapsed project IDs in FL Unplanned section */
 var sparkShowActualsRow = false;
 var projFinActualsOpen = {}; /* per-project code toggle state for actuals row */
+var oppActualsOpen = false; /* toggle state for actuals row in opportunity editor */
 var masterActualsOpen  = false; /* toggle for master / client portfolio actuals row */
 var clientActualsOpen  = {}; /* per-client-id toggle state for client overview actuals */
 let showInactiveClients = false;
@@ -8287,6 +8288,11 @@ function toggleClientActuals(clientId) {
   navigate(currentView);
 }
 
+function oppToggleActuals() {
+  oppActualsOpen = !oppActualsOpen;
+  sparkRenderBudgetContent(true);
+}
+
 function projFinToggleActuals(code) {
   projFinActualsOpen[code] = !projFinActualsOpen[code];
   var p = null;
@@ -9562,7 +9568,77 @@ function sparkRenderBudgetContent(embedded) {
       fh += '<div class="snap-fin-item"><div class="sf-label">Est. Profit</div><div class="sf-value' + (oppProfit >= 0 ? ' sf-green' : '') + '">$' + Math.round(oppProfit).toLocaleString() + '</div></div>';
       var oppSparkle = oppMargin >= 25;
       fh += '<div class="snap-fin-item"><div class="sf-label">Est. Margin</div><div class="sf-value' + (oppSparkle ? ' margin-sparkle' : '') + '" style="' + (oppSparkle ? '' : 'color:' + mColor) + '">' + oppMargin.toFixed(1) + '%</div></div>';
-      fh += '</div></div>';
+      fh += '</div>';
+      /* ── Actuals toggle (opportunity editor) ── */
+      if (canViewActuals()) {
+        fh += '<div style="display:flex;justify-content:flex-end;margin-top:6px">';
+        fh += '<button onclick="oppToggleActuals()" style="font-size:11px;padding:3px 12px;border-radius:20px;border:1px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.45);cursor:pointer;font-family:inherit;letter-spacing:.02em">';
+        fh += (oppActualsOpen ? '\u25b2 Hide Actuals' : '\u25bc Show Actuals') + '</button></div>';
+      }
+      if (oppActualsOpen && canViewActuals()) {
+        /* Build FBR lookup from global team member list */
+        var _oaRateMap = {};
+        if (FURNACE_TEAM_MEMBERS) {
+          for (var _oati = 0; _oati < FURNACE_TEAM_MEMBERS.length; _oati++) {
+            var _oatm = FURNACE_TEAM_MEMBERS[_oati];
+            if (_oatm.name && _oatm.fully_burdened_rate) _oaRateMap[_oatm.name] = _oatm.fully_burdened_rate;
+          }
+        }
+        var _oaLaborHrs = 0, _oaLaborCost = 0;
+        var _oaActList = sparkCurrentData.actuals || [];
+        for (var _oai = 0; _oai < _oaActList.length; _oai++) {
+          var _oae = _oaActList[_oai];
+          var _oaeRate = (_oae.person_name && _oaRateMap[_oae.person_name]) ? _oaRateMap[_oae.person_name] : ((_oae.team_member && _oae.team_member.fully_burdened_rate) || 180);
+          _oaLaborHrs += (_oae.hours || 0);
+          _oaLaborCost += (_oae.hours || 0) * _oaeRate;
+        }
+        /* FL actuals: sum paid calendar entries */
+        var _oaFlPaid = 0;
+        var _oaFlEnts = sparkCurrentData.freelancerEntries || [];
+        var _oaHasCal = false;
+        for (var _oaci = 0; _oaci < _oaFlEnts.length; _oaci++) { if (_oaFlEnts[_oaci].week_label !== '__budget__') { _oaHasCal = true; break; } }
+        for (var _oafi = 0; _oafi < _oaFlEnts.length; _oafi++) {
+          var _oaffe = _oaFlEnts[_oafi];
+          var _oaffc = (_oaffe.hours || 0) * (_oaffe.rate || 0);
+          if (_oaffe.week_label === '__budget__') { if (!_oaHasCal && _oaffe.paid) _oaFlPaid += _oaffc; }
+          else { if (_oaffe.paid) _oaFlPaid += _oaffc; }
+        }
+        var _oaFlInternal = _oaFlPaid * 0.5;
+        /* OOP: use budget oop_spent (paid OOP) */
+        var _oaOopPaid = (budget && budget.oop_spent) || 0;
+        var _oaProfit  = tcv - _oaLaborCost - _oaFlInternal - _oaOopPaid;
+        var _oaMargin  = tcv > 0 ? (_oaProfit / tcv * 100) : 0;
+        var _oaSparkle = _oaMargin > 45;
+        var _oaMColor  = _oaMargin >= 0 ? '#81C784' : 'var(--ember)';
+        fh += '<div class="snap-financials" style="margin-top:6px;padding-top:12px;border-top:1px solid rgba(129,199,132,.25)">';
+        fh += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.7)">Actual Labor</div><div class="sf-value">$' + Math.round(_oaLaborCost).toLocaleString() + '</div><div class="sf-sub">' + _oaLaborHrs.toFixed(1) + ' hrs at cost rate</div></div>';
+        fh += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.7)">Actual FL</div><div class="sf-value" style="color:#CE93D8">$' + Math.round(_oaFlInternal).toLocaleString() + '</div><div class="sf-sub">paid: $' + Math.round(_oaFlPaid).toLocaleString() + '</div></div>';
+        fh += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.7)">Actual OOP</div><div class="sf-value">$' + Math.round(_oaOopPaid).toLocaleString() + '</div></div>';
+        fh += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.7)">Actual Profit</div><div class="sf-value" style="color:' + (_oaProfit >= 0 ? '#81C784' : 'var(--ember)') + '">$' + Math.round(_oaProfit).toLocaleString() + '</div></div>';
+        fh += '<div class="snap-fin-item"><div class="sf-label" style="color:rgba(129,199,132,.7)">Actual Margin</div><div class="sf-value' + (_oaSparkle ? ' margin-sparkle' : '') + '" style="' + (_oaSparkle ? '' : 'color:' + _oaMColor) + '">' + _oaMargin.toFixed(1) + '%</div></div>';
+        fh += '</div>';
+        /* Actuals bar */
+        var _oaBarTot  = tcv > 0 ? tcv : 1;
+        var _oapL      = Math.max(0, Math.min(100, _oaLaborCost  / _oaBarTot * 100));
+        var _oapFl     = Math.max(0, Math.min(100 - _oapL, _oaFlInternal / _oaBarTot * 100));
+        var _oapOop    = Math.max(0, Math.min(100 - _oapL - _oapFl, _oaOopPaid / _oaBarTot * 100));
+        var _oapProfit = Math.max(0, 100 - _oapL - _oapFl - _oapOop);
+        fh += '<div style="margin-top:12px">';
+        fh += '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.8px;opacity:.4;margin-bottom:5px;font-weight:600">Actuals vs. Client Price</div>';
+        fh += '<div class="lob-bar">';
+        if (_oapL      > 0.1) fh += '<div class="lob-seg" style="width:' + _oapL.toFixed(1)      + '%;background:#1565C0">' + (_oapL      >= 8 ? '$' + Math.round(_oaLaborCost).toLocaleString()  : '') + '</div>';
+        if (_oapFl     > 0.1) fh += '<div class="lob-seg" style="width:' + _oapFl.toFixed(1)     + '%;background:#7B1FA2">' + (_oapFl     >= 8 ? '$' + Math.round(_oaFlInternal).toLocaleString() : '') + '</div>';
+        if (_oapOop    > 0.1) fh += '<div class="lob-seg" style="width:' + _oapOop.toFixed(1)    + '%;background:var(--ember)">' + (_oapOop    >= 8 ? '$' + Math.round(_oaOopPaid).toLocaleString()   : '') + '</div>';
+        if (_oapProfit > 0.5) fh += '<div class="lob-seg" style="width:' + _oapProfit.toFixed(1) + '%;background:#81C784">' + (_oapProfit >= 8 ? '$' + Math.round(_oaProfit).toLocaleString()     : '') + '</div>';
+        fh += '</div>';
+        fh += '<div class="lob-legend">';
+        if (_oapL      > 0.1) fh += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#1565C0"></div>Actual Labor</div>';
+        if (_oapFl     > 0.1) fh += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#7B1FA2"></div>Actual FL</div>';
+        if (_oapOop    > 0.1) fh += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:var(--ember)"></div>Actual OOP</div>';
+        if (_oapProfit > 0.5) fh += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Actual Profit</div>';
+        fh += '</div></div>';
+      }
+      fh += '</div>';
       finEl.innerHTML = fh;
     }
 
