@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Progress Bar Color Preview</title>
+<style>
+  body { background: #0f1923; color: #fff; font-family: Arial, sans-serif; padding: 40px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1.2px; opacity: .5; margin: 0 0 10px; font-weight: 600; }
+  .bar { display: flex; height: 32px; border-radius: 6px; overflow: hidden; margin-bottom: 8px; width: 100%; }
+  .seg { display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: rgba(255,255,255,.85); }
+  .seg.dark-text { color: rgba(0,0,0,.65); }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-bottom: 36px; }
+  .li { display: flex; align-items: center; gap: 6px; font-size: 11px; opacity: .75; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .section { background: #1a2a38; border-radius: 12px; padding: 24px 28px; margin-bottom: 28px; }
+  .label { font-size: 11px; opacity: .5; margin-bottom: 4px; }
+  .divider { border: none; border-top: 1px solid rgba(255,255,255,.08); margin: 22px 0; }
+  .swatch-row { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .swatch { border-radius: 8px; padding: 10px 14px; font-size: 11px; font-weight: 600; min-width: 100px; }
+  .swatch.light { color: rgba(0,0,0,.7); }
+  .swatch.dark  { color: #fff; }
+  .tag { font-size: 9px; font-weight: 400; opacity: .6; display: block; margin-top: 2px; }
+  .badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; background: rgba(255,255,255,.08); letter-spacing:.5px; }
+</style>
+</head>
+<body>
+
+<div style="font-size:20px;font-weight:700;margin-bottom:4px">Progress Bar Color Preview</div>
+<div style="font-size:12px;opacity:.4;margin-bottom:32px">Proposed changes vs. current</div>
+
+<!-- CURRENT -->
+<div class="section">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+    <div style="font-size:14px;font-weight:700">Current</div>
+    <span class="badge">v0.28.129</span>
+  </div>
+  <div class="label">Sample bar — 60% labor spent, 15% labor remaining, 8% FL spent, 5% FL remaining, 7% OOP spent, 5% profit</div>
+  <div class="bar" style="margin-top:10px">
+    <div class="seg" style="width:60%;background:#CE7338">Labor Spent</div>
+    <div class="seg" style="width:15%;background:#306D7C">Labor Rem.</div>
+    <div class="seg" style="width:8%;background:#7B1FA2">FL Spent</div>
+    <div class="seg" style="width:5%;background:#CE93D8" class="dark-text">FL Rem.</div>
+    <div class="seg" style="width:7%;background:#00897B">OOP Spent</div>
+    <div class="seg" style="width:5%;background:#81C784">Profit</div>
+  </div>
+  <div class="legend" style="margin-top:10px">
+    <div class="li"><div class="dot" style="background:#CE7338"></div>Labor Spent</div>
+    <div class="li"><div class="dot" style="background:#306D7C"></div>Labor Remaining</div>
+    <div class="li"><div class="dot" style="background:#7B1FA2"></div>FL Spent</div>
+    <div class="li"><div class="dot" style="background:#CE93D8"></div>FL Remaining</div>
+    <div class="li"><div class="dot" style="background:#00897B"></div>OOP Spent</div>
+    <div class="li"><div class="dot" style="background:#81C784"></div>Profit</div>
+  </div>
+  <div class="swatch-row">
+    <div class="swatch dark" style="background:#CE7338">Labor Spent <span class="tag">#CE7338 (ember)</span></div>
+    <div class="swatch dark" style="background:#306D7C">Labor Rem. <span class="tag">#306D7C (ocean)</span></div>
+    <div class="swatch dark" style="background:#00897B">OOP Spent <span class="tag">#00897B (teal)</span></div>
+    <div class="swatch light" style="background:#B2DFDB">OOP Rem. <span class="tag">#B2DFDB (lt teal)</span></div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- PROPOSED -->
+<div class="section" style="border: 1.5px solid rgba(129,199,132,.35)">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+    <div style="font-size:14px;font-weight:700">Proposed</div>
+    <span class="badge" style="color:#81C784;border:1px solid rgba(129,199,132,.3)">Draft</span>
+  </div>
+
+  <div style="font-size:11px;opacity:.5;margin-bottom:12px">Each category = dark (spent) + light (remaining/budgeted)</div>
+
+  <div class="swatch-row">
+    <div class="swatch dark" style="background:#1565C0">Labor Spent <span class="tag">#1565C0 (dark blue)</span></div>
+    <div class="swatch light" style="background:#80CBC4">Labor Rem. <span class="tag">#80CBC4 (lt teal)</span></div>
+    <div class="swatch dark" style="background:#7B1FA2">FL Spent <span class="tag">#7B1FA2 unchanged</span></div>
+    <div class="swatch light" style="background:#CE93D8">FL Rem. <span class="tag">#CE93D8 unchanged</span></div>
+    <div class="swatch dark" style="background:#CE7338">OOP Spent <span class="tag">#CE7338 (ember)</span></div>
+    <div class="swatch light" style="background:#FFCC80">OOP Rem. <span class="tag">#FFCC80 (lt orange)</span></div>
+  </div>
+
+  <div class="label" style="margin-top:16px">Unspent (budgeted only, no spend yet)</div>
+  <div class="bar" style="margin-top:8px">
+    <div class="seg" style="width:70%;background:#80CBC4;color:rgba(0,0,0,.55)">Labor Budgeted</div>
+    <div class="seg" style="width:10%;background:#CE93D8;color:rgba(0,0,0,.55)">FL Budgeted</div>
+    <div class="seg" style="width:10%;background:#FFCC80;color:rgba(0,0,0,.55)">OOP Budgeted</div>
+    <div class="seg" style="width:10%;background:#81C784">Profit</div>
+  </div>
+
+  <div class="label" style="margin-top:16px">Active spend (spent + remaining visible)</div>
+  <div class="bar" style="margin-top:8px">
+    <div class="seg" style="width:60%;background:#1565C0">Labor Spent</div>
+    <div class="seg" style="width:15%;background:#80CBC4;color:rgba(0,0,0,.55)">Labor Rem.</div>
+    <div class="seg" style="width:8%;background:#7B1FA2">FL Spent</div>
+    <div class="seg" style="width:5%;background:#CE93D8;color:rgba(0,0,0,.55)">FL Rem.</div>
+    <div class="seg" style="width:7%;background:#CE7338">OOP Spent</div>
+    <div class="seg" style="width:5%;background:#81C784">Profit</div>
+  </div>
+
+  <div class="label" style="margin-top:16px">With OOP remaining visible</div>
+  <div class="bar" style="margin-top:8px">
+    <div class="seg" style="width:52%;background:#1565C0">Labor Spent</div>
+    <div class="seg" style="width:12%;background:#80CBC4;color:rgba(0,0,0,.55)">Rem.</div>
+    <div class="seg" style="width:8%;background:#7B1FA2">FL</div>
+    <div class="seg" style="width:4%;background:#CE93D8;color:rgba(0,0,0,.55)"></div>
+    <div class="seg" style="width:8%;background:#CE7338">OOP</div>
+    <div class="seg" style="width:8%;background:#FFCC80;color:rgba(0,0,0,.55)">OOP Rem.</div>
+    <div class="seg" style="width:8%;background:#81C784">Profit</div>
+  </div>
+
+  <div class="legend" style="margin-top:14px">
+    <div class="li"><div class="dot" style="background:#1565C0"></div>Labor Spent</div>
+    <div class="li"><div class="dot" style="background:#80CBC4"></div>Labor Remaining / Budgeted</div>
+    <div class="li"><div class="dot" style="background:#7B1FA2"></div>FL Spent</div>
+    <div class="li"><div class="dot" style="background:#CE93D8"></div>FL Remaining / Budgeted</div>
+    <div class="li"><div class="dot" style="background:#CE7338"></div>OOP Spent</div>
+    <div class="li"><div class="dot" style="background:#FFCC80"></div>OOP Remaining / Budgeted</div>
+    <div class="li"><div class="dot" style="background:#81C784"></div>Profit</div>
+  </div>
+</div>
+
+<!-- FAMILY BREAKDOWN -->
+<div class="section">
+  <div style="font-size:14px;font-weight:700;margin-bottom:16px">Color Family Summary</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+    <div>
+      <div style="font-size:10px;opacity:.4;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Labor — Blue</div>
+      <div style="height:28px;border-radius:4px;background:#1565C0;margin-bottom:6px;display:flex;align-items:center;padding:0 10px;font-size:10px;font-weight:700">Spent</div>
+      <div style="height:28px;border-radius:4px;background:#80CBC4;color:rgba(0,0,0,.6);display:flex;align-items:center;padding:0 10px;font-size:10px;font-weight:700">Remaining / Budgeted</div>
+    </div>
+    <div>
+      <div style="font-size:10px;opacity:.4;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">FL — Purple</div>
+      <div style="height:28px;border-radius:4px;background:#7B1FA2;margin-bottom:6px;display:flex;align-items:center;padding:0 10px;font-size:10px;font-weight:700">Spent</div>
+      <div style="height:28px;border-radius:4px;background:#CE93D8;color:rgba(0,0,0,.6);display:flex;align-items:center;padding:0 10px;font-size:10px;font-weight:700">Remaining / Budgeted</div>
+    </div>
+    <div>
+      <div style="font-size:10px;opacity:.4;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">OOP — Orange</div>
+      <div style="height:28px;border-radius:4px;background:#CE7338;margin-bottom:6px;display:flex;align-items:center;padding:0 10px;font-size:10px;font-weight:700">Spent</div>
+      <div style="height:28px;border-radius:4px;background:#FFCC80;color:rgba(0,0,0,.6);display:flex;align-items:center;padding:0 10px;font-size:10px;font-weight:700">Remaining / Budgeted</div>
+    </div>
+    <div>
+      <div style="font-size:10px;opacity:.4;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Profit — Green</div>
+      <div style="height:28px;border-radius:4px;background:#81C784;margin-bottom:6px;display:flex;align-items:center;padding:0 10px;font-size:10px;font-weight:700">Profit</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
