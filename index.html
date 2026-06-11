@@ -307,8 +307,10 @@ body { font-family: Arial, 'TT Hoves Pro', sans-serif; background: var(--light-g
 .spark-person-row td { padding:7px 10px; font-size:13px; border-bottom:1px solid var(--light-gray); }
 .spark-person-row td.num { text-align:right; font-variant-numeric:tabular-nums; }
 .spark-person-row:last-child td { border-bottom:none; }
-.spark-input { width:72px; padding:5px 8px; border:1px solid var(--canvas); border-radius:5px; font-size:13px; text-align:right; font-family:inherit; font-variant-numeric:tabular-nums; background:var(--white); color:var(--abyss); }
+.spark-input { width:72px; padding:8px 10px; border:1px solid var(--canvas); border-radius:5px; font-size:13px; text-align:right; font-family:inherit; font-variant-numeric:tabular-nums; background:var(--white); color:var(--abyss); }
 .spark-input:focus { outline:none; border-color:var(--ocean); box-shadow:0 0 0 2px rgba(48,109,124,.15); }
+.spark-input::-webkit-outer-spin-button, .spark-input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+.spark-input[type=number] { -moz-appearance:textfield; }
 .spark-oop-wrap { margin-bottom:14px; }
 .spark-oop-dept-header { background:var(--abyss); color:var(--white); border-radius:8px 8px 0 0; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; cursor:pointer; user-select:none; }
 .spark-oop-dept-header:hover { opacity:.9; }
@@ -746,7 +748,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.21 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · May 12, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.22 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Jun 11, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
   </div>
