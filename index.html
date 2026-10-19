@@ -748,7 +748,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.22 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Jun 11, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.24 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Oct 19, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
   </div>
@@ -4501,7 +4501,7 @@ async function renderOpportunityEditor(budgetId) {
     sparkFetch('oop_budget_entries', 'budget_id=eq.' + budgetId + '&select=*,section:oop_sections(id,name,slug),category:oop_categories(id,name)&order=display_order.asc'),
     sparkFetch('oop_sections', 'select=*&order=display_order.asc'),
     sparkFetch('oop_categories', 'select=*&order=display_order.asc'),
-    sparkFetch('labor_actuals', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,department,employment_type)&order=work_date.desc'),
+    sparkFetchAll('labor_actuals', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,department,employment_type)&order=work_date.desc'),
     sparkFetch('agency_settings', 'select=*&order=category.asc,sort_order.asc'),
     sparkFetch('freelancer_budget_entries', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,billable_rate,fully_burdened_rate)&order=team_member_id.asc,display_order.asc')
   ]);
@@ -4882,22 +4882,8 @@ async function oppConvertSubmit(budgetId, projId) {
     return;
   }
 
-  /* Duplicate check — fast local scan */
-  var _convCodeUpper = code.toUpperCase();
-  var _convDup = false;
-  for (var _cci = 0; _cci < (CLIENTS || []).length; _cci++) {
-    for (var _cpi = 0; _cpi < CLIENTS[_cci].projects.length; _cpi++) {
-      if ((CLIENTS[_cci].projects[_cpi].code || '').toUpperCase() === _convCodeUpper) { _convDup = true; break; }
-    }
-    if (_convDup) break;
-  }
-  if (_convDup) {
-    if (errEl) { errEl.textContent = 'Project code \u201c' + code + '\u201d is already in use \u2014 please choose a different number.'; errEl.style.display = 'block'; }
-    codeEl.focus(); return;
-  }
-  /* Supabase check for stale local state */
-  var _convDbCheck = await sparkFetch('projects', 'project_code=eq.' + encodeURIComponent(code) + '&select=id');
-  if (_convDbCheck && _convDbCheck.length > 0) {
+  /* Duplicate check — Supabase is the source of truth (the local list can be up to 45 min stale) */
+  if (await projectCodeInUse(code)) {
     if (errEl) { errEl.textContent = 'Project code \u201c' + code + '\u201d is already in use \u2014 please choose a different number.'; errEl.style.display = 'block'; }
     codeEl.focus(); return;
   }
@@ -6503,7 +6489,7 @@ async function sparkLoadBudgetForProject(projectCode) {
     sparkFetch('oop_budget_entries', 'budget_id=eq.' + budgetId + '&select=*,section:oop_sections(id,name,slug),category:oop_categories(id,name)&order=display_order.asc'),
     sparkFetch('oop_sections', 'select=*&order=display_order.asc'),
     sparkFetch('oop_categories', 'select=*&order=display_order.asc'),
-    sparkFetch('labor_actuals', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,department,employment_type)&order=work_date.desc'),
+    sparkFetchAll('labor_actuals', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,department,employment_type)&order=work_date.desc'),
     sparkFetch('agency_settings', 'select=*&order=category.asc,sort_order.asc'),
     sparkFetch('freelancer_budget_entries', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,billable_rate,fully_burdened_rate)&order=team_member_id.asc,display_order.asc')
   ]);
@@ -6552,8 +6538,8 @@ async function sparkRenderSmallProjectList(projectCode) {
 
   var fetchResults = projId ? await Promise.all([
     sparkFetch('budgets', 'project_id=eq.' + projId + '&visibility=eq.visible&select=id,name,status,client_price,agency_fee,has_discount,created_at&order=created_at.asc'),
-    sparkFetch('labor_actuals', 'project_code=eq.' + encodeURIComponent(projectCode) + '&budget_id=is.null&select=id,person_name,work_date,hours,item_name,source,is_billable,is_bizdev&order=item_name.asc,work_date.asc'),
-    sparkFetch('labor_actuals', 'project_code=eq.' + encodeURIComponent(projectCode) + '&budget_id=not.is.null&select=budget_id,hours,person_name&order=budget_id.asc')
+    sparkFetchAll('labor_actuals', 'project_code=eq.' + encodeURIComponent(projectCode) + '&budget_id=is.null&select=id,person_name,work_date,hours,item_name,source,is_billable,is_bizdev&order=item_name.asc,work_date.asc'),
+    sparkFetchAll('labor_actuals', 'project_code=eq.' + encodeURIComponent(projectCode) + '&budget_id=not.is.null&select=budget_id,hours,person_name&order=budget_id.asc')
   ]) : [[], [], []];
   var budgets    = fetchResults[0] || [];
   var unassigned = fetchResults[1] || [];
@@ -6859,7 +6845,7 @@ async function sparkEditSmallSnapshot(budgetId, projectCode) {
     sparkFetch('oop_budget_entries', 'budget_id=eq.' + budgetId + '&select=*,section:oop_sections(id,name,slug),category:oop_categories(id,name)&order=display_order.asc'),
     sparkFetch('oop_sections', 'select=*&order=display_order.asc'),
     sparkFetch('oop_categories', 'select=*&order=display_order.asc'),
-    sparkFetch('labor_actuals', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,department,employment_type)&order=work_date.desc'),
+    sparkFetchAll('labor_actuals', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,department,employment_type)&order=work_date.desc'),
     sparkFetch('agency_settings', 'select=*&order=category.asc,sort_order.asc'),
     sparkFetch('freelancer_budget_entries', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,billable_rate,fully_burdened_rate)&order=team_member_id.asc,display_order.asc')
   ]);
@@ -7202,6 +7188,19 @@ function hideAddProjectForm() {
   if (overlay) overlay.style.display = 'none';
 }
 
+/* True if a project already uses this code. Asks Supabase first; falls back to the
+   local CLIENTS list only if the lookup fails (e.g. offline). */
+async function projectCodeInUse(code) {
+  try {
+    var rows = await sparkFetch('projects', 'project_code=eq.' + encodeURIComponent(code) + '&select=id');
+    if (Array.isArray(rows)) return rows.length > 0;
+  } catch(e) {}
+  var up = (code || '').toUpperCase();
+  return (CLIENTS || []).some(function(c) {
+    return (c.projects || []).some(function(p) { return (p.code || '').toUpperCase() === up; });
+  });
+}
+
 async function createNewProject() {
   var clientEl = document.getElementById('addProjClientSelect');
   var nameEl = document.getElementById('addProjName');
@@ -7219,20 +7218,8 @@ async function createNewProject() {
   if (!name) { showErr('Project name is required.'); if (nameEl) nameEl.focus(); return; }
   if (!code) { showErr('Project code is required.'); if (codeEl) codeEl.focus(); return; }
 
-  /* Duplicate check — fast local scan first */
-  var _codeUpper = code.toUpperCase();
-  var _dupFound = false;
-  for (var _ci = 0; _ci < (CLIENTS || []).length; _ci++) {
-    for (var _pi = 0; _pi < CLIENTS[_ci].projects.length; _pi++) {
-      if ((CLIENTS[_ci].projects[_pi].code || '').toUpperCase() === _codeUpper) { _dupFound = true; break; }
-    }
-    if (_dupFound) break;
-  }
-  if (_dupFound) { showErr('Project code \u201c' + code + '\u201d is already in use \u2014 please choose a different one.'); if (codeEl) codeEl.focus(); return; }
-
-  /* Also hit Supabase in case local state is stale */
-  var _dbCheck = await sparkFetch('projects', 'project_code=eq.' + encodeURIComponent(code) + '&select=id');
-  if (_dbCheck && _dbCheck.length > 0) { showErr('Project code \u201c' + code + '\u201d is already in use \u2014 please choose a different one.'); if (codeEl) codeEl.focus(); return; }
+  /* Duplicate check — Supabase is the source of truth (the local list can be up to 45 min stale) */
+  if (await projectCodeInUse(code)) { showErr('Project code \u201c' + code + '\u201d is already in use \u2014 please choose a different one.'); if (codeEl) codeEl.focus(); return; }
 
   /* Disable button during creation */
   var btn = document.querySelector('#addProjectOverlay button');
@@ -7309,7 +7296,7 @@ async function createNewProject() {
     }
 
     /* 5. Bust cache */
-    try { localStorage.removeItem('furnace_supa_v4'); } catch(e) {}
+    try { localStorage.removeItem(FURNACE_CACHE_KEY); } catch(e) {}
 
     /* 6. Navigate to new project page */
     hideAddProjectForm();
@@ -7402,7 +7389,7 @@ function deleteProject(btn) {
             if (_pr[pi].code === projCode) { _pr.splice(pi, 1); break; }
           }
         }
-        try { localStorage.removeItem('furnace_supa_v4'); } catch(e) {}
+        try { localStorage.removeItem(FURNACE_CACHE_KEY); } catch(e) {}
         sparkHideSaving();
         ov2.remove();
         if (clientId) navigate('client:' + clientId); else navigate('master');
@@ -7974,6 +7961,12 @@ function sparkBudgetAmtBlur(el) {
   sparkPatchBudgetField('client_price', v);
   el.value = Math.round(v).toLocaleString();
 }
+
+document.addEventListener('focusin', function(e) {
+  if (e.target.classList && e.target.classList.contains('spark-input') && e.target.tagName !== 'SELECT') {
+    e.target.select();
+  }
+});
 
 async function sparkSaveSmallProjHours(val) {
   /* For Small Projects — save total hours as a single "Team" labor entry in phase4 */
@@ -9475,7 +9468,7 @@ async function sparkLoadBudget(budgetId) {
     sparkFetch('oop_budget_entries', 'budget_id=eq.' + budgetId + '&select=*,section:oop_sections(id,name,slug),category:oop_categories(id,name)&order=display_order.asc'),
     sparkFetch('oop_sections', 'select=*&order=display_order.asc'),
     sparkFetch('oop_categories', 'select=*&order=display_order.asc'),
-    sparkFetch('labor_actuals', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,department,employment_type)&order=work_date.desc'),
+    sparkFetchAll('labor_actuals', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,department,employment_type)&order=work_date.desc'),
     sparkFetch('agency_settings', 'select=*&order=category.asc,sort_order.asc'),
     sparkFetch('freelancer_budget_entries', 'budget_id=eq.' + budgetId + '&select=*,team_member:team_members(id,name,billable_rate,fully_burdened_rate)&order=team_member_id.asc,display_order.asc')
   ]);
@@ -9816,6 +9809,9 @@ function sparkRenderBudgetContent(embedded) {
   h += '</label></div>';
   h += '<div class="rt-card"><div id="sparkFreelancersContent"></div></div>';
 
+  /* ── Contributors Section (contractors tracked via labor_actuals by project_code) ── */
+  h += '<div id="sparkContributorsSection" style="display:none;margin-top:28px"></div>';
+
   /* ── OOP Section ── */
   /* OOP section with No OOP toggle */
   var noOopChecked = data.budget.no_oop === true;
@@ -9839,6 +9835,62 @@ function sparkRenderBudgetContent(embedded) {
   sparkRenderFreelancersContent();
   sparkRenderOopContent();
   sparkRenderSummary();
+  sparkRenderContributorHours(projCode);
+}
+
+async function sparkRenderContributorHours(projCode) {
+  var el = document.getElementById('sparkContributorsSection');
+  if (!el || !projCode) return;
+
+  var rows = await sparkFetchAll('labor_actuals',
+    'select=person_name,hours,team_member:team_members(employment_type)&project_code=eq.' + encodeURIComponent(projCode) + '&order=person_name.asc');
+
+  var byPerson = {};
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    if (!r.team_member || r.team_member.employment_type !== 'Contractor') continue;
+    if (!byPerson[r.person_name]) byPerson[r.person_name] = 0;
+    byPerson[r.person_name] += parseFloat(r.hours || 0);
+  }
+
+  var people = Object.keys(byPerson);
+  if (!people.length) { el.style.display = 'none'; return; }
+
+  people.sort(function(a, b) { return byPerson[b] - byPerson[a]; });
+
+  var total = people.reduce(function(s, n) { return s + byPerson[n]; }, 0);
+  var maxHrs = byPerson[people[0]] || 1;
+
+  var h = '<div class="section-title" style="margin:0;margin-bottom:12px">Contributors</div>';
+  h += '<div class="rt-card" style="padding:16px 20px">';
+  h += '<table style="width:100%;border-collapse:collapse">';
+  h += '<thead><tr>';
+  h += '<th style="text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--mid-gray);padding:0 0 10px">Name</th>';
+  h += '<th style="text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--mid-gray);padding:0 0 10px;white-space:nowrap">Total Hours</th>';
+  h += '</tr></thead><tbody>';
+
+  for (var p = 0; p < people.length; p++) {
+    var name = people[p];
+    var hrs = byPerson[name];
+    var pct = Math.round((hrs / maxHrs) * 100);
+    h += '<tr style="border-top:1px solid var(--canvas)">';
+    h += '<td style="padding:10px 0 10px">';
+    h += '<div style="font-size:13px;font-weight:600;margin-bottom:5px">' + name + '</div>';
+    h += '<div style="height:5px;border-radius:3px;background:var(--canvas);overflow:hidden">';
+    h += '<div style="height:100%;width:' + pct + '%;background:var(--ocean);border-radius:3px;transition:width .4s"></div>';
+    h += '</div></td>';
+    h += '<td style="padding:10px 0;text-align:right;font-size:15px;font-weight:700;vertical-align:top">' + hrs.toFixed(1) + '<span style="font-size:10px;font-weight:500;color:var(--mid-gray);margin-left:2px">hrs</span></td>';
+    h += '</tr>';
+  }
+
+  h += '<tr style="border-top:2px solid var(--canvas)">';
+  h += '<td style="padding:10px 0;font-size:11px;font-weight:600;color:var(--mid-gray);text-transform:uppercase;letter-spacing:.5px">Total</td>';
+  h += '<td style="padding:10px 0;text-align:right;font-size:16px;font-weight:700;color:var(--ocean)">' + total.toFixed(1) + '<span style="font-size:10px;font-weight:500;color:var(--mid-gray);margin-left:2px">hrs</span></td>';
+  h += '</tr>';
+  h += '</tbody></table></div>';
+
+  el.innerHTML = h;
+  el.style.display = '';
 }
 
 async function renderSpark() {
@@ -10746,7 +10798,7 @@ function rmFlOpenCellModal(projCode, tmId, weekISO) {
   h += '<input id="rmFlCellPaidDate" type="date" value="' + paidDate + '" style="width:100%;padding:7px 10px;border-radius:6px;border:1px solid var(--canvas);font-size:13px;outline:none;box-sizing:border-box">';
   h += '</div>';
   h += '<div style="display:flex;gap:8px;margin-top:4px">';
-  h += '<button onclick="rmFlSaveCellEntry(\'' + projCode + '\',\'' + tmId + '\',\'' + weekISO + '\',\'' + entryId + '\',' + rate + ')" style="flex:1;padding:10px 0;border-radius:6px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-size:13px;font-weight:600">Save</button>';
+  h += '<button id="rmFlSaveBtn" onclick="this.disabled=true;this.textContent=\'Saving…\';rmFlSaveCellEntry(\'' + projCode + '\',\'' + tmId + '\',\'' + weekISO + '\',\'' + entryId + '\',' + rate + ')" style="flex:1;padding:10px 0;border-radius:6px;border:none;background:#5B4A8A;color:#fff;cursor:pointer;font-size:13px;font-weight:600">Save</button>';
   if (entryId) h += '<button onclick="rmFlDeleteCellEntry(\'' + entryId + '\')" style="padding:10px 14px;border-radius:6px;border:1px solid rgba(220,53,69,.3);background:transparent;color:var(--ember);cursor:pointer;font-size:13px">Delete</button>';
   h += '<button onclick="document.getElementById(\'rmFlCellOverlay\').remove()" style="padding:10px 14px;border-radius:6px;border:1px solid var(--canvas);background:transparent;cursor:pointer;font-size:13px;color:var(--mid-gray)">Cancel</button>';
   h += '</div></div></div>';
@@ -12030,6 +12082,18 @@ var allocViewMode = 'day'; /* 'day' or 'week' */
 var allocProjSearch = '';
 var allocEditingCell = null; /* {person, date} when inline editing */
 var allocExpandedPerson = {}; /* person name -> true/false for project breakdown toggle */
+
+/* People who have left Forge — hidden from the grid for any week >= their departure date */
+var ALLOC_DEPARTED_MEMBERS = {
+  'Christian Lau': '2026-08-10',
+  'Grace Donovan': '2026-08-10'
+};
+function allocActiveTeam(weekOf) {
+  return (ALLOCATIONS.team || []).filter(function(p) {
+    var cutoff = ALLOC_DEPARTED_MEMBERS[p];
+    return !cutoff || weekOf < cutoff;
+  }).sort(function(a, b) { return a.localeCompare(b); });
+}
 
 function getNextMonday() {
   var d = new Date(); var day = d.getDay();
@@ -13874,7 +13938,7 @@ function renderAllocGrid() {
     return;
   }
 
-  var team = (ALLOCATIONS.team || []).slice().sort(function(a, b) { return a.localeCompare(b); });
+  var team = allocActiveTeam(allocWeekOf);
   var people = team;
 
   var days, cols;
@@ -14120,7 +14184,7 @@ function allocFinishEdit(person, dateISO, value) {
 
 function allocShowAddPerson() {
   /* Quick: add first unassigned person with 0 hours so they appear in the grid */
-  var team = ALLOCATIONS.team || [];
+  var team = allocActiveTeam(allocWeekOf);
   var assigned = getProjectPeople(allocProject, allocWeekOf);
   for (var i = 0; i < team.length; i++) {
     if (assigned.indexOf(team[i]) < 0) {
@@ -14136,7 +14200,7 @@ function renderCapacityPanel() {
   var el = document.getElementById('allocCapPanel');
   if (!el) return;
   var maxCap = ALLOCATIONS.weeklyCapacity || 40;
-  var team = ALLOCATIONS.team || [];
+  var team = allocActiveTeam(allocWeekOf);
 
   /* Build project name → billable lookup */
   var projBillable = {};
