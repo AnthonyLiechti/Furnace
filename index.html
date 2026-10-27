@@ -748,7 +748,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.25 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Oct 27, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.26 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Oct 27, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
   </div>
@@ -4225,8 +4225,8 @@ async function importDedup() {
 
   if (statusEl) statusEl.innerHTML = '<div style="background:#E8F5E9;border-radius:8px;padding:16px;margin-bottom:12px"><div style="font-weight:600;color:#2E7D32">&#10003; Deduplication Complete</div><div style="font-size:12px;color:#2E7D32">Removed ' + deleted + ' duplicate entries. ' + (all.length - deleted) + ' unique entries remain.</div></div>';
 
-  /* Reload data */
-  await loadSupabaseData();
+  /* Reload data — bypass the cache so the totals reflect the deletions */
+  await loadSupabaseData(true);
   enrichProjectsWithSupabase();
 }
 
@@ -4950,7 +4950,7 @@ async function sparkLogin() {
     renderSettings();
     /* Reload data now that we're connected */
     if (typeof loadSupabaseData === 'function') {
-      await loadSupabaseData();
+      await loadSupabaseData(true);
       enrichProjectsWithSupabase();
     }
   } else {
@@ -14610,27 +14610,54 @@ async function sparkFetchAll(table, query) {
   /* Use anon key directly — no user session required */
   var token = sparkConfig.supabaseAnonKey;
 
-  var all = [], page = 0, pageSize = 1000;
+  var pageSize = 1000;
   var url = sparkConfig.supabaseUrl + '/rest/v1/' + table + '?' + query;
-  while (true) {
+  function fetchPage(page, isRetry) {
     var start = page * pageSize;
-    var end = start + pageSize - 1;
-    try {
-      var resp = await fetch(url, {
-        headers: {
-          'apikey': sparkConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ' + token,
-          'Range': start + '-' + end,
-          'Prefer': 'count=exact'
-        }
-      });
-      if (!resp.ok) break;
-      var batch = await resp.json();
-      if (!batch || !batch.length) break;
-      all = all.concat(batch);
-      if (batch.length < pageSize) break;
-      page++;
-    } catch (err) { console.error('sparkFetchAll page error', err); break; }
+    var headers = {
+      'apikey': sparkConfig.supabaseAnonKey,
+      'Authorization': 'Bearer ' + token,
+      'Range': start + '-' + (start + pageSize - 1)
+    };
+    /* Only the first page asks for the total (reported in Content-Range, e.g. "0-999/28271");
+       counting on every page would run 29 extra count queries at once for nothing */
+    if (page === 0) headers['Prefer'] = 'count=exact';
+    return fetch(url, { headers: headers }).then(function(resp) {
+      if (!resp.ok) throw new Error(table + ' page ' + page + ' → HTTP ' + resp.status);
+      return resp.json().then(function(rows) { return { rows: rows || [], range: resp.headers.get('content-range') || '' }; });
+    }).catch(function(err) {
+      /* One retry covers the usual transient blip; a second failure stops the load loudly
+         rather than silently showing totals with a page of rows missing */
+      if (isRetry) throw err;
+      console.warn('sparkFetchAll retrying', table, 'page', page, err.message);
+      return fetchPage(page, true);
+    });
+  }
+
+  /* First page tells us the total; every remaining page is requested at once.
+     Sequentially, 28k rows took ~14s; in parallel the same pages take ~2s. */
+  var all = [];
+  try {
+    var first = await fetchPage(0);
+    all = first.rows;
+    if (first.rows.length < pageSize) return all;
+    var total = parseInt((first.range.split('/')[1] || ''), 10);
+    if (isNaN(total)) {
+      /* No total reported — fall back to walking pages one at a time */
+      for (var p = 1; ; p++) {
+        var next = await fetchPage(p);
+        all = all.concat(next.rows);
+        if (next.rows.length < pageSize) break;
+      }
+      return all;
+    }
+    var remaining = [];
+    for (var pg = 1; pg * pageSize < total; pg++) remaining.push(fetchPage(pg));
+    var results = await Promise.all(remaining);
+    for (var r = 0; r < results.length; r++) all = all.concat(results[r].rows);
+  } catch (err) {
+    console.error('sparkFetchAll failed for ' + table + ' — not returning partial data', err);
+    throw err;
   }
   return all;
 }
@@ -14758,7 +14785,9 @@ function furnaceGlobalHandleEntryChange(type, payload) {
     for (var i = 0; i < arr.length; i++) {
       if (arr[i].id === rec.id) { arr[i] = Object.assign({}, arr[i], rec); found = true; break; }
     }
-    if (!found && payload.eventType === 'INSERT') arr.push(rec);
+    /* Not in memory on UPDATE too: zero-hour labor rows are left out of the portfolio load,
+       so the first time someone types hours into one it arrives here as an unseen UPDATE */
+    if (!found) arr.push(rec);
   }
   if (type === 'labor') sb.labor = arr;
   else if (type === 'oop') { sb.oop = arr; sb._oopEntries = arr; } /* keep _oopEntries in sync for OOP planner */
@@ -14829,23 +14858,58 @@ function furnaceGlobalRefreshProjectCard(projCode) {
   }
 }
 
-async function loadSupabaseData() {
+/* Entry point. Three cases:
+   • cache fresh (< FURNACE_CACHE_TTL)  → apply it, done, no network
+   • cache stale                        → apply it so the page draws now, fetch fresh data in the
+                                          background, then furnaceAfterBackgroundRefresh() redraws
+   • no cache, or forceFresh            → wait for the fresh fetch before returning */
+async function loadSupabaseData(forceFresh) {
   if (!sparkAuth.connected) return;
-  try {
+  var cached = forceFresh ? null : furnaceLoadCache();
+  var isStale = !cached || (Date.now() - cached.ts > FURNACE_CACHE_TTL);
+  if (cached) {
+    furnaceApplyCachePayload(cached.d);
+    furnaceSubscribeGlobalRealtime();
+    if (!isStale) { setDataStatus('live'); return; }
+    setDataStatus('cached');
+    furnaceFetchFreshData().then(function(ok) {
+      if (ok) furnaceAfterBackgroundRefresh();
+      else setDataStatus('cached'); /* refresh failed — keep showing the cached copy, honestly labelled */
+    });
+    return;
+  }
+  await furnaceFetchFreshData();
+}
 
-    /* ── CACHE: serve stale data instantly while fresh fetch runs in background ──
-       If we have cached data, apply it now so the rest of loadData can render
-       immediately using cached SUPA_BUDGETS/SUPA_ACTUALS. Then if cache is still
-       fresh, skip the heavy re-fetch entirely. If stale, continue to re-fetch and
-       the UI will silently update when the fresh data arrives. ── */
-    var cached = furnaceLoadCache();
-    var isStale = !cached || (Date.now() - cached.ts > FURNACE_CACHE_TTL);
-    if (cached) {
-      furnaceApplyCachePayload(cached.d);
-      furnaceSubscribeGlobalRealtime();
-      if (!isStale) { setDataStatus('live'); return; } /* cache is fresh */
-      setDataStatus('cached'); /* stale cache applied — fresh fetch starting */
+/* After a background refresh lands: rebuild what loadData derives from SUPA_BUDGETS /
+   SUPA_ACTUALS, then redraw the open view. Skipped while someone is typing in a field. */
+function furnaceAfterBackgroundRefresh() {
+  if (!CLIENTS || !CLIENTS.length) return; /* loadData hasn't built clients yet; it will use the fresh data itself */
+  enrichProjectsWithSupabase();
+  buildProjectBudgetLookup();
+  computeResourceWeeks();
+  var ae = document.activeElement;
+  if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT' || ae.isContentEditable)) return;
+  var v = currentView || '';
+  if (v.indexOf('project:') === 0) {
+    /* The budget editor on a project page keeps its own live data — refresh only the financials banner */
+    var key = v.split(':')[1];
+    for (var ci = 0; ci < CLIENTS.length; ci++) {
+      for (var pi = 0; pi < CLIENTS[ci].projects.length; pi++) {
+        var proj = CLIENTS[ci].projects[pi];
+        if (proj.code === key || proj.id === key) { renderProjFinancials(proj); return; }
+      }
     }
+  } else if (['master', 'ytd', 'flagged', 'completed', 'resource', 'allocations'].indexOf(v) >= 0 || v.indexOf('client:') === 0) {
+    navigate(v);
+  }
+  /* opportunities / spark / settings / importTime fetch their own data — leave them alone */
+}
+
+/* Fetches everything from Supabase and rebuilds SUPA_BUDGETS / SUPA_ACTUALS.
+   Resolves true on success, false on failure (never throws). */
+async function furnaceFetchFreshData() {
+  try {
     setDataStatus('syncing');
     /* 0+1+1b. Fetch team members, budgets, and project ID map in parallel */
     var _phase1 = await Promise.all([
@@ -14874,11 +14938,15 @@ async function loadSupabaseData() {
     var budgetIds = budgets.map(function(b) { return b.id; });
     var _bids = budgetIds.join(',');
     var _phase2 = await Promise.all([
-      sparkFetchAll('labor_budget_entries', 'select=id,budget_id,department,employment_type,phase1,phase2,phase3_1,phase3_2,phase4,phase5,rate_override,team_member_id,team_member:team_members(id,name,fully_burdened_rate)&budget_id=in.(' + _bids + ')'),
+      /* Skip rows with 0 hours in every phase — ~94% of the table is placeholder rows created
+         with each new project. They add nothing to any total here; the budget editor fetches
+         its own full row set so the editable 0s still show there. */
+      sparkFetchAll('labor_budget_entries', 'select=id,budget_id,department,employment_type,phase1,phase2,phase3_1,phase3_2,phase4,phase5,rate_override,team_member_id,team_member:team_members(id,name,fully_burdened_rate)&budget_id=in.(' + _bids + ')&or=(phase1.gt.0,phase2.gt.0,phase3_1.gt.0,phase3_2.gt.0,phase4.gt.0,phase5.gt.0)'),
       sparkFetchAll('oop_budget_entries', 'select=id,budget_id,line_item_name,count,rate,days,head_count,adjusted_count,adjusted_rate,adjusted_days,adjusted_head_count,actual_count,actual_rate,actual_days,actual_head_count,actual_amount,paid,paid_date,is_active&budget_id=in.(' + _bids + ')'),
       sparkFetchAll('freelancer_budget_entries', 'select=id,budget_id,team_member_id,week_label,hours,rate,paid,paid_date,notes&budget_id=in.(' + _bids + ')'),
-      sparkFetchAll('labor_actuals', 'select=id,budget_id,hours,work_date,person_name,project_code,phase_key,is_billable,is_bizdev,is_timeoff,board_name,billable_rate&source=eq.timetracker&work_date=gte.2024-01-01&project_code=not.like.100_%25&order=work_date.desc'),
-      sparkFetchAll('allocations', 'select=id,person,project,date,hours_per_day,week_of&order=date.asc')
+      sparkFetchAll('labor_actuals', 'select=id,budget_id,hours,work_date,person_name,project_code,phase_key,is_billable,is_bizdev,is_timeoff,board_name,billable_rate&source=eq.timetracker&work_date=gte.2024-01-01&project_code=not.like.100_%25&order=work_date.desc')
+      /* allocations are loaded (with all their fields) by loadData — fetching them here too
+         meant two copies raced, and the poorer one could win */
     ]);
     var laborEntries = _phase2[0];
     var oopEntries   = _phase2[1];
@@ -15109,31 +15177,6 @@ async function loadSupabaseData() {
       }
     }
 
-    /* 7. Allocations already fetched in phase 2 parallel batch */
-    var supaAllocs = _phase2[4];
-    if (supaAllocs && supaAllocs.length > 0) {
-      ALLOCATIONS.allocations = supaAllocs.map(function(a) {
-        return { id: a.id, person: a.person, project: a.project, date: a.date, hoursPerDay: a.hours_per_day, weekOf: a.week_of };
-      });
-      /* Build team list from allocations */
-      var teamSet = {};
-      for (var i = 0; i < ALLOCATIONS.allocations.length; i++) {
-        teamSet[ALLOCATIONS.allocations[i].person] = true;
-      }
-      ALLOCATIONS.team = Object.keys(teamSet).sort();
-      /* Build forecastProjects from allocations, merged with any existing local forecastProjects */
-      var projSet = {};
-      var existingForecast = (ALLOCATIONS.forecastProjects || []);
-      for (var i = 0; i < existingForecast.length; i++) {
-        projSet[existingForecast[i]] = true;
-      }
-      for (var i = 0; i < ALLOCATIONS.allocations.length; i++) {
-        projSet[ALLOCATIONS.allocations[i].project] = true;
-      }
-      ALLOCATIONS.forecastProjects = Object.keys(projSet).sort();
-      console.log('Supabase allocations loaded:', ALLOCATIONS.allocations.length, 'entries,', ALLOCATIONS.team.length, 'team members,', ALLOCATIONS.forecastProjects.length, 'forecast projects');
-    }
-
     SUPA_LOADED = true;
     setDataStatus('live');
     console.log('Supabase data loaded:', Object.keys(SUPA_BUDGETS).length, 'budgets,', SUPA_ACTUALS_ALL.length, 'actuals');
@@ -15171,9 +15214,11 @@ async function loadSupabaseData() {
 
     /* Start global real-time subscription (no-op if already subscribed) */
     furnaceSubscribeGlobalRealtime();
+    return true;
 
   } catch (err) {
     console.error('Failed to load Supabase data:', err);
+    return false;
   }
 }
 
