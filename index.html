@@ -768,7 +768,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.30 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Oct 27, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.31 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Oct 27, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
     <div id="furnaceLoadText"></div>
@@ -12139,7 +12139,8 @@ var allocExpandedPerson = {}; /* person name -> true/false for project breakdown
 /* People who have left Forge — hidden from the grid for any week >= their departure date */
 var ALLOC_DEPARTED_MEMBERS = {
   'Christian Lau': '2026-08-10',
-  'Grace Donovan': '2026-08-10'
+  'Grace Donovan': '2026-08-10',
+  'Jordan Pereira': '2026-10-26'
 };
 function allocActiveTeam(weekOf) {
   return (ALLOCATIONS.team || []).filter(function(p) {
