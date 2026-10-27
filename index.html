@@ -768,7 +768,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.31 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Oct 27, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.32 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Oct 27, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
     <div id="furnaceLoadText"></div>
@@ -3786,6 +3786,18 @@ function importHandleDrop(event) {
   if (files.length > 0) importHandleFile(files[0]);
 }
 
+/* Monday reports some people by first name only. Map those to the team-list name BEFORE the
+   duplicate check so re-imports match the corrected history instead of duplicating it. */
+var FURNACE_NAME_ALIASES = {
+  'Emma':   'Emma Walters',
+  'Rae':    'Rae Santangelo',
+  'Trevor': 'Trevor Morse'
+};
+function furnaceCanonicalName(name) {
+  var n = (name || '').trim();
+  return FURNACE_NAME_ALIASES[n] || n;
+}
+
 async function importHandleFile(file) {
   if (!file) return;
   var statusEl = document.getElementById('importStatus');
@@ -3827,7 +3839,7 @@ async function importHandleFile(file) {
     var hours = parseFloat(col(r, ['Logged Time', 'Hours', 'Duration']) || 0);
     if (!hours || hours === 0) { skipped++; continue; }
 
-    var person = col(r, ['Person', 'User', 'Member']) || '';
+    var person = furnaceCanonicalName(col(r, ['Person', 'User', 'Member']) || '');
     var board = col(r, ['Board', 'Project']) || '';
     var dateRaw = col(r, ['Date Logged', 'Date', 'Start']);
     var group = col(r, ['Group', 'Phase']) || '';
