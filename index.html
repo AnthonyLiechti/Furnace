@@ -23,6 +23,10 @@ body { font-family: Arial, 'TT Hoves Pro', sans-serif; background: var(--light-g
 #dataStatusBadge.ds-syncing { opacity:1; background:rgba(245,127,23,.18); color:#FFB74D; border:1px solid rgba(245,127,23,.3); animation:dsPulse 1.4s ease-in-out infinite; }
 #dataStatusBadge.ds-live    { opacity:1; background:rgba(129,199,132,.18); color:#81C784; border:1px solid rgba(129,199,132,.3); }
 #dataStatusBadge.ds-cached  { opacity:1; background:rgba(255,183,77,.12);  color:#FFB74D; border:1px solid rgba(255,183,77,.25); }
+/* Load progress: thin bar across the top of the window + a record count under the badge */
+#furnaceLoadBar { position:fixed; top:0; left:0; height:3px; width:0; z-index:100; pointer-events:none; background:linear-gradient(90deg, var(--ocean), var(--sand) 60%, var(--honey)); box-shadow:0 0 8px rgba(218,195,142,.7); opacity:0; transition:width .25s ease-out, opacity .5s ease; }
+#furnaceLoadBar.on { opacity:1; }
+#furnaceLoadText { font-size:9px; color:rgba(255,255,255,.45); margin-top:4px; min-height:11px; font-variant-numeric:tabular-nums; transition:opacity .4s; }
 @keyframes dsPulse { 0%,100%{opacity:.7} 50%{opacity:1} }
 .sidebar-header h2 { font-size:16px; letter-spacing:1px; text-transform:uppercase; color:var(--sand); }
 .sidebar-header p { font-size:11px; color:rgba(255,255,255,.5); margin-top:4px; }
@@ -743,14 +747,16 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
 </style>
 </head>
 <body>
+<div id="furnaceLoadBar"></div>
 
 <div class="sidebar">
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.27 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Oct 27, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.28 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Oct 27, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
+    <div id="furnaceLoadText"></div>
   </div>
   <div class="sidebar-nav" id="sidebarNav"></div>
   <div class="dark-toggle" onclick="toggleDarkMode()">
@@ -14640,19 +14646,23 @@ async function sparkFetchAll(table, query) {
   try {
     var first = await fetchPage(0);
     all = first.rows;
-    if (first.rows.length < pageSize) return all;
+    if (first.rows.length < pageSize) { furnaceProgressRows(first.rows.length, first.rows.length); return all; }
     var total = parseInt((first.range.split('/')[1] || ''), 10);
+    furnaceProgressRows(isNaN(total) ? first.rows.length : total, first.rows.length);
     if (isNaN(total)) {
       /* No total reported — fall back to walking pages one at a time */
       for (var p = 1; ; p++) {
         var next = await fetchPage(p);
         all = all.concat(next.rows);
+        furnaceProgressRows(next.rows.length, next.rows.length);
         if (next.rows.length < pageSize) break;
       }
       return all;
     }
     var remaining = [];
-    for (var pg = 1; pg * pageSize < total; pg++) remaining.push(fetchPage(pg));
+    for (var pg = 1; pg * pageSize < total; pg++) {
+      remaining.push(fetchPage(pg).then(function(res) { furnaceProgressRows(0, res.rows.length); return res; }));
+    }
     var results = await Promise.all(remaining);
     for (var r = 0; r < results.length; r++) all = all.concat(results[r].rows);
   } catch (err) {
@@ -14670,6 +14680,70 @@ async function sparkFetchAll(table, query) {
    ══════════════════════════════════════════════════════════════ */
 /* ── DATA STATUS BADGE ── */
 var _dsLiveTimer = null;
+/* ══════════════════════════════════════════════════════════════
+   LOAD PROGRESS — real checkpoints (rows received ÷ rows expected, reported
+   by sparkFetchAll as pages land) with a gentle creep between them so the
+   bar never looks frozen. Snaps to 100% when the page is drawn.
+   ══════════════════════════════════════════════════════════════ */
+var furnaceProgress = { active: false, known: 0, learned: 0, expected: 0, done: 0, target: 0, shown: 0, timer: null, background: false };
+var FURNACE_EXPECTED_ROWS_KEY = 'furnace_load_rows'; /* row count of the last full load — the bar's expected size until the real totals arrive */
+
+function furnaceProgressRender() {
+  var bar = document.getElementById('furnaceLoadBar');
+  var txt = document.getElementById('furnaceLoadText');
+  if (bar) bar.style.width = furnaceProgress.shown.toFixed(1) + '%';
+  if (txt) {
+    if (!furnaceProgress.active) txt.textContent = '';
+    else if (furnaceProgress.known > 0) txt.textContent = 'Loading ' + Math.min(furnaceProgress.done, furnaceProgress.known).toLocaleString() + ' of ' + furnaceProgress.known.toLocaleString() + ' records';
+    else txt.textContent = 'Connecting…';
+  }
+}
+
+function furnaceProgressStart() {
+  var p = furnaceProgress;
+  if (p.active) return;
+  p.active = true; p.learned = 0; p.done = 0; p.target = 4; p.shown = 0; p.background = false;
+  /* Small tables report their totals within ~0.3s; the big time-entry table's total only arrives
+     with its first page (~1s). Without a prior, the bar would leap to ~85% then stall. */
+  var prior = 0;
+  try { prior = parseInt(localStorage.getItem(FURNACE_EXPECTED_ROWS_KEY) || '', 10) || 0; } catch(e) {}
+  p.expected = prior || 36000;
+  p.known = p.expected;
+  var bar = document.getElementById('furnaceLoadBar');
+  if (bar) { bar.style.transition = 'none'; bar.style.width = '0'; void bar.offsetWidth; bar.style.transition = ''; bar.classList.add('on'); }
+  if (p.timer) clearInterval(p.timer);
+  p.timer = setInterval(function() {
+    /* ease toward the real target; past it, creep slowly (never beyond 92%) so a long page wait still shows motion */
+    if (p.shown < p.target) p.shown += (p.target - p.shown) * 0.3;
+    else if (p.shown < 92) p.shown = Math.min(92, p.shown + 0.25);
+    furnaceProgressRender();
+  }, 80);
+  furnaceProgressRender();
+}
+
+/* Called by sparkFetchAll: `known` rows newly learned to exist, `done` rows just received */
+function furnaceProgressRows(known, done) {
+  var p = furnaceProgress;
+  if (!p.active) return;
+  p.learned += known || 0; p.done += done || 0;
+  p.known = Math.max(p.learned, p.expected); /* real totals take over once they exceed the prior */
+  if (p.known > 0) p.target = Math.max(p.target, 8 + 82 * Math.min(1, p.done / p.known));
+}
+
+/* Data is in; the page is being assembled/drawn */
+function furnaceProgressStage(pct) { if (furnaceProgress.active) furnaceProgress.target = Math.max(furnaceProgress.target, pct); }
+
+function furnaceProgressDone() {
+  var p = furnaceProgress;
+  if (!p.active) return;
+  if (p.timer) { clearInterval(p.timer); p.timer = null; }
+  p.shown = 100; p.target = 100; p.active = false; p.background = false;
+  if (p.done > 1000) { try { localStorage.setItem(FURNACE_EXPECTED_ROWS_KEY, String(p.done)); } catch(e) {} } /* next load's prior */
+  furnaceProgressRender();
+  var bar = document.getElementById('furnaceLoadBar');
+  setTimeout(function() { if (!furnaceProgress.active && bar) { bar.classList.remove('on'); setTimeout(function() { if (!furnaceProgress.active) bar.style.width = '0'; }, 500); } }, 350);
+}
+
 function setDataStatus(state) {
   var el = document.getElementById('dataStatusBadge');
   if (!el) return;
@@ -14931,13 +15005,17 @@ async function loadSupabaseData(forceFresh) {
     furnaceSubscribeGlobalRealtime();
     if (!isStale) { setDataStatus('live'); return; }
     setDataStatus('cached');
+    furnaceProgressStart(); furnaceProgress.background = true;
     furnaceFetchFreshData().then(function(ok) {
       if (ok) furnaceAfterBackgroundRefresh();
       else setDataStatus('cached'); /* refresh failed — keep showing the cached copy, honestly labelled */
+      furnaceProgressDone();
     });
     return;
   }
+  furnaceProgressStart(); /* no-op if loadData already started it; covers the forceFresh callers */
   await furnaceFetchFreshData();
+  if (forceFresh) furnaceProgressDone();
 }
 
 /* After a background refresh lands: rebuild what loadData derives from SUPA_BUDGETS /
@@ -15435,6 +15513,7 @@ async function loadData() {
   try {
     /* Always connected — load everything from Supabase */
     await sparkCheckStatus();
+    furnaceProgressStart();
 
     /* Start these now so they download alongside the budget/actuals load instead of after it.
        The no-op .catch keeps the browser from reporting an "unhandled rejection" if one fails
@@ -15454,6 +15533,7 @@ async function loadData() {
     var allocRows = _loadResults[1] || [];
     var schedRows = _loadResults[2] || [];
 
+    furnaceProgressStage(94); /* everything downloaded — assembling */
     enrichProjectsWithSupabase();
     buildProjectBudgetLookup();
 
@@ -15519,7 +15599,7 @@ async function loadData() {
         currentView = savedView;
         renderSidebar();
         renderProject(_fp.id);
-        /* Re-attach the already-loaded budget editor if renderProject replaced it */
+        if (!furnaceProgress.background) furnaceProgressDone();
         return;
       }
     }
@@ -15527,7 +15607,9 @@ async function loadData() {
     var _sensitiveInit = ['master','ytd','completed','importTime','settings'];
     if (_sensitiveInit.indexOf(_initView) >= 0 && !canViewSensitive()) _initView = 'flagged';
     navigate(_initView);
+    if (!furnaceProgress.background) furnaceProgressDone(); /* background refresh finishes the bar itself */
   } catch(e) {
+    furnaceProgressDone();
     console.error('loadData error:', e);
     document.getElementById('mainContent').innerHTML = '<div style="padding:60px 40px;text-align:center"><h2 style="color:var(--ember)">Unable to load data</h2><p style="color:var(--mid-gray);margin-top:12px">' + e.message + '</p></div>';
   }
