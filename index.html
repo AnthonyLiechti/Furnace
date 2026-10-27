@@ -748,7 +748,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.24 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Oct 19, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.25 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Oct 27, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
   </div>
@@ -9489,6 +9489,66 @@ async function sparkLoadBudget(budgetId) {
   sparkRenderBudgetContent();
 }
 
+/* Progress bar for the opportunity editor — same segments/colors as the active-project
+   bar in renderProjFinancials: spent + remaining for labor, FL and OOP, then profit,
+   all scaled to the client price (compressed proportionally if costs exceed it). */
+function oppProgressBarHTML(data, tcv, laborBudget, oopBudget) {
+  var budget = data.budget || {};
+  var noFl  = budget.no_freelancers === true;
+  var noOop = budget.no_oop === true;
+
+  var laborSpent = 0;
+  for (var i = 0; i < (data.actuals || []).length; i++) {
+    var a = data.actuals[i];
+    laborSpent += (a.hours || 0) * (a.billable_rate || 200);
+  }
+  var laborRem = Math.max(0, laborBudget - laborSpent);
+
+  var fl = { _flEntries: data.freelancerEntries || [] };
+  flRecomputeTotals(fl);
+  var flBudget = noFl ? 0 : fl.flTotal;
+  var flSpent  = noFl ? 0 : fl.flSpent;
+  var flRem    = Math.max(0, flBudget - flSpent);
+
+  var oopSpent = 0;
+  if (!noOop) {
+    for (var j = 0; j < (data.oop || []).length; j++) {
+      var oe = data.oop[j];
+      if (oe.is_active !== false && oe.paid) oopSpent += sparkOopItemEffective(oe);
+    }
+  }
+  if (noOop) oopBudget = 0;
+  var oopRem = Math.max(0, oopBudget - oopSpent);
+
+  var profit = Math.max(0, tcv - laborSpent - laborRem - flSpent - flRem - oopSpent - oopRem);
+
+  var segs = [
+    { v: laborSpent, color: '#1565C0', text: '#fff',          label: 'Labor Spent' },
+    { v: laborRem,   color: '#80CBC4', text: 'var(--abyss)',  label: 'Labor Remaining' },
+    { v: flSpent,    color: '#7B1FA2', text: '#fff',          label: 'FL Spent' },
+    { v: flRem,      color: '#CE93D8', text: 'var(--abyss)',  label: 'FL Remaining' },
+    { v: oopSpent,   color: 'var(--ember)', text: '#fff',     label: 'OOP Spent' },
+    { v: oopRem,     color: '#FFCC80', text: 'var(--abyss)',  label: 'OOP Remaining' },
+    { v: profit,     color: '#81C784', text: '#fff',          label: 'Profit' }
+  ];
+  var barTotal = tcv > 0 ? tcv : 1;
+  var sum = segs.reduce(function(s, x) { return s + x.v; }, 0);
+  var scale = (sum > barTotal && sum > 0) ? barTotal / sum : 1;
+
+  var bar = '', legend = '';
+  for (var k = 0; k < segs.length; k++) {
+    var s = segs[k];
+    var pctW = s.v / barTotal * 100 * scale;
+    if (pctW <= 0.5) continue;
+    bar += '<div class="lob-seg" style="width:' + pctW.toFixed(1) + '%;background:' + s.color + ';color:' + s.text + '">' + (pctW >= 8 ? '$' + Math.round(s.v).toLocaleString() : '') + '</div>';
+    legend += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:' + s.color + '"></div>' + s.label + '</div>';
+  }
+  if (!bar) return '';
+  return '<div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1)">'
+    + '<div class="lob-bar">' + bar + '</div>'
+    + '<div class="lob-legend">' + legend + '</div></div>';
+}
+
 function sparkRenderBudgetContent(embedded) {
   var el = embedded ? document.getElementById('sparkProjectBudget') : document.getElementById('sparkBudgetContent');
   if (!el) return;
@@ -9633,6 +9693,7 @@ function sparkRenderBudgetContent(embedded) {
         if (_oapProfit > 0.5) fh += '<div class="lob-legend-item"><div class="lob-legend-dot" style="background:#81C784"></div>Actual Profit</div>';
         fh += '</div></div>';
       }
+      fh += oppProgressBarHTML(data, tcv, totalLaborCost, totalOopWithMarkup);
       fh += '</div>';
       finEl.innerHTML = fh;
     }
