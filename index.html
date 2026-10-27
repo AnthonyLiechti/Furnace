@@ -26,6 +26,15 @@ body { font-family: Arial, 'TT Hoves Pro', sans-serif; background: var(--light-g
 /* Load progress: thin bar across the top of the window + a record count under the badge */
 #furnaceLoadBar { position:fixed; top:0; left:0; height:3px; width:0; z-index:100; pointer-events:none; background:linear-gradient(90deg, var(--ocean), var(--sand) 60%, var(--honey)); box-shadow:0 0 8px rgba(218,195,142,.7); opacity:0; transition:width .25s ease-out, opacity .5s ease; }
 #furnaceLoadBar.on { opacity:1; }
+/* Centered load card over the main area — cold loads only (background refreshes keep just the top bar) */
+#furnaceLoadCard { position:fixed; top:0; bottom:0; left:var(--sidebar-w); right:0; display:flex; align-items:center; justify-content:center; z-index:50; pointer-events:none; opacity:0; transition:opacity .4s ease; }
+#furnaceLoadCard.on { opacity:1; }
+#furnaceLoadCard .flc { width:min(440px, 80%); background:var(--abyss); color:var(--white); border-radius:14px; padding:28px 32px 26px; box-shadow:0 18px 50px rgba(24,64,71,.35); }
+#furnaceLoadCard .flc-label { font-size:10px; font-weight:700; letter-spacing:1.4px; text-transform:uppercase; color:var(--sand); margin-bottom:6px; }
+#furnaceLoadCard .flc-pct { font-size:44px; font-weight:700; line-height:1; font-variant-numeric:tabular-nums; margin-bottom:16px; }
+#furnaceLoadCard .flc-track { height:8px; border-radius:4px; background:rgba(255,255,255,.12); overflow:hidden; }
+#furnaceLoadCard .flc-fill { height:100%; width:0; border-radius:4px; background:linear-gradient(90deg, var(--ocean), var(--sand) 60%, var(--honey)); transition:width .25s ease-out; }
+#furnaceLoadCard .flc-meta { display:flex; justify-content:space-between; margin-top:12px; font-size:12px; color:rgba(255,255,255,.6); font-variant-numeric:tabular-nums; }
 #furnaceLoadText { font-size:9px; color:rgba(255,255,255,.45); margin-top:4px; min-height:11px; font-variant-numeric:tabular-nums; transition:opacity .4s; }
 @keyframes dsPulse { 0%,100%{opacity:.7} 50%{opacity:1} }
 .sidebar-header h2 { font-size:16px; letter-spacing:1px; text-transform:uppercase; color:var(--sand); }
@@ -748,12 +757,18 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
 </head>
 <body>
 <div id="furnaceLoadBar"></div>
+<div id="furnaceLoadCard"><div class="flc">
+  <div class="flc-label">Loading Furnace</div>
+  <div class="flc-pct" id="furnaceLoadPct">0%</div>
+  <div class="flc-track"><div class="flc-fill" id="furnaceLoadFill"></div></div>
+  <div class="flc-meta"><span id="furnaceLoadStage">Connecting&#8230;</span><span id="furnaceLoadRows"></span></div>
+</div></div>
 
 <div class="sidebar">
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.28 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Oct 27, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.29 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Oct 27, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
     <div id="furnaceLoadText"></div>
@@ -14689,13 +14704,26 @@ var furnaceProgress = { active: false, known: 0, learned: 0, expected: 0, done: 
 var FURNACE_EXPECTED_ROWS_KEY = 'furnace_load_rows'; /* row count of the last full load — the bar's expected size until the real totals arrive */
 
 function furnaceProgressRender() {
+  var p = furnaceProgress;
   var bar = document.getElementById('furnaceLoadBar');
   var txt = document.getElementById('furnaceLoadText');
-  if (bar) bar.style.width = furnaceProgress.shown.toFixed(1) + '%';
-  if (txt) {
-    if (!furnaceProgress.active) txt.textContent = '';
-    else if (furnaceProgress.known > 0) txt.textContent = 'Loading ' + Math.min(furnaceProgress.done, furnaceProgress.known).toLocaleString() + ' of ' + furnaceProgress.known.toLocaleString() + ' records';
-    else txt.textContent = 'Connecting…';
+  var rows = p.known > 0 ? Math.min(p.done, p.known).toLocaleString() + ' of ' + p.known.toLocaleString() + ' records' : '';
+  var stage = !p.active ? '' : p.done === 0 ? 'Connecting…' : p.target >= 94 ? 'Building the page' : 'Downloading data';
+  if (bar) bar.style.width = p.shown.toFixed(1) + '%';
+  if (txt) txt.textContent = !p.active ? '' : (rows ? 'Loading ' + rows : stage);
+  /* Centered card: cold loads only — a background refresh already has real content on screen */
+  var card = document.getElementById('furnaceLoadCard');
+  if (card) {
+    var show = p.active && !p.background;
+    if (show !== card.classList.contains('on')) card.classList.toggle('on', show);
+    if (show || p.shown >= 100) {
+      var pct = document.getElementById('furnaceLoadPct'), fill = document.getElementById('furnaceLoadFill');
+      var st = document.getElementById('furnaceLoadStage'), rw = document.getElementById('furnaceLoadRows');
+      if (pct) pct.textContent = Math.round(p.shown) + '%';
+      if (fill) fill.style.width = p.shown.toFixed(1) + '%';
+      if (st) st.textContent = p.shown >= 100 ? 'Ready' : stage;
+      if (rw) rw.textContent = rows;
+    }
   }
 }
 
@@ -14741,7 +14769,12 @@ function furnaceProgressDone() {
   if (p.done > 1000) { try { localStorage.setItem(FURNACE_EXPECTED_ROWS_KEY, String(p.done)); } catch(e) {} } /* next load's prior */
   furnaceProgressRender();
   var bar = document.getElementById('furnaceLoadBar');
-  setTimeout(function() { if (!furnaceProgress.active && bar) { bar.classList.remove('on'); setTimeout(function() { if (!furnaceProgress.active) bar.style.width = '0'; }, 500); } }, 350);
+  var card = document.getElementById('furnaceLoadCard');
+  setTimeout(function() {
+    if (furnaceProgress.active) return;
+    if (bar) { bar.classList.remove('on'); setTimeout(function() { if (!furnaceProgress.active) bar.style.width = '0'; }, 500); }
+    if (card) card.classList.remove('on');
+  }, 350);
 }
 
 function setDataStatus(state) {
