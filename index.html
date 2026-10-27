@@ -768,7 +768,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.32 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Oct 27, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.33 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Oct 27, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
     <div id="furnaceLoadText"></div>
@@ -3897,7 +3897,39 @@ async function importHandleFile(file) {
     });
   }
 
-  prog.textContent = 'Parsed ' + entries.length + ' valid entries (skipped ' + skipped + ' empty). Checking for duplicates in Supabase...';
+  prog.textContent = 'Parsed ' + entries.length + ' valid entries (skipped ' + skipped + ' empty). Matching names to the team list...';
+
+  /* Link every entry to its team record, and flag names the team list doesn't know.
+     An unknown name (a new hire not yet added, or Monday sending a first name only)
+     would otherwise import silently and never attach to a budget row. */
+  var _teamRows = await sparkFetchAll('team_members', 'select=id,name');
+  var _teamIdByName = {};
+  for (var _tn = 0; _tn < (_teamRows || []).length; _tn++) _teamIdByName[(_teamRows[_tn].name || '').trim()] = _teamRows[_tn].id;
+  var _unknownNames = {};
+  for (var _ui = 0; _ui < entries.length; _ui++) {
+    var _un = entries[_ui].person_name;
+    entries[_ui].team_member_id = _teamIdByName[_un] || null;
+    if (!entries[_ui].team_member_id) {
+      if (!_unknownNames[_un]) _unknownNames[_un] = { entries: 0, hours: 0 };
+      _unknownNames[_un].entries++; _unknownNames[_un].hours += entries[_ui].hours;
+    }
+  }
+  var nameWarnHtml = '';
+  var _unknownList = Object.keys(_unknownNames).sort();
+  if (_unknownList.length) {
+    nameWarnHtml += '<div style="background:#FFF8E1;border:1px solid #F57F17;border-radius:8px;padding:12px 14px;margin-bottom:12px">';
+    nameWarnHtml += '<div style="font-weight:600;color:#E65100;margin-bottom:6px">&#9888; ' + _unknownList.length + ' name' + (_unknownList.length === 1 ? '' : 's') + ' in this file ' + (_unknownList.length === 1 ? 'is' : 'are') + ' not in the team list</div>';
+    nameWarnHtml += '<div style="font-size:12px;color:#5D4037;margin-bottom:6px">These hours will import but will not attach to anyone\u2019s budget row. Add the person under Team, or add an alias in FURNACE_NAME_ALIASES if Monday is using a short name.</div>';
+    nameWarnHtml += '<div style="font-size:12px;color:#5D4037">';
+    for (var _wi = 0; _wi < _unknownList.length; _wi++) {
+      var _wn = _unknownNames[_unknownList[_wi]];
+      nameWarnHtml += '<div>&#8226; <strong>' + _unknownList[_wi] + '</strong> \u2014 ' + _wn.entries + ' entr' + (_wn.entries === 1 ? 'y' : 'ies') + ', ' + _wn.hours.toFixed(1) + 'h</div>';
+    }
+    nameWarnHtml += '</div></div>';
+    console.warn('[Furnace import] names not in team list:', _unknownNames);
+  }
+
+  prog.textContent = 'Checking for duplicates in Supabase...';
 
   /* Find date range in the file to query only relevant existing entries */
   var fileDates = entries.map(function(e) { return e.work_date; }).filter(Boolean).sort();
@@ -3951,7 +3983,7 @@ async function importHandleFile(file) {
   prog.textContent = 'Found ' + newEntries.length + ' new entries (' + dupes + ' duplicates skipped). Importing...';
 
   if (newEntries.length === 0) {
-    statusEl.innerHTML = '<div style="background:#E8F5E9;border-radius:8px;padding:16px;margin-bottom:12px"><div style="font-weight:600;color:#2E7D32;margin-bottom:4px">&#10003; All caught up!</div><div style="font-size:12px;color:#2E7D32;margin-bottom:8px">All ' + entries.length + ' entries already exist in Supabase. No new data to import.</div><button onclick="importExecute(true)" style="padding:6px 16px;border-radius:6px;border:none;background:#F57F17;color:white;cursor:pointer;font-size:12px;font-weight:600">&#x1F504; Replace All Data</button><div style="font-size:10px;color:var(--mid-gray);margin-top:4px">Use Replace All to refresh start/end times or fix data issues.</div></div>';
+    statusEl.innerHTML = nameWarnHtml + '<div style="background:#E8F5E9;border-radius:8px;padding:16px;margin-bottom:12px"><div style="font-weight:600;color:#2E7D32;margin-bottom:4px">&#10003; All caught up!</div><div style="font-size:12px;color:#2E7D32;margin-bottom:8px">All ' + entries.length + ' entries already exist in Supabase. No new data to import.</div><button onclick="importExecute(true)" style="padding:6px 16px;border-radius:6px;border:none;background:#F57F17;color:white;cursor:pointer;font-size:12px;font-weight:600">&#x1F504; Replace All Data</button><div style="font-size:10px;color:var(--mid-gray);margin-top:4px">Use Replace All to refresh start/end times or fix data issues.</div></div>';
     importTimeState.allParsed = entries;
     importTimeState.status = 'preview';
     return;
@@ -3969,7 +4001,8 @@ async function importHandleFile(file) {
     totalHrs += e.hours;
   }
 
-  var preview = '<div style="background:var(--white);border-radius:8px;padding:16px;margin-bottom:12px;border:1px solid var(--canvas)">';
+  var preview = nameWarnHtml;
+  preview += '<div style="background:var(--white);border-radius:8px;padding:16px;margin-bottom:12px;border:1px solid var(--canvas)">';
   preview += '<div style="font-weight:600;color:var(--abyss);margin-bottom:8px">Preview: ' + newEntries.length + ' new entries to import</div>';
   preview += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">';
   preview += '<div><div style="font-size:10px;text-transform:uppercase;color:var(--mid-gray)">Date Range</div><div style="font-weight:600">' + dateMin + ' to ' + dateMax + '</div></div>';
