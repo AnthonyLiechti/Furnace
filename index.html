@@ -768,7 +768,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.29 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Oct 27, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.30 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Oct 27, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
     <div id="furnaceLoadText"></div>
@@ -4741,21 +4741,7 @@ async function oppSubmitCreate() {
     if (!newBudget || !newBudget[0]) throw new Error('Failed to create budget record');
     var budgetId = newBudget[0].id;
 
-    /* Pre-fill all active team members with 0 hours (skip Former Employees) */
-    var allTeam = await sparkFetch('team_members', 'select=id,name,department,employment_type&is_active=eq.true&order=name.asc');
-    if (allTeam && allTeam.length) {
-      var lb = [];
-      for (var ti = 0; ti < allTeam.length; ti++) {
-        var tm = allTeam[ti];
-        if (tm.department === 'Former Employees') continue;
-        var dept = tm.department;
-        if (dept && dept !== 'Executive/Admin' && dept !== 'Account' && dept !== 'Creative' && dept !== 'Post') dept = null;
-        lb.push({ budget_id: budgetId, team_member_id: tm.id, department: dept,
-          employment_type: tm.employment_type || 'Employee',
-          phase1: 0, phase2: 0, phase3_1: 0, phase3_2: 0, phase4: 0, phase5: 0, display_order: ti });
-      }
-      await sparkFetch('labor_budget_entries', '', 'POST', lb);
-    }
+    await sparkPrefillLaborRows(budgetId);
 
     /* Default OOP entries */
     var oopCats = await sparkFetch('oop_categories', 'select=id,name,section_id&order=display_order.asc');
@@ -6410,24 +6396,7 @@ async function sparkCreateBudgetForProject(projectCode) {
     if (!newBudget || !newBudget[0]) throw new Error('Failed to create budget');
     var budgetId = newBudget[0].id;
 
-    /* 2b. Pre-fill all active team members with 0 hours (skip Former Employees) */
-    var allTeam = await sparkFetch('team_members', 'select=id,name,department,employment_type&is_active=eq.true&order=name.asc');
-    if (allTeam && allTeam.length) {
-      var laborBatch = [];
-      for (var ti = 0; ti < allTeam.length; ti++) {
-        var tm = allTeam[ti];
-        if (tm.department === 'Former Employees') continue;
-        var dept = tm.department;
-        if (dept && dept !== 'Executive/Admin' && dept !== 'Account' && dept !== 'Creative' && dept !== 'Post') dept = null;
-        laborBatch.push({
-          budget_id: budgetId, team_member_id: tm.id, department: dept,
-          employment_type: tm.employment_type || 'Employee',
-          phase1: 0, phase2: 0, phase3_1: 0, phase3_2: 0, phase4: 0, phase5: 0,
-          display_order: ti
-        });
-      }
-      await sparkFetch('labor_budget_entries', '', 'POST', laborBatch);
-    }
+    await sparkPrefillLaborRows(budgetId);
 
     /* 3. Create default OOP entries from categories template */
     var oopSections = await sparkFetch('oop_sections', 'select=id,slug');
@@ -6968,19 +6937,7 @@ async function sparkCreateSmallSnapshot(projectCode) {
     if (!newBudget || !newBudget[0]) throw new Error('Failed to create budget');
     var budgetId = newBudget[0].id;
 
-    /* Pre-fill active team members (skip Former Employees) */
-    var allTeam = await sparkFetch('team_members', 'select=id,name,department,employment_type&is_active=eq.true&order=name.asc');
-    if (allTeam && allTeam.length) {
-      var lb = [];
-      for (var ti = 0; ti < allTeam.length; ti++) {
-        var tm = allTeam[ti];
-        if (tm.department === 'Former Employees') continue;
-        lb.push({ budget_id: budgetId, team_member_id: tm.id, department: tm.department,
-          employment_type: tm.employment_type || 'Employee',
-          phase1: 0, phase2: 0, phase3_1: 0, phase3_2: 0, phase4: 0, phase5: 0, display_order: ti });
-      }
-      await sparkFetch('labor_budget_entries', '', 'POST', lb);
-    }
+    await sparkPrefillLaborRows(budgetId);
 
     /* Reload list */
     await sparkRenderSmallProjectList(projectCode);
@@ -7275,22 +7232,7 @@ async function createNewProject() {
     /* 2b. Pre-fill all active team members with 0 hours across all phases */
     if (newBudget && newBudget[0]) {
       var budgetId = newBudget[0].id;
-      var allTeam = await sparkFetch('team_members', 'select=id,department,employment_type&is_active=eq.true&order=name.asc');
-      if (allTeam && allTeam.length) {
-        var laborBatch = [];
-        for (var ti = 0; ti < allTeam.length; ti++) {
-          var tm = allTeam[ti];
-          var dept = tm.department;
-          if (dept && dept !== 'Executive/Admin' && dept !== 'Account' && dept !== 'Creative' && dept !== 'Post') dept = null;
-          laborBatch.push({
-            budget_id: budgetId, team_member_id: tm.id, department: dept,
-            employment_type: tm.employment_type || 'Employee',
-            phase1: 0, phase2: 0, phase3_1: 0, phase3_2: 0, phase4: 0, phase5: 0,
-            display_order: ti
-          });
-        }
-        await sparkFetch('labor_budget_entries', '', 'POST', laborBatch);
-      }
+      await sparkPrefillLaborRows(budgetId);
     }
 
     /* 3. Update CLIENTS local state */
@@ -7575,6 +7517,35 @@ var SPARK_DEPT_COLORS = {
   'Post':             'var(--honey)',
   'Former Employees': 'var(--mid-gray)'
 };
+
+/* Which team members get a 0-hour row when a budget is created: active people in the four
+   departments (any type except Freelancer). Anyone without a department used to be added too
+   and collected in an "Other" section nobody wanted. */
+var SPARK_LABOR_DEPTS = ['Executive/Admin', 'Account', 'Creative', 'Post'];
+function sparkNormalizeDept(d) {
+  if (!d) return null;
+  var k = String(d).trim().toLowerCase();
+  if (k === 'executive' || k === 'executive/admin' || k === 'exec' || k === 'admin') return 'Executive/Admin';
+  if (k === 'account' || k === 'accounts') return 'Account';
+  if (k === 'creative') return 'Creative';
+  if (k === 'post') return 'Post';
+  if (k === 'former employees' || k === 'former') return 'Former Employees';
+  return d;
+}
+async function sparkPrefillLaborRows(budgetId) {
+  var allTeam = await sparkFetch('team_members', 'select=id,name,department,employment_type&is_active=eq.true&order=name.asc');
+  var rows = [];
+  for (var ti = 0; ti < (allTeam || []).length; ti++) {
+    var tm = allTeam[ti];
+    var dept = sparkNormalizeDept(tm.department);
+    if (SPARK_LABOR_DEPTS.indexOf(dept) < 0) continue;            /* no department / Former Employees → not pre-filled */
+    if (tm.employment_type === 'Freelancer') continue;            /* freelancers have their own section */
+    rows.push({ budget_id: budgetId, team_member_id: tm.id, department: dept, employment_type: tm.employment_type || 'Employee',
+                phase1: 0, phase2: 0, phase3_1: 0, phase3_2: 0, phase4: 0, phase5: 0, display_order: rows.length });
+  }
+  if (rows.length) await sparkFetch('labor_budget_entries', '', 'POST', rows);
+  return rows.length;
+}
 
 var SPARK_DEPT_ORDER = ['Executive/Admin', 'Account', 'Creative', 'Post', 'Former Employees'];
 
@@ -8349,7 +8320,7 @@ function sparkRenderLaborContent() {
     for (var i = 0; i < SPARK_DEPT_ORDER.length; i++) groups[SPARK_DEPT_ORDER[i]] = [];
     var other = [];
     for (var i = 0; i < entries.length; i++) {
-      var dept = entries[i].department || (entries[i].team_member && entries[i].team_member.department) || 'Other';
+      var dept = sparkNormalizeDept(entries[i].department || (entries[i].team_member && entries[i].team_member.department)) || 'Other';
       if (groups[dept]) groups[dept].push(entries[i]);
       else other.push(entries[i]);
     }
