@@ -748,7 +748,7 @@ html.dark .spark-oop-grand-total { background:var(--dm-surface2); }
   <div class="sidebar-header">
     <h2>FURNACE</h2>
     <p>Forge Portfolio Tracker</p>
-    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.26 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Oct 27, 2026</p>
+    <p style="font-size:9px;color:rgba(255,255,255,.45);margin-top:3px">v1.0.27 · <span style="color:rgba(255,255,255,.6);font-weight:600">Live Edits</span> · Oct 27, 2026</p>
     <p id="lastUpdated" style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px"></p>
     <div id="dataStatusBadge"></div>
   </div>
@@ -14693,11 +14693,67 @@ function setDataStatus(state) {
   }
 }
 
-var FURNACE_CACHE_KEY = 'furnace_supa_v5';
-var FURNACE_CACHE_TTL = 45 * 60 * 1000; /* 45 min — real-time handles live updates */
+var FURNACE_CACHE_KEY = 'furnace_supa_v6';          /* v6: time entries stored in the compact form below */
+var FURNACE_CACHE_TTL = 45 * 60 * 1000;             /* 45 min — within this, no refetch at all */
+var FURNACE_CACHE_MAX_AGE = 24 * 60 * 60 * 1000;    /* older than this is never drawn from — a cold load is better than day-old numbers */
+
+/* The 28k time-entry rows are ~8.7 MB as plain JSON, which Chrome's ~10 MB localStorage cap
+   rejected silently — so the cache never updated and a 100-day-old copy lingered. Stored as
+   columns with lookup tables (dates, people, codes, boards, budget ids each listed once) the
+   same rows are ~1.9 MB. Round-trips exactly; booleans are packed into one small integer. */
+var FURNACE_ACT_FIELDS = ['id', 'hours', 'work_date', 'person_name', 'project_code', 'phase_key', 'board_name', 'budget_id', 'billable_rate'];
+function furnacePackActuals(rows) {
+  var tables = { work_date: [], person_name: [], project_code: [], phase_key: [], board_name: [], budget_id: [] };
+  var index = {};
+  for (var t in tables) index[t] = {};
+  function idx(t, v) {
+    if (v == null) return -1;
+    var i = index[t][v];
+    if (i === undefined) { i = tables[t].length; index[t][v] = i; tables[t].push(v); }
+    return i;
+  }
+  var packed = [];
+  for (var r = 0; r < rows.length; r++) {
+    var a = rows[r];
+    packed.push([
+      a.id, a.hours,
+      idx('work_date', a.work_date), idx('person_name', a.person_name), idx('project_code', a.project_code),
+      idx('phase_key', a.phase_key), idx('board_name', a.board_name), idx('budget_id', a.budget_id),
+      a.billable_rate == null ? -1 : a.billable_rate,
+      (a.is_billable === false ? 0 : 1) | (a.is_bizdev ? 2 : 0) | (a.is_timeoff ? 4 : 0)
+    ]);
+  }
+  return { t: tables, r: packed };
+}
+function furnaceUnpackActuals(p) {
+  var t = p.t, out = [];
+  for (var i = 0; i < p.r.length; i++) {
+    var x = p.r[i];
+    out.push({
+      id: x[0], hours: x[1],
+      work_date: t.work_date[x[2]], person_name: x[3] < 0 ? null : t.person_name[x[3]],
+      project_code: x[4] < 0 ? null : t.project_code[x[4]], phase_key: x[5] < 0 ? null : t.phase_key[x[5]],
+      board_name: x[6] < 0 ? null : t.board_name[x[6]], budget_id: x[7] < 0 ? null : t.budget_id[x[7]],
+      billable_rate: x[8] < 0 ? null : x[8],
+      is_billable: !!(x[9] & 1), is_bizdev: !!(x[9] & 2), is_timeoff: !!(x[9] & 4)
+    });
+  }
+  return out;
+}
 
 function furnaceSaveCache(payload) {
-  try { localStorage.setItem(FURNACE_CACHE_KEY, JSON.stringify({ ts: Date.now(), d: payload })); } catch(e) {}
+  var d = {
+    teamMembers: payload.teamMembers, supaBudgets: payload.supaBudgets, supaActuals: payload.supaActuals,
+    actPacked: furnacePackActuals(payload.supaActualsAll || [])
+  };
+  try {
+    localStorage.setItem(FURNACE_CACHE_KEY, JSON.stringify({ ts: Date.now(), v: 6, d: d }));
+    try { localStorage.removeItem('furnace_supa_v5'); } catch(e2) {} /* old-format copy, no longer read */
+  } catch(e) {
+    /* Usually QuotaExceededError. Don't leave a stale copy behind to mislead the next load. */
+    console.warn('[Furnace] could not save cache (' + e.name + ') — removing any old copy');
+    try { localStorage.removeItem(FURNACE_CACHE_KEY); } catch(e3) {}
+  }
 }
 
 function furnaceLoadCache() {
@@ -14705,8 +14761,11 @@ function furnaceLoadCache() {
     var raw = localStorage.getItem(FURNACE_CACHE_KEY);
     if (!raw) return null;
     var p = JSON.parse(raw);
-    if (!p || !p.d) return null;
-    return p; /* return even if stale — caller decides what to do with it */
+    if (!p || p.v !== 6 || !p.d || !p.d.actPacked || !p.d.supaBudgets) return null;
+    if (Date.now() - p.ts > FURNACE_CACHE_MAX_AGE) return null; /* too old to show, even briefly */
+    p.d.supaActualsAll = furnaceUnpackActuals(p.d.actPacked);
+    delete p.d.actPacked;
+    return p; /* may still be "stale" (> TTL) — caller decides whether to refresh */
   } catch(e) { return null; }
 }
 
@@ -14911,15 +14970,24 @@ function furnaceAfterBackgroundRefresh() {
 async function furnaceFetchFreshData() {
   try {
     setDataStatus('syncing');
-    /* 0+1+1b. Fetch team members, budgets, and project ID map in parallel */
-    var _phase1 = await Promise.all([
+    /* ONE WAVE: every table at once. The entry tables used to wait for the budget list so they
+       could filter by budget id; without that filter they return ~70 extra rows for budgets we
+       don't show, which the grouping below simply ignores. Three sequential rounds (~5s) → one (~2s). */
+    var _all = await Promise.all([
       sparkFetchAll('team_members', 'select=id,name,department,employment_type,fully_burdened_rate,billable_rate,is_active&is_active=eq.true&order=department.asc,name.asc'),
       sparkFetchAll('budgets', 'select=id,name,status,client_price,agency_fee,total_amount,has_discount,discount_percentage,reserve_percentage,oop_markup_percentage,oop_section_markups,no_oop,no_freelancers,is_small_project,project_id,projects(id,project_code,name)&visibility=eq.visible&status=neq.opportunity&status=neq.lost'),
-      sparkFetchAll('projects', 'select=id,project_code')
+      sparkFetchAll('projects', 'select=id,project_code'),
+      /* Skip rows with 0 hours in every phase — ~94% of the table is placeholder rows created
+         with each new project. They add nothing to any total here; the budget editor fetches
+         its own full row set so the editable 0s still show there. */
+      sparkFetchAll('labor_budget_entries', 'select=id,budget_id,department,employment_type,phase1,phase2,phase3_1,phase3_2,phase4,phase5,rate_override,team_member_id,team_member:team_members(id,name,fully_burdened_rate)&or=(phase1.gt.0,phase2.gt.0,phase3_1.gt.0,phase3_2.gt.0,phase4.gt.0,phase5.gt.0)'),
+      sparkFetchAll('oop_budget_entries', 'select=id,budget_id,line_item_name,count,rate,days,head_count,adjusted_count,adjusted_rate,adjusted_days,adjusted_head_count,actual_count,actual_rate,actual_days,actual_head_count,actual_amount,paid,paid_date,is_active'),
+      sparkFetchAll('freelancer_budget_entries', 'select=id,budget_id,team_member_id,week_label,hours,rate,paid,paid_date,notes'),
+      sparkFetchAll('labor_actuals', 'select=id,budget_id,hours,work_date,person_name,project_code,phase_key,is_billable,is_bizdev,is_timeoff,board_name,billable_rate&source=eq.timetracker&work_date=gte.2024-01-01&project_code=not.like.100_%25&order=work_date.desc')
     ]);
-    FURNACE_TEAM_MEMBERS = _phase1[0] || [];
-    var budgets = _phase1[1];
-    var projRows = _phase1[2] || [];
+    FURNACE_TEAM_MEMBERS = _all[0] || [];
+    var budgets = _all[1];
+    var projRows = _all[2] || [];
 
     if (!budgets || !budgets.length) {
       /* Fallback: try without the projects join in case join is failing */
@@ -14934,23 +15002,10 @@ async function furnaceFetchFreshData() {
     }
     var projCodeMap = PROJ_CODE_MAP;
 
-    /* 2. Fetch all entry tables + actuals + allocations in parallel */
-    var budgetIds = budgets.map(function(b) { return b.id; });
-    var _bids = budgetIds.join(',');
-    var _phase2 = await Promise.all([
-      /* Skip rows with 0 hours in every phase — ~94% of the table is placeholder rows created
-         with each new project. They add nothing to any total here; the budget editor fetches
-         its own full row set so the editable 0s still show there. */
-      sparkFetchAll('labor_budget_entries', 'select=id,budget_id,department,employment_type,phase1,phase2,phase3_1,phase3_2,phase4,phase5,rate_override,team_member_id,team_member:team_members(id,name,fully_burdened_rate)&budget_id=in.(' + _bids + ')&or=(phase1.gt.0,phase2.gt.0,phase3_1.gt.0,phase3_2.gt.0,phase4.gt.0,phase5.gt.0)'),
-      sparkFetchAll('oop_budget_entries', 'select=id,budget_id,line_item_name,count,rate,days,head_count,adjusted_count,adjusted_rate,adjusted_days,adjusted_head_count,actual_count,actual_rate,actual_days,actual_head_count,actual_amount,paid,paid_date,is_active&budget_id=in.(' + _bids + ')'),
-      sparkFetchAll('freelancer_budget_entries', 'select=id,budget_id,team_member_id,week_label,hours,rate,paid,paid_date,notes&budget_id=in.(' + _bids + ')'),
-      sparkFetchAll('labor_actuals', 'select=id,budget_id,hours,work_date,person_name,project_code,phase_key,is_billable,is_bizdev,is_timeoff,board_name,billable_rate&source=eq.timetracker&work_date=gte.2024-01-01&project_code=not.like.100_%25&order=work_date.desc')
-      /* allocations are loaded (with all their fields) by loadData — fetching them here too
-         meant two copies raced, and the poorer one could win */
-    ]);
-    var laborEntries = _phase2[0];
-    var oopEntries   = _phase2[1];
-    var flEntries    = _phase2[2] || [];
+    /* 2. Entry tables (already fetched above) — allocations are loaded by loadData with their full fields */
+    var laborEntries = _all[3];
+    var oopEntries   = _all[4];
+    var flEntries    = _all[5] || [];
 
     /* 3. Group entries by budget_id */
     var laborByBudget = {}, oopByBudget = {}, flByBudget = {};
@@ -15110,8 +15165,8 @@ async function furnaceFetchFreshData() {
       }
     }
 
-    /* 5. labor_actuals already fetched in phase 2 parallel batch */
-    SUPA_ACTUALS_ALL = _phase2[3] || [];
+    /* 5. labor_actuals (fetched in the same wave) */
+    SUPA_ACTUALS_ALL = _all[6] || [];
 
     /* 5a. Compute per-snapshot timesheetHours for small project aggregates (billable only) */
     var _snapHrsMap = {};
@@ -15291,11 +15346,16 @@ function enrichProjectsWithSupabase() {
 }
 
 /* ── BUILD CLIENTS FROM SUPABASE ── */
-async function buildClientsFromSupabase() {
-  var _results = await Promise.all([
+/* The fetch can be started early (see loadData) so it overlaps the budget load;
+   the assembly below needs SUPA_BUDGETS, so it waits until that is ready. */
+function fetchClientsAndProjects() {
+  return Promise.all([
     sparkFetch('clients', 'select=id,name,client_number,color,client_status&order=client_number.asc'),
     sparkFetchAll('projects', 'select=*&order=project_code.asc')
   ]);
+}
+async function buildClientsFromSupabase(prefetched) {
+  var _results = await (prefetched || fetchClientsAndProjects());
   var clients  = _results[0] || [];
   var projects = _results[1] || [];
 
@@ -15375,13 +15435,21 @@ async function loadData() {
   try {
     /* Always connected — load everything from Supabase */
     await sparkCheckStatus();
+
+    /* Start these now so they download alongside the budget/actuals load instead of after it.
+       The no-op .catch keeps the browser from reporting an "unhandled rejection" if one fails
+       before we await it below — the real error still surfaces at the await. */
+    var _clientsFetch = fetchClientsAndProjects();                                   _clientsFetch.catch(function() {});
+    var _allocFetch   = sparkFetchAll('allocations', 'select=*&order=date.asc');     _allocFetch.catch(function() {});
+    var _schedFetch   = sparkFetch('payment_schedule', 'select=*&order=scheduled_date.asc'); _schedFetch.catch(function() {});
+
     await loadSupabaseData();
 
-    /* Build client/project list + allocations + payment schedule in parallel */
+    /* Assemble client/project list (needs SUPA_BUDGETS) + allocations + payment schedule */
     var _loadResults = await Promise.all([
-      buildClientsFromSupabase(),
-      sparkFetchAll('allocations', 'select=*&order=date.asc'),
-      sparkFetch('payment_schedule', 'select=*&order=scheduled_date.asc')
+      buildClientsFromSupabase(_clientsFetch),
+      _allocFetch,
+      _schedFetch
     ]);
     var allocRows = _loadResults[1] || [];
     var schedRows = _loadResults[2] || [];
